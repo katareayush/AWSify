@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "baseUrl": ".",
+    "paths": {
+      "@awsify/ai": ["packages/ai/src/index.ts"],
+      "@awsify/config": ["packages/config/src/index.ts"],
+      "@awsify/database": ["packages/database/src/index.ts"],
+      "@awsify/deployment-schemas": ["packages/deployment-schemas/src/index.ts"],
+      "@awsify/pulumi-templates": ["packages/pulumi-templates/src/index.ts"],
+      "@awsify/repo-scanner": ["packages/repo-scanner/src/index.ts"],
+      "@awsify/templates": ["packages/templates/src/index.ts"]
+    }
+  }
+}

@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AwsConnectionStatus {
+  pending
+  valid
+  invalid
+}
+
+enum DeploymentStatus {
+  draft
+  scanning
+  awaiting_approval
+  approved
+  queued
+  deploying
+  deployed
+  failed
+}
+
+enum ArtifactKind {
+  dockerfile
+  github_action
+  pulumi_preview
+  cloudformation_role
+}
+
+model User {
+  id              String               @id @default(cuid())
+  email           String?              @unique
+  name            String?
+  avatarUrl       String?
+  githubUserId    String               @unique
+  githubLogin     String
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  installations   GitHubInstallation[]
+  projects        Project[]
+  awsConnections  AwsConnection[]
+  deployments     Deployment[]
+}
+
+model GitHubInstallation {
+  id               String       @id @default(cuid())
+  installationId   String       @unique
+  accountLogin     String
+  accountType      String
+  accessTokenHint  String?
+  userId           String
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repositories     Repository[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model Repository {
+  id                String             @id @default(cuid())
+  githubId          String             @unique
+  fullName          String
+  defaultBranch     String
+  private           Boolean
+  installationId    String
+  installation      GitHubInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  projects          Project[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model AwsConnection {
+  id                    String              @id @default(cuid())
+  accountId             String
+  roleArn               String
+  externalId            String
+  defaultRegion         String              @default("us-east-1")
+  status                AwsConnectionStatus @default(pending)
+  lastValidationResult  String?
+  userId                String
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects              Project[]
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+}
+
+model Project {
+  id                String          @id @default(cuid())
+  name              String
+  slug              String
+  branch            String
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repositoryId      String
+  repository        Repository      @relation(fields: [repositoryId], references: [id])
+  awsConnectionId   String?
+  awsConnection     AwsConnection?  @relation(fields: [awsConnectionId], references: [id])
+  plans             DeploymentPlan[]
+  deployments       Deployment[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([userId, slug])
+}
+
+model DeploymentPlan {
+  id             String               @id @default(cuid())
+  projectId      String
+  project        Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  appName        String
+  region         String
+  suggestion     Json
+  resources      Json
+  estimatedCost  Json
+  status         DeploymentStatus     @default(awaiting_approval)
+  artifacts      DeploymentArtifact[]
+  deployments    Deployment[]
+  approvedAt     DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+}
+
+model DeploymentArtifact {
+  id         String         @id @default(cuid())
+  kind       ArtifactKind
+  path       String
+  content    String
+  summary    String
+  planId     String
+  plan       DeploymentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  createdAt  DateTime       @default(now())
+}
+
+model Deployment {
+  id              String           @id @default(cuid())
+  projectId       String
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  planId          String
+  plan            DeploymentPlan   @relation(fields: [planId], references: [id])
+  actorUserId     String
+  actor           User             @relation(fields: [actorUserId], references: [id])
+  status          DeploymentStatus @default(queued)
+  liveUrl         String?
+  failureReason   String?
+  logs            Json             @default("[]")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
