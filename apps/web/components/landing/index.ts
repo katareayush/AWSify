@@ -1,0 +1,13 @@
+export { Backdrop } from "./backdrop";
+export { Nav } from "./nav";
+export { Hero } from "./hero";
+export { LogoStrip } from "./logo-strip";
+export { Problem } from "./problem";
+export { Solution } from "./solution";
+export { HowItWorks } from "./how-it-works";
+export { InfrastructureExamples } from "./infrastructure-examples";
+export { CostEstimation } from "./cost-estimation";
+export { Security } from "./security";
+export { FAQ } from "./faq";
+export { FinalCTA } from "./final-cta";
+export { Footer } from "./footer";
