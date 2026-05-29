@@ -6,13 +6,16 @@ import { Button } from "../../components/ui/button";
 import { Panel } from "../../components/ui/panel";
 
 export default function ConnectionsPage() {
+  const githubInstallations: Array<{ id: string; account: string; repositoryCount: number }> = [];
+  const awsConnections: Array<{ id: string; accountId: string; region: string; status: string }> = [];
+
   return (
     <ProductShell active="Connections">
       <div className="space-y-5">
         <PageHeading
           eyebrow="Connections"
           title="GitHub and AWS access"
-          description="AWSify keeps source access and cloud execution separate. GitHub App permissions scan repositories; AWS role assumptions execute approved templates."
+          description="AWS-ify keeps source access and cloud execution separate. GitHub App permissions scan repositories; AWS role assumptions execute approved templates."
         />
 
         <div className="grid gap-5 xl:grid-cols-[1fr_380px]">
@@ -25,15 +28,16 @@ export default function ConnectionsPage() {
                     <p className="text-sm font-semibold">GitHub App</p>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Install AWSify on the organization or personal account that owns the repository you want to deploy.
+                    Install AWS-ify on the organization or personal account that owns the repository you want to deploy.
                   </p>
                 </div>
-                <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">Connected</span>
+                <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">Not connected</span>
               </div>
-              <div className="mt-5 rounded-md border border-border bg-background p-3 text-sm">
-                <p className="font-medium">demo organization</p>
-                <p className="mt-1 text-xs text-muted-foreground">2 repositories installed · read-only contents access</p>
-              </div>
+              {githubInstallations.length === 0 ? (
+                <div className="mt-5 rounded-md border border-dashed border-border bg-background p-4 text-sm text-muted-foreground">
+                  No GitHub App installations have been synced yet.
+                </div>
+              ) : null}
             </Panel>
 
             <Panel className="p-5">
@@ -47,20 +51,22 @@ export default function ConnectionsPage() {
                     Deploy the generated CloudFormation template in the target AWS account, then paste the RoleArn output here.
                   </p>
                 </div>
-                <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">Validation ready</span>
+                <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
+                  {awsConnections.length === 0 ? "Not connected" : "Configured"}
+                </span>
               </div>
 
               <div className="mt-5 grid gap-3">
                 <label className="block">
                   <span className="text-xs font-medium text-muted-foreground">External ID</span>
                   <div className="mt-1 flex h-10 items-center justify-between rounded-md border border-border bg-background px-3 text-sm">
-                    <span>awsify-proj-demo-7f42</span>
+                    <span>Created by the backend when a project is saved</span>
                     <Clipboard className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </label>
                 <label className="block">
                   <span className="text-xs font-medium text-muted-foreground">Role ARN</span>
-                  <input className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary" placeholder="arn:aws:iam::123456789012:role/AWSifyDeploymentRole" />
+                  <input className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary" placeholder="Paste RoleArn from CloudFormation output" />
                 </label>
               </div>
 
@@ -75,16 +81,16 @@ export default function ConnectionsPage() {
           </div>
 
           <div className="space-y-3">
-            <SetupStep icon={Github} title="Source permissions" description="Repo contents and metadata only." state="done" />
-            <SetupStep icon={ShieldCheck} title="External ID trust" description="Prevents confused-deputy role assumption." state="done" />
-            <SetupStep icon={KeyRound} title="AWS execution role" description="Used only after plan approval." state="active" />
+            <SetupStep icon={Github} title="Source permissions" description="Repo contents and metadata only." state="pending" />
+            <SetupStep icon={ShieldCheck} title="External ID trust" description="Prevents confused-deputy role assumption." state="pending" />
+            <SetupStep icon={KeyRound} title="AWS execution role" description="Used only after plan approval." state="pending" />
           </div>
         </div>
 
         <Panel className="p-4">
           <div className="flex gap-3 text-sm text-muted-foreground">
             <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-            <p>AWSify should eventually generate a narrower policy per deployment target. The current MVP role covers only ECS/Fargate deployment primitives.</p>
+            <p>AWS-ify should eventually generate a narrower policy per deployment target. The current MVP role covers only ECS/Fargate deployment primitives.</p>
           </div>
         </Panel>
       </div>

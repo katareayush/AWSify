@@ -27,7 +27,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-See [docs/env.md](docs/env.md) for every required local and production environment variable.
+Use [.env.example](.env.example) as the environment checklist.
 
 No Docker installed? Use [docs/local-without-docker.md](docs/local-without-docker.md).
 

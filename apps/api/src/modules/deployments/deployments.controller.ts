@@ -1,4 +1,5 @@
 import { Body, Controller, Param, Post } from "@nestjs/common";
+import type { DeploymentSuggestion } from "@awsify/deployment-schemas";
 import { DeploymentsService } from "./deployments.service";
 
 @Controller("deployments")
@@ -12,8 +13,7 @@ export class DeploymentsController {
       projectId: string;
       appName: string;
       region: string;
-      repoFullName: string;
-      branch: string;
+      suggestion?: DeploymentSuggestion;
     }
   ) {
     return this.deployments.createPlan(body);

@@ -77,7 +77,7 @@ model AwsConnection {
   accountId             String
   roleArn               String
   externalId            String
-  defaultRegion         String              @default("us-east-1")
+  defaultRegion         String
   status                AwsConnectionStatus @default(pending)
   lastValidationResult  String?
   userId                String

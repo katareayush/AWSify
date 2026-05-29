@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AWSify",
+  title: "AWS-ify",
   description: "Deploy GitHub apps to AWS ECS Fargate with reviewed templates."
 };
 

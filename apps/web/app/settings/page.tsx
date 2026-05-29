@@ -18,10 +18,10 @@ export default function SettingsPage() {
             <p className="text-sm font-semibold">Planned settings</p>
           </div>
           <div className="mt-4 grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
-            <p>Default AWS region: us-east-1</p>
-            <p>AI provider: Claude with deterministic fallback</p>
+            <p>AWS region: not configured</p>
+            <p>AI provider: Anthropic required</p>
             <p>Approval mode: always required</p>
-            <p>Deployment target: ECS Fargate MVP</p>
+            <p>Deployment target: not configured</p>
           </div>
         </Panel>
       </div>

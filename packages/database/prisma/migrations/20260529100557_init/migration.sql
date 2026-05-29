@@ -55,7 +55,7 @@ CREATE TABLE "AwsConnection" (
     "accountId" TEXT NOT NULL,
     "roleArn" TEXT NOT NULL,
     "externalId" TEXT NOT NULL,
-    "defaultRegion" TEXT NOT NULL DEFAULT 'us-east-1',
+    "defaultRegion" TEXT NOT NULL,
     "status" "AwsConnectionStatus" NOT NULL DEFAULT 'pending',
     "lastValidationResult" TEXT,
     "userId" TEXT NOT NULL,

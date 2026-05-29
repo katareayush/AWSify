@@ -4,7 +4,7 @@ import { Background, Controls, ReactFlow, type Edge, type Node } from "@xyflow/r
 
 const nodes: Node[] = [
   { id: "github", position: { x: 0, y: 90 }, data: { label: "GitHub repo" }, type: "input" },
-  { id: "worker", position: { x: 210, y: 90 }, data: { label: "AWSify worker" } },
+  { id: "worker", position: { x: 210, y: 90 }, data: { label: "AWS-ify worker" } },
   { id: "ecr", position: { x: 430, y: 10 }, data: { label: "ECR image" } },
   { id: "ecs", position: { x: 430, y: 100 }, data: { label: "ECS Fargate" } },
   { id: "alb", position: { x: 660, y: 100 }, data: { label: "Public ALB URL" }, type: "output" },

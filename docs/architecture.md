@@ -17,7 +17,7 @@ AWSify is a deployment control plane. It does not let AI directly create AWS res
 - `apps/worker`: BullMQ worker for scanning, artifact generation, and deployment orchestration.
 - `packages/deployment-schemas`: Shared Zod contracts.
 - `packages/repo-scanner`: Node/Next repo detector.
-- `packages/ai`: Claude-first recommendation adapter with deterministic fallback.
+- `packages/ai`: Anthropic Claude recommendation adapter. Missing Anthropic configuration fails loudly.
 - `packages/templates`: Dockerfile, GitHub Action, CloudFormation role, and deployment plan generators.
 - `packages/pulumi-templates`: ECS Fargate/ECR/ALB/CloudWatch Pulumi resources.
 - `packages/database`: Prisma schema and generated client boundary.

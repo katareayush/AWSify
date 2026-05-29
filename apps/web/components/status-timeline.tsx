@@ -1,10 +1,10 @@
 import { CheckCircle2, CircleDashed, Loader2 } from "lucide-react";
 
 const steps = [
-  { label: "GitHub app installed", state: "done" },
-  { label: "AWS role validated", state: "done" },
-  { label: "Repository scanned", state: "done" },
-  { label: "Review generated plan", state: "active" },
+  { label: "Install GitHub app", state: "pending" },
+  { label: "Validate AWS role", state: "pending" },
+  { label: "Scan repository", state: "pending" },
+  { label: "Review generated plan", state: "pending" },
   { label: "Deploy ECS service", state: "pending" }
 ];
 

@@ -4,11 +4,7 @@ import { ProductShell } from "../../components/product-shell";
 import { Button } from "../../components/ui/button";
 import { Panel } from "../../components/ui/panel";
 
-const repos = [
-  { name: "demo/express-api", branch: "main", stack: "Express backend", status: "Supported" },
-  { name: "demo/next-dashboard", branch: "main", stack: "Next.js app", status: "Supported" },
-  { name: "demo/python-worker", branch: "main", stack: "Python", status: "Later" }
-];
+const repos: Array<{ id: string; name: string; branch: string; stack: string; status: string }> = [];
 
 export default function RepositoriesPage() {
   return (
@@ -16,7 +12,7 @@ export default function RepositoriesPage() {
       <div className="space-y-5">
         <PageHeading
           eyebrow="Repository selection"
-          title="Choose what AWSify should scan"
+          title="Choose what AWS-ify should scan"
           description="The MVP supports Node.js backends and Next.js apps. Unsupported stacks stay visible but cannot be deployed yet."
           action={
             <Button variant="secondary">
@@ -33,26 +29,39 @@ export default function RepositoriesPage() {
           </div>
 
           <div className="mt-4 divide-y divide-border">
-            {repos.map((repo) => (
-              <div key={repo.name} className="grid gap-3 py-4 text-sm md:grid-cols-[1fr_150px_130px_130px]">
-                <div>
-                  <p className="font-medium">{repo.name}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Default branch: {repo.branch}</p>
-                </div>
-                <p className="text-muted-foreground">{repo.stack}</p>
-                <div>
-                  <span className={`rounded-md px-2 py-1 text-xs ${repo.status === "Supported" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                    {repo.status}
-                  </span>
-                </div>
-                <div className="flex md:justify-end">
-                  <Button variant="secondary" disabled={repo.status !== "Supported"}>
-                    Scan
-                    {repo.status === "Supported" ? <ArrowRight className="h-4 w-4" /> : null}
-                  </Button>
-                </div>
+            {repos.length === 0 ? (
+              <div className="py-12 text-center">
+                <p className="text-sm font-medium">No repositories connected</p>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                  Install the GitHub App to list repositories here. AWS-ify will show supported stacks after the repo metadata sync runs.
+                </p>
+                <Button className="mt-4" variant="secondary">
+                  <Github className="h-4 w-4" />
+                  Install GitHub App
+                </Button>
               </div>
-            ))}
+            ) : (
+              repos.map((repo) => (
+                <div key={repo.id} className="grid gap-3 py-4 text-sm md:grid-cols-[1fr_150px_130px_130px]">
+                  <div>
+                    <p className="font-medium">{repo.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Default branch: {repo.branch}</p>
+                  </div>
+                  <p className="text-muted-foreground">{repo.stack}</p>
+                  <div>
+                    <span className={`rounded-md px-2 py-1 text-xs ${repo.status === "Supported" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                      {repo.status}
+                    </span>
+                  </div>
+                  <div className="flex md:justify-end">
+                    <Button variant="secondary" disabled={repo.status !== "Supported"}>
+                      Scan
+                      {repo.status === "Supported" ? <ArrowRight className="h-4 w-4" /> : null}
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </Panel>
 

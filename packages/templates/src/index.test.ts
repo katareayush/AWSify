@@ -5,9 +5,9 @@ describe("createDeploymentPlan", () => {
   it("creates only approved MVP resource types", () => {
     const plan = createDeploymentPlan({
       projectId: "proj_1",
-      appName: "demo-api",
-      region: "us-east-1",
-      awsifyAccountId: "123456789012",
+      appName: "test-api",
+      region: "test-region",
+      awsifyAccountId: "000000000000",
       externalId: "external-id-123456",
       suggestion: {
         appType: "node-backend",

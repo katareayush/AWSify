@@ -13,7 +13,7 @@ export default function OnboardingPage() {
             <Cloud className="h-4 w-4" />
           </div>
           <div>
-            <p className="text-sm font-semibold">AWSify</p>
+            <p className="text-sm font-semibold">AWS-ify</p>
             <p className="text-xs text-muted-foreground">Deploy with review-first infrastructure</p>
           </div>
         </div>
@@ -22,7 +22,7 @@ export default function OnboardingPage() {
           <PageHeading
             eyebrow="Setup"
             title="Prepare your first ECS Fargate deployment"
-            description="AWSify needs GitHub repo access, an AWS role, a repo scan, and a reviewed plan before anything is created in your AWS account."
+            description="AWS-ify needs GitHub repo access, an AWS role, a repo scan, and a reviewed plan before anything is created in your AWS account."
             action={
               <Button>
                 Start with GitHub
@@ -35,7 +35,7 @@ export default function OnboardingPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <SetupStep icon={Github} title="Sign in with GitHub" description="Use GitHub identity for the MVP account model." state="active" />
           <SetupStep icon={Github} title="Install GitHub App" description="Grant repository access through installation-scoped permissions." state="pending" />
-          <SetupStep icon={KeyRound} title="Connect AWS role" description="Deploy AWSify's CloudFormation role and submit the RoleArn." state="pending" />
+          <SetupStep icon={KeyRound} title="Connect AWS role" description="Deploy AWS-ify's CloudFormation role and submit the RoleArn." state="pending" />
           <SetupStep icon={ScanLine} title="Scan repository" description="Detect framework, commands, port, env vars, and database signals." state="pending" />
           <SetupStep icon={ShieldCheck} title="Review plan" description="Inspect resources, files, cost range, and approval gate." state="pending" />
         </div>

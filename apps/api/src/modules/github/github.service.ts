@@ -3,19 +3,26 @@ import { Injectable } from "@nestjs/common";
 @Injectable()
 export class GithubService {
   createOAuthLoginUrl() {
-    const clientId = process.env.GITHUB_CLIENT_ID ?? "missing-client-id";
-    const redirectUri = `${process.env.API_URL ?? "http://localhost:4000"}/v1/github/callback`;
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    const apiUrl = process.env.API_URL;
+
+    if (!clientId || !apiUrl) {
+      return null;
+    }
+
+    const redirectUri = `${apiUrl}/v1/github/callback`;
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
       scope: "read:user user:email",
-      state: "local-dev-state"
+      state: crypto.randomUUID()
     });
     return `https://github.com/login/oauth/authorize?${params.toString()}`;
   }
 
   createAppInstallUrl() {
-    const slug = process.env.GITHUB_APP_SLUG ?? "awsify-dev";
+    const slug = process.env.GITHUB_APP_SLUG;
+    if (!slug) return null;
     return `https://github.com/apps/${slug}/installations/new`;
   }
 
@@ -28,24 +35,10 @@ export class GithubService {
     };
   }
 
-  listMockRepositories() {
+  listRepositories() {
     return {
-      repositories: [
-        {
-          id: "repo_mock_express",
-          fullName: "demo/express-api",
-          defaultBranch: "main",
-          private: true,
-          supported: true
-        },
-        {
-          id: "repo_mock_next",
-          fullName: "demo/next-dashboard",
-          defaultBranch: "main",
-          private: false,
-          supported: true
-        }
-      ]
+      repositories: [],
+      note: "Repository listing is empty until GitHub App installation token exchange is wired."
     };
   }
 }

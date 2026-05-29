@@ -93,7 +93,7 @@ export const awsConnectionSchema = z.object({
   accountId: z.string(),
   roleArn: z.string().startsWith("arn:aws:iam::"),
   externalId: z.string().min(16),
-  defaultRegion: z.string().default("us-east-1"),
+  defaultRegion: z.string().min(1),
   status: z.enum(["pending", "valid", "invalid"]),
   lastValidationResult: z.string().optional()
 });

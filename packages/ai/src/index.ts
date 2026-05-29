@@ -63,28 +63,10 @@ export class ClaudeAiProvider implements AiProvider {
   }
 }
 
-export class DeterministicAiProvider implements AiProvider {
-  async recommendDeployment(input: AiRecommendationInput): Promise<DeploymentSuggestion> {
-    return deploymentSuggestionSchema.parse({
-      appType: input.scan.appType,
-      services: input.scan.appType === "nextjs-app" ? ["frontend"] : ["backend"],
-      packageManager: input.scan.packageManager,
-      buildCommand: input.scan.buildCommand,
-      startCommand: input.scan.startCommand,
-      installCommand: input.scan.installCommand,
-      port: input.scan.port,
-      hasDockerfile: input.scan.hasDockerfile,
-      envVars: input.scan.envVars,
-      database: input.scan.databaseRequired
-        ? { required: true, engine: "postgresql", note: "Detected by static scan. RDS is planned after the first ECS MVP." }
-        : { required: false },
-      confidence: input.scan.signals.length > 0 ? 0.78 : 0.5,
-      notes: ["Deterministic fallback used because no AI provider is configured.", ...input.scan.signals]
-    });
-  }
-}
-
 export function createAiProvider(options: { anthropicApiKey?: string }): AiProvider {
-  if (options.anthropicApiKey) return new ClaudeAiProvider({ apiKey: options.anthropicApiKey });
-  return new DeterministicAiProvider();
+  if (!options.anthropicApiKey) {
+    throw new Error("ANTHROPIC_API_KEY is required. AWSify does not run repo-analysis AI with a fallback provider.");
+  }
+
+  return new ClaudeAiProvider({ apiKey: options.anthropicApiKey });
 }

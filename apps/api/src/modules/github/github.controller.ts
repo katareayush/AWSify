@@ -22,6 +22,6 @@ export class GithubController {
 
   @Get("repositories")
   repositories() {
-    return this.github.listMockRepositories();
+    return this.github.listRepositories();
   }
 }

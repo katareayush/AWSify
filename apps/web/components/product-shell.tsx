@@ -11,10 +11,10 @@ import {
 import { Button } from "./ui/button";
 
 const navItems = [
-  { label: "Deployments", href: "/", icon: LayoutDashboard },
+  { label: "Deployments", href: "/dashboard", icon: LayoutDashboard },
   { label: "Repositories", href: "/repositories", icon: Github },
   { label: "Connections", href: "/connections", icon: KeyRound },
-  { label: "Templates", href: "/deployments/demo", icon: FileCode2 },
+  { label: "Templates", href: "/deployments", icon: FileCode2 },
   { label: "Settings", href: "/settings", icon: Settings }
 ];
 
@@ -28,7 +28,7 @@ export function ProductShell({ children, active = "Deployments" }: { children: R
               <Cloud className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-sm font-semibold leading-none">AWSify</p>
+              <p className="text-sm font-semibold leading-none">AWS-ify</p>
               <p className="mt-1 text-xs text-muted-foreground">Personal workspace</p>
             </div>
           </Link>
@@ -57,7 +57,7 @@ export function ProductShell({ children, active = "Deployments" }: { children: R
               </Link>
               <button className="hidden h-8 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm text-muted-foreground sm:flex">
                 <Search className="h-4 w-4" />
-                Search AWSify
+                Search AWS-ify
               </button>
             </div>
             <div className="flex items-center gap-2">

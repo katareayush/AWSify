@@ -6,7 +6,16 @@ import { generateCloudFormationRoleTemplate } from "@awsify/templates";
 export class AwsService {
   createConnectionTemplate() {
     const externalId = `awsify-${crypto.randomUUID()}`;
-    const awsifyAccountId = process.env.AWSIFY_AWS_ACCOUNT_ID ?? "123456789012";
+    const awsifyAccountId = process.env.AWSIFY_AWS_ACCOUNT_ID;
+
+    if (!awsifyAccountId) {
+      return {
+        externalId,
+        template: null,
+        status: "missing_awsify_account_id",
+        note: "Set AWSIFY_AWS_ACCOUNT_ID before generating a customer CloudFormation role template."
+      };
+    }
 
     return {
       externalId,
@@ -16,7 +25,14 @@ export class AwsService {
   }
 
   async validateConnection(input: { roleArn: string; externalId: string; region?: string }) {
-    const client = new STSClient({ region: input.region ?? "us-east-1" });
+    if (!input.region) {
+      return {
+        status: "missing_region",
+        reason: "Provide an AWS region before validating the role."
+      };
+    }
+
+    const client = new STSClient({ region: input.region });
     try {
       const response = await client.send(
         new AssumeRoleCommand({

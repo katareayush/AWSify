@@ -38,11 +38,18 @@ export class DeploymentOrchestrator {
       fileSummaries: scan.signals.map((signal) => ({ path: "scan", summary: signal }))
     });
 
+    const region = process.env.AWS_REGION;
+    const awsifyAccountId = process.env.AWSIFY_AWS_ACCOUNT_ID;
+
+    if (!region || !awsifyAccountId) {
+      throw new Error("AWS_REGION and AWSIFY_AWS_ACCOUNT_ID must be configured before deployment planning.");
+    }
+
     const plan = createDeploymentPlan({
       projectId: job.projectId,
       appName: sanitizeAppName(job.repoFullName),
-      region: process.env.AWS_REGION ?? "us-east-1",
-      awsifyAccountId: process.env.AWSIFY_AWS_ACCOUNT_ID ?? "123456789012",
+      region,
+      awsifyAccountId,
       externalId: `awsify-${job.projectId}`,
       suggestion
     });

@@ -13,8 +13,7 @@ export const appEnvSchema = z.object({
   GITHUB_APP_SLUG: z.string().optional(),
   GITHUB_APP_PRIVATE_KEY_BASE64: z.string().optional(),
   GITHUB_WEBHOOK_SECRET: z.string().optional(),
-  ANTHROPIC_API_KEY: z.string().optional(),
-  OPENAI_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().min(1),
   AWSIFY_EXTERNAL_ID_SALT: z.string().min(8).default("local-dev-salt"),
   PULUMI_CONFIG_PASSPHRASE: z.string().min(1).default("local-dev-passphrase")
 });
