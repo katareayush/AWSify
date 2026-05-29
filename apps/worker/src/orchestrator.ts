@@ -5,7 +5,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createAiProvider } from "@awsify/ai";
 import type { DeploymentJob } from "@awsify/deployment-schemas";
-import { scanRepository } from "@awsify/repo-scanner";
+import { collectKeyFiles, scanRepository } from "@awsify/repo-scanner";
 import { createDeploymentPlan } from "@awsify/templates";
 
 const execFileAsync = promisify(execFile);
@@ -32,10 +32,13 @@ export class DeploymentOrchestrator {
     emit("scanning", "Repository cloned; running static scanner.");
 
     const scan = scanRepository(repoPath);
+    const keyFiles = collectKeyFiles(repoPath);
+    emit("scanning", `Static scan complete (${scan.signals.length} signals, ${keyFiles.length} key files). Sending to Claude for analysis.`);
+
     const suggestion = await this.ai.recommendDeployment({
       repoFullName: job.repoFullName,
       scan,
-      fileSummaries: scan.signals.map((signal) => ({ path: "scan", summary: signal }))
+      keyFiles
     });
 
     const region = process.env.AWS_REGION;

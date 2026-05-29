@@ -2,6 +2,52 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { DeploymentSuggestion } from "@awsify/deployment-schemas";
 
+export interface KeyFile {
+  path: string;
+  content: string;
+}
+
+const KEY_FILE_MAX_CHARS = 4000;
+
+export function collectKeyFiles(root: string): KeyFile[] {
+  const results: KeyFile[] = [];
+
+  const tryRead = (relPath: string): boolean => {
+    const full = join(root, relPath);
+    if (!existsSync(full)) return false;
+    try {
+      if (!statSync(full).isFile()) return false;
+      results.push({ path: relPath, content: readFileSync(full, "utf8").slice(0, KEY_FILE_MAX_CHARS) });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Core project files
+  tryRead("package.json");
+  tryRead("tsconfig.json");
+  tryRead("Dockerfile");
+
+  // Framework configs
+  tryRead("next.config.ts") || tryRead("next.config.mjs") || tryRead("next.config.js");
+
+  // Env templates (most informative for required vars)
+  tryRead(".env.example") || tryRead(".env.sample") || tryRead("env.example") || tryRead(".env.template");
+
+  // First found entry point
+  const entryPoints = [
+    "src/index.ts", "src/main.ts", "src/server.ts", "src/app.ts",
+    "index.ts", "server.ts", "app.ts",
+    "src/index.js", "index.js", "server.js"
+  ];
+  for (const ep of entryPoints) {
+    if (tryRead(ep)) break;
+  }
+
+  return results;
+}
+
 export interface RepoScanResult {
   root: string;
   packageManager: DeploymentSuggestion["packageManager"];
