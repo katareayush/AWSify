@@ -10,7 +10,7 @@ export function InfrastructureExamples() {
       id="examples"
       eyebrow="Generated output"
       title="Real infrastructure, not pseudocode."
-      sub="Every plan produces a Dockerfile, a deployment workflow, and a Pulumi stack — auditable, versioned in your repo."
+      sub="Every plan produces a Dockerfile, a deployment workflow, and a Pulumi stack, auditable and versioned in your repo."
     >
       <div className="mt-16 grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">

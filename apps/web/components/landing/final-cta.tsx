@@ -4,7 +4,7 @@ import { ArrowUpRight } from "lucide-react";
 export function FinalCTA() {
   return (
     <section className="relative z-10">
-      <div className="mx-auto max-w-6xl px-6 pb-32 pt-28">
+      <div className="mx-auto max-w-7xl px-6 pb-32 pt-28">
         <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-[#070708] px-8 py-20 text-center sm:px-16">
           <div className="pointer-events-none absolute inset-0 bg-grid-fine opacity-60" />
           <div className="pointer-events-none absolute -top-40 left-1/2 h-[420px] w-[820px] -translate-x-1/2 violet-glow opacity-80" />

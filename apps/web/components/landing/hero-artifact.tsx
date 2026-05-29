@@ -218,7 +218,7 @@ function GuardrailsPanel() {
 
       <div className="mt-6 overflow-hidden rounded-lg border border-white/[0.06] bg-black/40">
         <div className="border-b border-white/[0.06] px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-white/35">
-          $ awsify plan
+          $ aws-ify plan
         </div>
         <pre className="px-3 py-2.5 font-mono text-[10.5px] leading-[1.6] text-white/70">
 {`✓ scan repo

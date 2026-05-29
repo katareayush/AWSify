@@ -22,34 +22,45 @@ export default function RepositoriesPage() {
           }
         />
 
-        <Panel className="p-5">
-          <div className="flex h-10 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm text-muted-foreground">
-            <Search className="h-4 w-4" />
+        <Panel className="p-6">
+          <div className="flex h-10 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 text-[13px] text-white/45">
+            <Search className="h-3.5 w-3.5" />
             Search repositories
           </div>
 
-          <div className="mt-4 divide-y divide-border">
+          <div className="mt-5 divide-y divide-white/[0.05]">
             {repos.length === 0 ? (
-              <div className="py-12 text-center">
-                <p className="text-sm font-medium">No repositories connected</p>
-                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+              <div className="py-14 text-center">
+                <p className="text-[14px] font-medium text-white">No repositories connected</p>
+                <p className="mx-auto mt-2 max-w-md text-[13px] leading-[1.6] text-white/55">
                   Install the GitHub App to list repositories here. AWS-ify will show supported stacks after the repo metadata sync runs.
                 </p>
-                <Button className="mt-4" variant="secondary">
+                <Button className="mt-5" variant="secondary">
                   <Github className="h-4 w-4" />
                   Install GitHub App
                 </Button>
               </div>
             ) : (
               repos.map((repo) => (
-                <div key={repo.id} className="grid gap-3 py-4 text-sm md:grid-cols-[1fr_150px_130px_130px]">
+                <div
+                  key={repo.id}
+                  className="grid gap-3 py-4 text-[13.5px] md:grid-cols-[1fr_150px_130px_130px]"
+                >
                   <div>
-                    <p className="font-medium">{repo.name}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Default branch: {repo.branch}</p>
+                    <p className="font-medium text-white">{repo.name}</p>
+                    <p className="mt-1 font-mono text-[11px] text-white/45">
+                      Default branch: {repo.branch}
+                    </p>
                   </div>
-                  <p className="text-muted-foreground">{repo.stack}</p>
+                  <p className="text-white/55">{repo.stack}</p>
                   <div>
-                    <span className={`rounded-md px-2 py-1 text-xs ${repo.status === "Supported" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                    <span
+                      className={`rounded-full border px-2.5 py-1 text-[11px] ${
+                        repo.status === "Supported"
+                          ? "border-violet/30 bg-violet/10 text-violet-soft"
+                          : "border-white/[0.08] bg-white/[0.04] text-white/55"
+                      }`}
+                    >
                       {repo.status}
                     </span>
                   </div>
@@ -65,10 +76,12 @@ export default function RepositoriesPage() {
           </div>
         </Panel>
 
-        <Panel className="p-4">
+        <Panel className="p-5">
           <div className="flex items-start gap-3">
-            <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-            <p className="text-sm text-muted-foreground">Repo access should come from the GitHub App installation, not broad personal OAuth scopes.</p>
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-violet-soft" />
+            <p className="text-[13px] leading-[1.6] text-white/55">
+              Repo access should come from the GitHub App installation, not broad personal OAuth scopes.
+            </p>
           </div>
         </Panel>
       </div>

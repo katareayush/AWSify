@@ -18,7 +18,7 @@ const pillars: Array<{ icon: Icon; title: string; body: string }> = [
   {
     icon: GitBranch,
     title: "Everything lives in your repo.",
-    body: "Infrastructure is committed code — pull requests, reviews, blame, rollback. Like every other artifact you own."
+    body: "Infrastructure is committed code: pull requests, reviews, blame, rollback. Like every other artifact you own."
   },
   {
     icon: Workflow,

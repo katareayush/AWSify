@@ -23,13 +23,14 @@ export default function DeploymentPlanPage() {
           }
         />
 
-        <Panel className="p-12 text-center">
-          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-md border border-border bg-background">
-            <FileCode2 className="h-5 w-5 text-primary" />
+        <Panel className="p-14 text-center">
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03]">
+            <FileCode2 className="h-5 w-5 text-violet-soft" />
           </div>
-          <p className="mt-4 text-sm font-medium">No plan payload available</p>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-            Once backend persistence is connected, this page will render the selected plan, generated artifacts, infra graph, env vars, and approval controls from the API.
+          <p className="mt-5 text-[14px] font-medium text-white">No plan payload available</p>
+          <p className="mx-auto mt-2 max-w-lg text-[13px] leading-[1.6] text-white/55">
+            Once backend persistence is connected, this page will render the selected plan,
+            generated artifacts, infra graph, env vars, and approval controls from the API.
           </p>
         </Panel>
       </div>

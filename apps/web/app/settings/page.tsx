@@ -12,19 +12,28 @@ export default function SettingsPage() {
           title="Settings"
           description="Workspace-level defaults for regions, approval policy, AI provider, and deployment notifications will live here."
         />
-        <Panel className="p-5">
+        <Panel className="p-6">
           <div className="flex items-center gap-2">
-            <Settings className="h-4 w-4 text-primary" />
-            <p className="text-sm font-semibold">Planned settings</p>
+            <Settings className="h-4 w-4 text-violet-soft" />
+            <p className="text-[14px] font-medium tracking-tight text-white">Planned settings</p>
           </div>
-          <div className="mt-4 grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
-            <p>AWS region: not configured</p>
-            <p>AI provider: Anthropic required</p>
-            <p>Approval mode: always required</p>
-            <p>Deployment target: not configured</p>
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            <SettingRow label="AWS region" value="not configured" />
+            <SettingRow label="AI provider" value="Anthropic required" />
+            <SettingRow label="Approval mode" value="always required" />
+            <SettingRow label="Deployment target" value="not configured" />
           </div>
         </Panel>
       </div>
     </ProductShell>
+  );
+}
+
+function SettingRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.015] px-4 py-3">
+      <span className="font-mono text-[11px] uppercase tracking-wider text-white/45">{label}</span>
+      <span className="text-[13px] text-white/75">{value}</span>
+    </div>
   );
 }

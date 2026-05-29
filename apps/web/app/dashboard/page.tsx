@@ -39,20 +39,22 @@ export default function Home() {
           <Metric icon={Cloud} label="Live services" value="0" />
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
-          <Panel className="p-5">
+        <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+          <Panel className="p-6">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold">Recent deployment plans</p>
-              <span className="text-xs text-muted-foreground">MVP workspace</span>
+              <p className="text-[14px] font-medium tracking-tight text-white">Recent deployment plans</p>
+              <span className="font-mono text-[10.5px] uppercase tracking-wider text-white/35">
+                MVP workspace
+              </span>
             </div>
-            <div className="mt-4 divide-y divide-border">
+            <div className="mt-5 divide-y divide-white/[0.05]">
               {deployments.length === 0 ? (
-                <div className="py-12 text-center">
-                  <p className="text-sm font-medium">No deployment plans yet</p>
-                  <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                <div className="py-14 text-center">
+                  <p className="text-[14px] font-medium text-white">No deployment plans yet</p>
+                  <p className="mx-auto mt-2 max-w-md text-[13px] leading-[1.6] text-white/55">
                     After GitHub and AWS are connected, selected repositories will appear here as reviewed deployment plans.
                   </p>
-                  <Link href="/repositories" className="mt-4 inline-flex">
+                  <Link href="/repositories" className="mt-5 inline-flex">
                     <Button variant="secondary">
                       Select repository
                       <ArrowRight className="h-4 w-4" />
@@ -61,17 +63,23 @@ export default function Home() {
                 </div>
               ) : (
                 deployments.map((deployment) => (
-                  <Link key={deployment.id} href={`/deployments/${deployment.id}`} className="grid gap-3 py-4 text-sm hover:bg-background sm:grid-cols-[1fr_150px_130px]">
+                  <Link
+                    key={deployment.id}
+                    href={`/deployments/${deployment.id}`}
+                    className="grid gap-3 py-4 text-[13.5px] transition-colors hover:bg-white/[0.02] sm:grid-cols-[1fr_150px_130px]"
+                  >
                     <div>
-                      <p className="font-medium">{deployment.name}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{deployment.repo}</p>
+                      <p className="font-medium text-white">{deployment.name}</p>
+                      <p className="mt-1 font-mono text-[11px] text-white/45">{deployment.repo}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">{deployment.target}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{deployment.updated}</p>
+                      <p className="text-white/70">{deployment.target}</p>
+                      <p className="mt-1 font-mono text-[11px] text-white/45">{deployment.updated}</p>
                     </div>
                     <div className="flex items-center sm:justify-end">
-                      <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">{deployment.status}</span>
+                      <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/65">
+                        {deployment.status}
+                      </span>
                     </div>
                   </Link>
                 ))
@@ -107,12 +115,12 @@ export default function Home() {
 
 function Metric({ icon: Icon, label, value }: { icon: typeof Github; label: string; value: string }) {
   return (
-    <Panel className="p-4">
+    <Panel className="p-5">
       <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-primary" />
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <Icon className="h-3.5 w-3.5 text-violet-soft" />
+        <p className="font-mono text-[10.5px] uppercase tracking-wider text-white/45">{label}</p>
       </div>
-      <p className="mt-3 text-2xl font-semibold">{value}</p>
+      <p className="mt-4 font-mono text-[28px] font-medium tracking-tight text-white">{value}</p>
     </Panel>
   );
 }

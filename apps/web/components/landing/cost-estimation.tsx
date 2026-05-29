@@ -8,7 +8,7 @@ export function CostEstimation() {
     <Section
       eyebrow="Before you spend a dollar"
       title="Cost estimation, line by line."
-      sub="Awsify simulates a month of usage from the plan and shows you exactly where the money goes."
+      sub="AWS-ify simulates a month of usage from the plan and shows you exactly where the money goes."
     >
       <div className="mt-16 grid gap-6 lg:grid-cols-5">
         <CostTable total={total} />
@@ -29,7 +29,7 @@ function CostTable({ total }: { total: number }) {
         <div className="flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-violet" />
           <p className="font-mono text-[10.5px] uppercase tracking-wider text-white/40">
-            monthly estimate — us-east-1
+            monthly estimate / us-east-1
           </p>
         </div>
         <span className="font-mono text-[10.5px] text-white/30">plan #042</span>

@@ -80,6 +80,45 @@ html:has(.landing-root) {
   scroll-behavior: smooth;
 }
 
+/* ── App (dashboard / connections / etc.) — dark theme tokens ─────────── */
+.app-root {
+  --background: 240 8% 4%;
+  --foreground: 0 0% 96%;
+  --muted: 240 6% 10%;
+  --muted-foreground: 240 5% 60%;
+  --border: 240 6% 14%;
+  --primary: 263 90% 75%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 263 90% 75%;
+  --accent-foreground: 0 0% 100%;
+  --surface: 240 8% 6%;
+
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+.app-root ::selection {
+  background: rgba(139, 92, 246, 0.35);
+  color: #fff;
+}
+
+html:has(.app-root),
+html:has(.app-root) body {
+  background-color: #050505;
+}
+
+html:has(.app-root) {
+  color-scheme: dark;
+  overscroll-behavior-y: none;
+}
+
+/* Soften the auto-generated focus ring on dark inputs */
+.app-root input:focus,
+.app-root textarea:focus,
+.app-root select:focus {
+  outline: none;
+}
+
 .bg-grid {
   background-image:
     linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),

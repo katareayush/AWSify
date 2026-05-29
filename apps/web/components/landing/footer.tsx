@@ -5,7 +5,7 @@ import { footerColumns } from "./data";
 export function Footer() {
   return (
     <footer className="relative z-10 border-t border-white/[0.06]">
-      <div className="mx-auto grid max-w-6xl gap-10 px-6 py-14 md:grid-cols-[1.4fr_2fr]">
+      <div className="mx-auto grid max-w-7xl gap-10 px-6 py-14 md:grid-cols-[1.4fr_2fr]">
         <Brand />
         <div className="grid grid-cols-2 gap-8 text-[13.5px] sm:grid-cols-3">
           {footerColumns.map((col) => (
@@ -22,14 +22,14 @@ function Brand() {
     <div>
       <Link href="/" className="flex items-center gap-2.5">
         <Mark />
-        <span className="text-[15px] font-medium tracking-tight text-white">Awsify</span>
+        <span className="text-[15px] font-medium tracking-tight text-white">AWS-ify</span>
       </Link>
       <p className="mt-5 max-w-sm text-[13.5px] leading-[1.6] text-white/45">
         A control plane between your repository and AWS. Reviewed templates.
         Owned by you. Built for teams shipping in production.
       </p>
       <p className="mt-6 font-mono text-[11px] text-white/30">
-        © {new Date().getFullYear()} Awsify Labs · status: operational
+        © {new Date().getFullYear()} AWS-ify Labs · status: operational
       </p>
     </div>
   );

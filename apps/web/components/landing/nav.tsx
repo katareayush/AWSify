@@ -12,10 +12,10 @@ export function Nav() {
   return (
     <header className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4 sm:top-5 sm:px-6">
       <div
-        className={`pointer-events-auto relative flex h-[56px] w-full items-center justify-between border border-white/[0.09] backdrop-blur-2xl backdrop-saturate-150 transition-[max-width,gap,padding,border-radius,background-color,box-shadow] duration-500 ease-out ${
+        className={`pointer-events-auto relative flex h-[56px] w-full items-center justify-between rounded-full border border-white/[0.09] backdrop-blur-2xl backdrop-saturate-150 transition-[max-width,gap,padding,background-color,box-shadow] duration-500 ease-out ${
           scrolled
-            ? "max-w-5xl gap-4 rounded-full bg-black/65 pl-5 pr-1.5 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.8)]"
-            : "max-w-7xl gap-8 rounded-2xl bg-black/35 pl-6 pr-2 shadow-[0_14px_40px_-18px_rgba(0,0,0,0.55)]"
+            ? "max-w-5xl gap-4 bg-black/65 pl-5 pr-1.5 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.8)]"
+            : "max-w-7xl gap-8 bg-black/35 pl-6 pr-2 shadow-[0_14px_40px_-18px_rgba(0,0,0,0.55)]"
         }`}
       >
         <NavRing />
@@ -53,7 +53,7 @@ function Brand() {
   return (
     <Link href="/" className="relative z-10 flex shrink-0 items-center gap-2.5">
       <Mark />
-      <span className="text-[15px] font-medium tracking-tight text-white">Awsify</span>
+      <span className="text-[15px] font-medium tracking-tight text-white">AWS-ify</span>
     </Link>
   );
 }

@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AWS-ify — Ship AWS infrastructure from your repository",
+  title: "AWS-ify: Ship AWS infrastructure from your repository",
   description:
-    "Awsify turns your repository into reviewed, production-grade AWS infrastructure. No console. No drift. Templates execute, you approve."
+    "AWS-ify turns your repository into reviewed, production-grade AWS infrastructure. No console. No drift. Templates execute, you approve."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

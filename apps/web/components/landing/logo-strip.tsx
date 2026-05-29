@@ -3,7 +3,7 @@ import { logoStripItems } from "./data";
 export function LogoStrip() {
   return (
     <section className="relative z-10 border-y border-white/[0.06]">
-      <div className="mx-auto max-w-6xl px-6 py-10">
+      <div className="mx-auto max-w-7xl px-6 py-10">
         <p className="text-center font-mono text-[10.5px] uppercase tracking-[0.2em] text-white/30">
           Built on rigorous primitives
         </p>

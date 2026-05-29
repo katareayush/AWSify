@@ -19,15 +19,15 @@ export default function DeploymentsPage() {
 
         <Panel className="p-5">
           {deploymentPlans.length === 0 ? (
-            <div className="py-12 text-center">
-              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-md border border-border bg-background">
-                <FileCode2 className="h-5 w-5 text-primary" />
+            <div className="py-14 text-center">
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03]">
+                <FileCode2 className="h-5 w-5 text-violet-soft" />
               </div>
-              <p className="mt-4 text-sm font-medium">No generated plans yet</p>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+              <p className="mt-5 text-[14px] font-medium text-white">No generated plans yet</p>
+              <p className="mx-auto mt-2 max-w-md text-[13px] leading-[1.6] text-white/55">
                 Select a connected repository and run a scan. AWS-ify will create a reviewed plan before any AWS resources are created.
               </p>
-              <Link href="/repositories" className="mt-4 inline-flex">
+              <Link href="/repositories" className="mt-5 inline-flex">
                 <Button variant="secondary">
                   Choose repository
                   <ArrowRight className="h-4 w-4" />
@@ -37,10 +37,12 @@ export default function DeploymentsPage() {
           ) : null}
         </Panel>
 
-        <Panel className="p-4">
+        <Panel className="p-5">
           <div className="flex items-start gap-3">
-            <ListChecks className="mt-0.5 h-4 w-4 text-primary" />
-            <p className="text-sm text-muted-foreground">Plan detail pages render from persisted deployment-plan data after the API is wired.</p>
+            <ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-violet-soft" />
+            <p className="text-[13px] leading-[1.6] text-white/55">
+              Plan detail pages render from persisted deployment-plan data after the API is wired.
+            </p>
           </div>
         </Panel>
       </div>

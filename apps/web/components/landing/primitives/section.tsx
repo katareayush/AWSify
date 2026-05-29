@@ -12,7 +12,7 @@ interface SectionProps {
 export function Section({ id, eyebrow, title, sub, children }: SectionProps) {
   return (
     <section id={id} className="relative z-10 border-t border-white/[0.05]">
-      <div className="mx-auto max-w-6xl px-6 py-28 sm:py-36">
+      <div className="mx-auto max-w-7xl px-6 py-28 sm:py-36">
         <div className="mx-auto max-w-3xl text-center">
           <Reveal>
             <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-violet-soft">

@@ -18,7 +18,7 @@ export const logoStripItems = [
 export const pains = [
   {
     title: "Console clicking",
-    body: "Hours lost to AWS forms — VPCs, IAM roles, target groups — each one a chance to misconfigure production."
+    body: "Hours lost to AWS forms: VPCs, IAM roles, target groups. Each one a chance to misconfigure production."
   },
   {
     title: "AI that hallucinates infra",
@@ -39,14 +39,14 @@ export const howItWorksSteps = [
     n: "01",
     title: "Connect",
     body: "Install the GitHub App. Add an AWS role via CloudFormation. Two minutes.",
-    code: `$ gh app install awsify
+    code: `$ gh app install aws-ify
 $ aws cloudformation create-stack \\
-    --stack-name awsify-role`
+    --stack-name aws-ify-role`
   },
   {
     n: "02",
     title: "Scan",
-    body: "Awsify reads your repo: runtime, framework, env vars, dependencies, secrets.",
+    body: "AWS-ify reads your repo: runtime, framework, env vars, dependencies, secrets.",
     code: `→ detected: next.js 15
 → runtime: node 20
 → env: 4 required, 0 secrets
@@ -65,7 +65,7 @@ $ aws cloudformation create-stack \\
   {
     n: "04",
     title: "Approve & ship",
-    body: "Review the diff. One click. Awsify provisions the stack and returns the service URL.",
+    body: "Review the diff. One click. AWS-ify provisions the stack and returns the service URL.",
     code: `→ applying...
 ✓ stack: api-gateway
 ✓ url: https://api-gw.app
@@ -107,7 +107,7 @@ jobs:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: \${{ secrets.AWS_DEPLOY_ROLE }}
-      - run: awsify apply --plan plan-042`;
+      - run: aws-ify apply --plan plan-042`;
 
 export const resourceListItems: ReadonlyArray<readonly [string, string]> = [
   ["ECR repository", "immutable image tags"],
@@ -142,12 +142,12 @@ export const costHighlights = [
   {
     kpi: "3",
     label: "Right-size suggestions",
-    body: "Awsify flags over-provisioned tasks and idle resources after 7 days."
+    body: "AWS-ify flags over-provisioned tasks and idle resources after 7 days."
   }
 ];
 
 export const securityBadges = [
-  "SOC2 Type II — in progress",
+  "SOC2 Type II (in progress)",
   "OIDC GitHub → AWS",
   "Least-privilege IAM",
   "Customer-managed KMS",
@@ -156,7 +156,7 @@ export const securityBadges = [
 
 export const faqs = [
   {
-    q: "Does Awsify need admin access to my AWS account?",
+    q: "Does AWS-ify need admin access to my AWS account?",
     a: "No. You create a CloudFormation role scoped to the resources our templates manage. We don't get global IAM, billing, or org-level access."
   },
   {
@@ -165,11 +165,11 @@ export const faqs = [
   },
   {
     q: "Can I edit the generated infrastructure code?",
-    a: "Yes — the Pulumi files are committed to your repo. You own them. Awsify will diff your edits against the next plan and respect them."
+    a: "Yes. The Pulumi files are committed to your repo. You own them. AWS-ify will diff your edits against the next plan and respect them."
   },
   {
     q: "How is this different from Terraform / Pulumi / SST?",
-    a: "Those are toolkits. Awsify is the layer above them: it infers your stack, generates the code, validates against a strict schema, and gates execution behind approval. Pulumi is what runs underneath."
+    a: "Those are toolkits. AWS-ify is the layer above them: it infers your stack, generates the code, validates against a strict schema, and gates execution behind approval. Pulumi is what runs underneath."
   },
   {
     q: "Where does the AI fit in?",
@@ -177,7 +177,7 @@ export const faqs = [
   },
   {
     q: "What happens if a deploy fails halfway?",
-    a: "Awsify wraps every apply in a transaction. Failed deploys roll back to the last known-good state, with a full event log in the dashboard."
+    a: "AWS-ify wraps every apply in a transaction. Failed deploys roll back to the last known-good state, with a full event log in the dashboard."
   }
 ];
 

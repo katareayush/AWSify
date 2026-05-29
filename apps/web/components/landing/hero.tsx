@@ -6,7 +6,7 @@ import { CursorGlow } from "./primitives/cursor-glow";
 export function Hero() {
   return (
     <section className="relative z-10 flex min-h-[100svh] flex-col justify-center pt-16 sm:pt-20">
-      <div className="mx-auto w-full max-w-6xl px-6 py-12 sm:py-16 lg:py-20">
+      <div className="mx-auto w-full max-w-7xl px-6 py-12 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-4xl text-center">
           <Eyebrow />
           <Headline />
@@ -48,7 +48,7 @@ function Eyebrow() {
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet opacity-75" />
         <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-violet" />
       </span>
-      Private beta — ECS Fargate, RDS, S3
+      Private beta: ECS Fargate, RDS, S3
       <ChevronRight className="h-3 w-3 opacity-50" />
     </div>
   );
@@ -67,7 +67,7 @@ function Headline() {
 function Subhead() {
   return (
     <p className="animate-reveal-up reveal-delay-2 mx-auto mt-8 max-w-2xl text-balance text-[17px] leading-[1.55] text-white/55 sm:text-[19px]">
-      Awsify reads your repository and generates reviewed, production-grade
+      AWS-ify reads your repository and generates reviewed, production-grade
       infrastructure. Templates execute. You approve. AWS stays yours.
     </p>
   );

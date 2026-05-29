@@ -12,12 +12,12 @@ const cards: Array<{ icon: Icon; title: string; body: string }> = [
   {
     icon: ShieldCheck,
     title: "Templates, owned.",
-    body: "Pulumi modules we audited generate the real resources — least-privilege by default."
+    body: "Pulumi modules we audited generate the real resources, least-privilege by default."
   },
   {
     icon: Lock,
     title: "Account, yours.",
-    body: "Awsify never holds your AWS credentials. Plans execute via an assumed role you control."
+    body: "AWS-ify never holds your AWS credentials. Plans execute via an assumed role you control."
   }
 ];
 
@@ -25,7 +25,7 @@ export function Solution() {
   return (
     <Section eyebrow="The solution" title="A control plane between your repo and AWS.">
       <p className="mx-auto mt-6 max-w-2xl text-center text-[17px] leading-[1.55] text-white/55">
-        Anthropic recommends. Awsify validates against a strict schema. Templates we
+        Anthropic recommends. AWS-ify validates against a strict schema. Templates we
         own execute. You stay in the loop the whole way.
       </p>
 

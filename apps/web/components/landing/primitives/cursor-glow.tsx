@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 
 /**
  * Soft violet halo that follows the cursor inside its parent.
- * Pointer-events disabled — purely cosmetic.
+ * Pointer-events disabled, purely cosmetic.
  */
 export function CursorGlow() {
   const ref = useRef<HTMLDivElement | null>(null);
