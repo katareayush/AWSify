@@ -18,7 +18,7 @@ export function HeroArtifact() {
       <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-violet/30 via-white/5 to-transparent opacity-60 blur-[2px]" />
       <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0c]/80 shadow-[0_30px_120px_-20px_rgba(0,0,0,0.6)] backdrop-blur-xl">
         <WindowChrome />
-        <div className="grid min-h-[440px] grid-cols-12">
+        <div className="grid min-h-[360px] grid-cols-12 lg:min-h-[420px]">
           <FileTree />
           <PlanPanel />
           <GuardrailsPanel />

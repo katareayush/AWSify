@@ -5,24 +5,39 @@ import { CursorGlow } from "./primitives/cursor-glow";
 
 export function Hero() {
   return (
-    <section className="relative z-10">
-      <div className="mx-auto max-w-6xl px-6 pb-28 pt-24 sm:pt-32 lg:pt-40">
+    <section className="relative z-10 flex min-h-[100svh] flex-col justify-center pt-16 sm:pt-20">
+      <div className="mx-auto w-full max-w-6xl px-6 py-12 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-4xl text-center">
           <Eyebrow />
           <Headline />
           <Subhead />
           <CTAs />
-          <p className="animate-reveal-fade reveal-delay-4 mt-6 text-[12px] text-white/35">
+          <p className="animate-reveal-fade reveal-delay-4 mt-5 text-[12px] text-white/35">
             No credit card. Connect a repo in 90 seconds.
           </p>
         </div>
 
-        <div className="animate-reveal-up reveal-delay-5 relative mx-auto mt-20 max-w-5xl">
+        <div className="animate-reveal-up reveal-delay-5 relative mx-auto mt-10 hidden max-w-5xl sm:mt-14 sm:block lg:mt-16">
           <CursorGlow />
           <HeroArtifact />
         </div>
       </div>
+      <ScrollHint />
     </section>
+  );
+}
+
+function ScrollHint() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 bottom-5 flex justify-center"
+    >
+      <div className="flex flex-col items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-white/30">
+        scroll
+        <div className="h-6 w-px bg-gradient-to-b from-white/30 to-transparent" />
+      </div>
+    </div>
   );
 }
 
@@ -41,7 +56,7 @@ function Eyebrow() {
 
 function Headline() {
   return (
-    <h1 className="animate-reveal-up reveal-delay-1 mt-8 text-balance text-[56px] font-medium leading-[0.94] tracking-tightest text-white sm:text-[88px] lg:text-[112px]">
+    <h1 className="animate-reveal-up reveal-delay-1 mt-7 text-balance text-[44px] font-medium leading-[0.96] tracking-tightest text-white xs:text-[52px] sm:text-[72px] md:text-[88px] lg:text-[104px]">
       From repository
       <br />
       <span className="text-gradient-sweep">to production AWS.</span>

@@ -65,6 +65,21 @@ select {
   color: #fff;
 }
 
+/* Paint html + body black when the landing page is mounted so over-scroll
+   (rubber-band on macOS/iOS, top/bottom whitespace) doesn't reveal the
+   light theme behind it. Other routes keep their own background. */
+html:has(.landing-root),
+html:has(.landing-root) body {
+  background-color: #050505;
+}
+
+html:has(.landing-root) {
+  color-scheme: dark;
+  overscroll-behavior-y: none;
+  scroll-padding-top: 5rem;
+  scroll-behavior: smooth;
+}
+
 .bg-grid {
   background-image:
     linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
