@@ -11,6 +11,7 @@ describe("createDeploymentPlan", () => {
       externalId: "external-id-123456",
       suggestion: {
         appType: "node-backend",
+        computeTarget: "ecs-fargate",
         services: ["backend"],
         packageManager: "npm",
         buildCommand: "npm run build",
@@ -20,6 +21,7 @@ describe("createDeploymentPlan", () => {
         hasDockerfile: false,
         envVars: [],
         database: { required: false },
+        cache: { required: false },
         confidence: 0.9,
         notes: []
       }

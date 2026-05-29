@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type { DeploymentSuggestion } from "@awsify/deployment-schemas";
+import type { ComputeTarget, DeploymentSuggestion } from "@awsify/deployment-schemas";
 
 export interface KeyFile {
   path: string;
@@ -24,22 +24,35 @@ export function collectKeyFiles(root: string): KeyFile[] {
     }
   };
 
-  // Core project files
+  // Node.js projects
   tryRead("package.json");
   tryRead("tsconfig.json");
+
+  // Python projects
+  tryRead("requirements.txt");
+  tryRead("pyproject.toml");
+  tryRead("Pipfile");
+  tryRead("setup.py");
+
+  // Go projects
+  tryRead("go.mod");
+
+  // Container
   tryRead("Dockerfile");
 
   // Framework configs
   tryRead("next.config.ts") || tryRead("next.config.mjs") || tryRead("next.config.js");
+  tryRead("vite.config.ts") || tryRead("vite.config.mjs") || tryRead("vite.config.js");
+  tryRead("astro.config.mjs") || tryRead("astro.config.ts");
 
-  // Env templates (most informative for required vars)
+  // Env templates
   tryRead(".env.example") || tryRead(".env.sample") || tryRead("env.example") || tryRead(".env.template");
 
   // First found entry point
   const entryPoints = [
     "src/index.ts", "src/main.ts", "src/server.ts", "src/app.ts",
-    "index.ts", "server.ts", "app.ts",
-    "src/index.js", "index.js", "server.js"
+    "index.ts", "server.ts", "app.ts", "main.go",
+    "src/index.js", "index.js", "server.js", "main.py", "app.py"
   ];
   for (const ep of entryPoints) {
     if (tryRead(ep)) break;
@@ -52,6 +65,7 @@ export interface RepoScanResult {
   root: string;
   packageManager: DeploymentSuggestion["packageManager"];
   appType: DeploymentSuggestion["appType"];
+  computeTarget: ComputeTarget;
   buildCommand: string;
   startCommand: string;
   installCommand: string;
@@ -59,48 +73,188 @@ export interface RepoScanResult {
   hasDockerfile: boolean;
   envVars: DeploymentSuggestion["envVars"];
   databaseRequired: boolean;
+  databaseEngine: "postgresql" | "mysql" | "mongodb" | undefined;
+  cacheRequired: boolean;
   signals: string[];
 }
 
 export function scanRepository(root: string): RepoScanResult {
-  const packageJsonPath = join(root, "package.json");
-  if (!existsSync(packageJsonPath)) {
-    throw new Error("Only repositories with a root package.json are supported in the MVP.");
+  const signals: string[] = [];
+  const hasDockerfile = existsSync(join(root, "Dockerfile"));
+
+  // --- Language / framework detection ---
+  const isPython =
+    existsSync(join(root, "requirements.txt")) ||
+    existsSync(join(root, "pyproject.toml")) ||
+    existsSync(join(root, "Pipfile")) ||
+    existsSync(join(root, "setup.py"));
+
+  const isGo = existsSync(join(root, "go.mod"));
+
+  const hasPackageJson = existsSync(join(root, "package.json"));
+
+  if (isPython) signals.push("Python project detected");
+  if (isGo) signals.push("Go project detected");
+  if (hasDockerfile) signals.push("Dockerfile present");
+
+  if (isPython) return scanPython(root, hasDockerfile, signals);
+  if (isGo) return scanGo(root, hasDockerfile, signals);
+  if (hasPackageJson) return scanNode(root, hasDockerfile, signals);
+
+  // Fallback: Dockerfile-only app
+  if (hasDockerfile) {
+    signals.push("No recognised language root — using Dockerfile as sole signal");
+    return {
+      root,
+      packageManager: "unknown",
+      appType: "dockerfile-app",
+      computeTarget: "ecs-fargate",
+      buildCommand: "docker build -t app .",
+      startCommand: "docker run app",
+      installCommand: "",
+      port: 3000,
+      hasDockerfile: true,
+      envVars: [],
+      databaseRequired: false,
+      databaseEngine: undefined,
+      cacheRequired: false,
+      signals
+    };
   }
 
-  const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
+  throw new Error("Unable to detect project type. No package.json, requirements.txt, go.mod, or Dockerfile found.");
+}
+
+function scanNode(root: string, hasDockerfile: boolean, signals: string[]): RepoScanResult {
+  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
     scripts?: Record<string, string>;
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
   };
 
-  const dependencies = { ...pkg.dependencies, ...pkg.devDependencies };
-  const signals: string[] = [];
-  const packageManager = detectPackageManager(root);
-  const isNext = Boolean(dependencies.next) || existsSync(join(root, "next.config.js")) || existsSync(join(root, "next.config.mjs"));
-  const isExpress = Boolean(dependencies.express);
+  const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+  const packageManager = detectNodePackageManager(root);
 
-  if (isNext) signals.push("next dependency/config detected");
-  if (isExpress) signals.push("express dependency detected");
+  const isNext = Boolean(deps.next) || existsSync(join(root, "next.config.js")) || existsSync(join(root, "next.config.mjs")) || existsSync(join(root, "next.config.ts"));
+  const isExpress = Boolean(deps.express);
+  const isVite = Boolean(deps.vite) || existsSync(join(root, "vite.config.ts")) || existsSync(join(root, "vite.config.js"));
+  const isAstro = Boolean(deps.astro) || existsSync(join(root, "astro.config.mjs"));
+  const isCra = Boolean(deps["react-scripts"]);
 
-  const envVars = findEnvVars(root);
-  const databaseRequired = envVars.some((envVar) => envVar.name === "DATABASE_URL") || Boolean(dependencies.pg || dependencies.prisma || dependencies["@prisma/client"]);
-  const appType = isNext ? "nextjs-app" : "node-backend";
-  const buildCommand = pkg.scripts?.build ? `${packageManagerRun(packageManager)} build` : "npm run build";
-  const startCommand = pkg.scripts?.start ? `${packageManagerRun(packageManager)} start` : "node server.js";
+  const isStaticOnly = (isVite || isAstro || isCra) && !isNext && !isExpress && !hasServerEntryPoint(root, deps);
+
+  if (isNext) signals.push("Next.js detected");
+  if (isExpress) signals.push("Express detected");
+  if (isStaticOnly) signals.push("Static site build detected (Vite/Astro/CRA)");
+
+  const envVars = findEnvVars(root, ["ts", "tsx", "js", "jsx", "mjs"]);
+  const { databaseRequired, databaseEngine } = detectDatabase(deps, envVars);
+  const cacheRequired = detectRedis(deps);
+
+  if (databaseRequired) signals.push(`Database dependency detected (${databaseEngine ?? "unknown"})`);
+  if (cacheRequired) signals.push("Redis/cache dependency detected");
+
+  const pm = packageManagerRun(packageManager);
+  const appType = isNext ? "nextjs-app" : isStaticOnly ? "static-site" : "node-backend";
+  const computeTarget: ComputeTarget = isStaticOnly ? "s3-cloudfront" : "ecs-fargate";
+  const buildCommand = pkg.scripts?.build ? `${pm} build` : "npm run build";
+  const startCommand = isStaticOnly ? "" : (pkg.scripts?.start ? `${pm} start` : "node server.js");
   const installCommand = packageManagerInstall(packageManager);
+  const port = isStaticOnly ? 0 : (detectPort(root, ["ts", "tsx", "js"]) ?? (isNext ? 3000 : 3000));
 
   return {
     root,
     packageManager,
     appType,
+    computeTarget,
     buildCommand,
     startCommand,
     installCommand,
-    port: detectPort(root) ?? (isNext ? 3000 : 3000),
-    hasDockerfile: existsSync(join(root, "Dockerfile")),
+    port,
+    hasDockerfile,
     envVars,
     databaseRequired,
+    databaseEngine,
+    cacheRequired,
+    signals
+  };
+}
+
+function scanPython(root: string, hasDockerfile: boolean, signals: string[]): RepoScanResult {
+  const packageManager = detectPythonPackageManager(root);
+  const requirements = readFileSafe(join(root, "requirements.txt")) + readFileSafe(join(root, "pyproject.toml")) + readFileSafe(join(root, "Pipfile"));
+  const lower = requirements.toLowerCase();
+
+  const isFastapi = lower.includes("fastapi");
+  const isFlask = lower.includes("flask");
+  const isDjango = lower.includes("django");
+
+  if (isFastapi) signals.push("FastAPI detected");
+  if (isFlask) signals.push("Flask detected");
+  if (isDjango) signals.push("Django detected");
+
+  const envVars = findEnvVars(root, ["py"]);
+  const databaseRequired = lower.includes("psycopg") || lower.includes("sqlalchemy") || lower.includes("django") || lower.includes("pymysql") || lower.includes("pymongo") || envVars.some(v => v.name === "DATABASE_URL");
+  const databaseEngine = lower.includes("psycopg") || lower.includes("postgres") ? "postgresql" : lower.includes("mysql") || lower.includes("pymysql") ? "mysql" : lower.includes("pymongo") ? "mongodb" : undefined;
+  const cacheRequired = lower.includes("redis") || lower.includes("celery");
+
+  if (databaseRequired) signals.push(`Database dependency detected (${databaseEngine ?? "unknown"})`);
+  if (cacheRequired) signals.push("Redis/cache dependency detected");
+
+  const port = detectPort(root, ["py"]) ?? 8000;
+  const installCommand = packageManager === "poetry" ? "poetry install --no-root" : packageManager === "uv" ? "uv pip install -r requirements.txt" : "pip install -r requirements.txt";
+
+  const startCommand = isFastapi
+    ? `uvicorn main:app --host 0.0.0.0 --port ${port}`
+    : isFlask
+      ? `gunicorn app:app -b 0.0.0.0:${port}`
+      : isDjango
+        ? `gunicorn config.wsgi:application -b 0.0.0.0:${port}`
+        : `python main.py`;
+
+  return {
+    root,
+    packageManager,
+    appType: "python-backend",
+    computeTarget: "ecs-fargate",
+    buildCommand: packageManager === "poetry" ? "poetry build" : "pip install -r requirements.txt",
+    startCommand,
+    installCommand,
+    port,
+    hasDockerfile,
+    envVars,
+    databaseRequired,
+    databaseEngine,
+    cacheRequired,
+    signals
+  };
+}
+
+function scanGo(root: string, hasDockerfile: boolean, signals: string[]): RepoScanResult {
+  const goMod = readFileSafe(join(root, "go.mod"));
+  const envVars = findEnvVars(root, ["go"]);
+  const databaseRequired = goMod.includes("gorm") || goMod.includes("pgx") || goMod.includes("go-pg") || goMod.includes("database/sql") || envVars.some(v => v.name === "DATABASE_URL");
+  const databaseEngine = goMod.includes("postgres") || goMod.includes("pgx") ? "postgresql" : goMod.includes("mysql") ? "mysql" : undefined;
+  const cacheRequired = goMod.includes("go-redis") || goMod.includes("redis");
+  const port = detectPort(root, ["go"]) ?? 8080;
+
+  if (databaseRequired) signals.push(`Database dependency detected (${databaseEngine ?? "unknown"})`);
+  if (cacheRequired) signals.push("Redis/cache dependency detected");
+
+  return {
+    root,
+    packageManager: "go-modules",
+    appType: "go-backend",
+    computeTarget: "ecs-fargate",
+    buildCommand: "go build -o server .",
+    startCommand: "./server",
+    installCommand: "go mod download",
+    port,
+    hasDockerfile,
+    envVars,
+    databaseRequired,
+    databaseEngine,
+    cacheRequired,
     signals
   };
 }
@@ -108,7 +262,8 @@ export function scanRepository(root: string): RepoScanResult {
 export function scanToSuggestion(scan: RepoScanResult): DeploymentSuggestion {
   return {
     appType: scan.appType,
-    services: scan.appType === "nextjs-app" ? ["frontend"] : ["backend"],
+    computeTarget: scan.computeTarget,
+    services: buildServices(scan),
     packageManager: scan.packageManager,
     buildCommand: scan.buildCommand,
     startCommand: scan.startCommand,
@@ -117,73 +272,147 @@ export function scanToSuggestion(scan: RepoScanResult): DeploymentSuggestion {
     hasDockerfile: scan.hasDockerfile,
     envVars: scan.envVars,
     database: scan.databaseRequired
-      ? { required: true, engine: "postgresql", note: "Detected DATABASE_URL or PostgreSQL/Prisma dependency. RDS provisioning is planned after MVP." }
+      ? { required: true, engine: scan.databaseEngine, note: "Detected database dependency. RDS will be provisioned." }
       : { required: false },
-    confidence: scan.signals.length > 0 ? 0.82 : 0.55,
+    cache: scan.cacheRequired
+      ? { required: true, note: "Detected Redis dependency. ElastiCache will be provisioned." }
+      : { required: false },
+    confidence: scan.signals.length >= 2 ? 0.82 : 0.55,
     notes: scan.signals
   };
 }
 
-function detectPackageManager(root: string): DeploymentSuggestion["packageManager"] {
+// --- helpers ---
+
+function buildServices(scan: RepoScanResult): DeploymentSuggestion["services"] {
+  const services: DeploymentSuggestion["services"] = [];
+  if (scan.appType === "nextjs-app" || scan.appType === "static-site") services.push("frontend");
+  else services.push("backend");
+  if (scan.databaseRequired) services.push("database");
+  if (scan.cacheRequired) services.push("cache");
+  return services;
+}
+
+function detectNodePackageManager(root: string): DeploymentSuggestion["packageManager"] {
   if (existsSync(join(root, "pnpm-lock.yaml"))) return "pnpm";
   if (existsSync(join(root, "yarn.lock"))) return "yarn";
   if (existsSync(join(root, "bun.lockb"))) return "bun";
-  if (existsSync(join(root, "package-lock.json"))) return "npm";
   return "npm";
 }
 
-function packageManagerRun(packageManager: DeploymentSuggestion["packageManager"]): string {
-  if (packageManager === "yarn") return "yarn";
-  if (packageManager === "pnpm") return "pnpm";
-  if (packageManager === "bun") return "bun run";
+function detectPythonPackageManager(root: string): DeploymentSuggestion["packageManager"] {
+  if (existsSync(join(root, "pyproject.toml"))) return "poetry";
+  if (existsSync(join(root, "uv.lock"))) return "uv";
+  return "pip";
+}
+
+function packageManagerRun(pm: DeploymentSuggestion["packageManager"]): string {
+  if (pm === "yarn") return "yarn";
+  if (pm === "pnpm") return "pnpm";
+  if (pm === "bun") return "bun run";
   return "npm run";
 }
 
-function packageManagerInstall(packageManager: DeploymentSuggestion["packageManager"]): string {
-  if (packageManager === "pnpm") return "corepack enable && pnpm install --frozen-lockfile";
-  if (packageManager === "yarn") return "corepack enable && yarn install --frozen-lockfile";
-  if (packageManager === "bun") return "bun install --frozen-lockfile";
+function packageManagerInstall(pm: DeploymentSuggestion["packageManager"]): string {
+  if (pm === "pnpm") return "corepack enable && pnpm install --frozen-lockfile";
+  if (pm === "yarn") return "corepack enable && yarn install --frozen-lockfile";
+  if (pm === "bun") return "bun install --frozen-lockfile";
   return "npm ci";
 }
 
-function detectPort(root: string): number | undefined {
-  const files = collectSourceFiles(root);
-  for (const file of files) {
-    const content = readFileSync(file, "utf8");
-    const match = content.match(/(?:process\.env\.PORT\s*\|\|\s*|PORT\s*=\s*)(\d{2,5})|listen\((\d{2,5})/);
+function detectDatabase(
+  deps: Record<string, string | undefined>,
+  envVars: DeploymentSuggestion["envVars"]
+): { databaseRequired: boolean; databaseEngine: "postgresql" | "mysql" | "mongodb" | undefined } {
+  const hasPg = Boolean(deps.pg || deps["@prisma/client"] || deps.prisma);
+  const hasMysql = Boolean(deps.mysql2);
+  const hasMongo = Boolean(deps.mongoose || deps.mongodb);
+  const hasDbUrl = envVars.some(v => v.name === "DATABASE_URL");
+
+  const databaseRequired = hasPg || hasMysql || hasMongo || hasDbUrl;
+  const databaseEngine = hasPg ? "postgresql" : hasMysql ? "mysql" : hasMongo ? "mongodb" : undefined;
+  return { databaseRequired, databaseEngine };
+}
+
+function detectRedis(deps: Record<string, string | undefined>): boolean {
+  return Boolean(deps.ioredis || deps.redis || deps.bullmq || deps["@bull-board/express"]);
+}
+
+function hasServerEntryPoint(root: string, deps: Record<string, string | undefined>): boolean {
+  if (deps.express || deps.fastify || deps.koa || deps.hapi) return true;
+  const entryPoints = ["src/server.ts", "src/server.js", "server.ts", "server.js", "src/main.ts", "src/main.js"];
+  return entryPoints.some(ep => existsSync(join(root, ep)));
+}
+
+function detectPort(root: string, extensions: string[]): number | undefined {
+  for (const file of collectSourceFiles(root, extensions)) {
+    const content = readFileSafe(file);
+    const match = content.match(/(?:process\.env\.PORT\s*\|\|\s*|PORT\s*=\s*)(\d{2,5})|listen\((\d{2,5})/) ||
+                  content.match(/os\.environ\.get\(['"]PORT['"],\s*['"]?(\d{2,5})/) ||
+                  content.match(/http\.ListenAndServe\([^,]*:(\d{2,5})/);
     const port = Number(match?.[1] ?? match?.[2]);
     if (Number.isInteger(port) && port > 0 && port < 65536) return port;
   }
   return undefined;
 }
 
-function findEnvVars(root: string): DeploymentSuggestion["envVars"] {
+function findEnvVars(root: string, extensions: string[]): DeploymentSuggestion["envVars"] {
   const names = new Set<string>();
-  for (const file of collectSourceFiles(root)) {
-    const content = readFileSync(file, "utf8");
-    const matches = content.matchAll(/process\.env\.([A-Z_][A-Z0-9_]*)/g);
-    for (const match of matches) names.add(match[1]);
+  const patterns = [
+    /process\.env\.([A-Z_][A-Z0-9_]*)/g,
+    /os\.environ\.get\(['"]([A-Z_][A-Z0-9_]*)['"]/g,
+    /os\.environ\[['"]([A-Z_][A-Z0-9_]*)['"]\]/g,
+    /os\.Getenv\(['"]([A-Z_][A-Z0-9_]*)['"]\)/g
+  ];
+
+  for (const file of collectSourceFiles(root, extensions)) {
+    const content = readFileSafe(file);
+    for (const pattern of patterns) {
+      for (const match of content.matchAll(pattern)) names.add(match[1]);
+    }
   }
 
-  return [...names].sort().map((name) => ({
+  return [...names].sort().map(name => ({
     name,
     required: name !== "NODE_ENV" && name !== "PORT"
   }));
 }
 
-function collectSourceFiles(root: string, depth = 0): string[] {
+function collectSourceFiles(root: string, extensions: string[], depth = 0): string[] {
   if (depth > 4) return [];
-  const ignored = new Set(["node_modules", ".git", ".next", "dist", "build", "coverage"]);
-  const entries = readdirSync(root);
+  const ignored = new Set(["node_modules", ".git", ".next", "dist", "build", "coverage", "__pycache__", ".venv", "vendor"]);
+  let entries: string[];
+  try {
+    entries = readdirSync(root);
+  } catch {
+    return [];
+  }
   const files: string[] = [];
+  const extSet = new Set(extensions);
 
   for (const entry of entries) {
     if (ignored.has(entry)) continue;
     const path = join(root, entry);
-    const stat = statSync(path);
-    if (stat.isDirectory()) files.push(...collectSourceFiles(path, depth + 1));
-    if (stat.isFile() && /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(entry)) files.push(path);
+    let stat;
+    try {
+      stat = statSync(path);
+    } catch {
+      continue;
+    }
+    if (stat.isDirectory()) files.push(...collectSourceFiles(path, extensions, depth + 1));
+    if (stat.isFile()) {
+      const ext = entry.split(".").pop() ?? "";
+      if (extSet.has(ext)) files.push(path);
+    }
   }
 
   return files;
+}
+
+function readFileSafe(path: string): string {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return "";
+  }
 }

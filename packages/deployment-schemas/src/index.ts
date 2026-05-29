@@ -1,7 +1,23 @@
 import { z } from "zod";
 
-export const supportedAppTypeSchema = z.enum(["node-backend", "nextjs-app"]);
-export const supportedServiceSchema = z.enum(["frontend", "backend", "database", "worker"]);
+export const supportedAppTypeSchema = z.enum([
+  "node-backend",
+  "nextjs-app",
+  "python-backend",
+  "go-backend",
+  "static-site",
+  "dockerfile-app"
+]);
+
+export const computeTargetSchema = z.enum([
+  "ecs-fargate",
+  "ecs-ec2",
+  "ec2-instance",
+  "lambda",
+  "s3-cloudfront"
+]);
+
+export const supportedServiceSchema = z.enum(["frontend", "backend", "database", "worker", "cache"]);
 
 export const envVarSchema = z.object({
   name: z.string().regex(/^[A-Z_][A-Z0-9_]*$/),
@@ -12,18 +28,27 @@ export const envVarSchema = z.object({
 
 export const deploymentSuggestionSchema = z.object({
   appType: supportedAppTypeSchema,
+  computeTarget: computeTargetSchema.default("ecs-fargate"),
   services: z.array(supportedServiceSchema).min(1),
-  packageManager: z.enum(["npm", "pnpm", "yarn", "bun", "unknown"]),
+  packageManager: z.enum(["npm", "pnpm", "yarn", "bun", "pip", "poetry", "uv", "go-modules", "unknown"]),
   buildCommand: z.string().min(1).max(200),
   startCommand: z.string().min(1).max(200),
   installCommand: z.string().min(1).max(200),
-  port: z.number().int().min(1).max(65535),
+  port: z.number().int().min(0).max(65535),
   hasDockerfile: z.boolean(),
   envVars: z.array(envVarSchema),
   database: z
     .object({
       required: z.boolean(),
-      engine: z.enum(["postgresql"]).optional(),
+      engine: z.enum(["postgresql", "mysql", "mongodb"]).optional(),
+      instanceClass: z.string().optional(),
+      note: z.string().max(300).optional()
+    })
+    .default({ required: false }),
+  cache: z
+    .object({
+      required: z.boolean(),
+      nodeType: z.string().optional(),
       note: z.string().max(300).optional()
     })
     .default({ required: false }),
@@ -32,6 +57,7 @@ export const deploymentSuggestionSchema = z.object({
 });
 
 export type DeploymentSuggestion = z.infer<typeof deploymentSuggestionSchema>;
+export type ComputeTarget = z.infer<typeof computeTargetSchema>;
 
 export const generatedArtifactSchema = z.object({
   kind: z.enum(["dockerfile", "github-action", "pulumi-preview", "cloudformation-role"]),
@@ -51,12 +77,28 @@ export const deploymentPlanSchema = z.object({
   resources: z.array(
     z.object({
       type: z.enum([
+        // Container / ECS
         "ecr.repository",
         "ecs.cluster",
         "ecs.service",
         "ecs.taskDefinition",
+        // Load balancing
         "elasticloadbalancingv2.loadBalancer",
         "elasticloadbalancingv2.targetGroup",
+        // EC2
+        "ec2.instance",
+        "ec2.launchTemplate",
+        "autoscaling.group",
+        // Lambda
+        "lambda.function",
+        "apigateway.httpApi",
+        // Static hosting
+        "s3.bucket",
+        "cloudfront.distribution",
+        // Database / Cache
+        "rds.dbInstance",
+        "elasticache.replicationGroup",
+        // Shared infra
         "cloudwatch.logGroup",
         "iam.role",
         "ec2.securityGroup"
