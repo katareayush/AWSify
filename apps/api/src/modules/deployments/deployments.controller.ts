@@ -1,34 +1,31 @@
-import { Body, Controller, Param, Post } from "@nestjs/common";
-import type { DeploymentSuggestion } from "@awsify/deployment-schemas";
+import { Body, Controller, Get, Param, Post, Req } from "@nestjs/common";
+import type { Request } from "express";
 import { DeploymentsService } from "./deployments.service";
+
+const SESSION_COOKIE = "aws_ify_session";
 
 @Controller("deployments")
 export class DeploymentsController {
   constructor(private readonly deployments: DeploymentsService) {}
 
-  @Post("plans")
-  createPlan(
-    @Body()
-    body: {
-      projectId: string;
-      appName: string;
-      region: string;
-      suggestion?: DeploymentSuggestion;
-    }
+  @Post("trigger")
+  trigger(
+    @Req() req: Request,
+    @Body() body: { repoId: string; branch: string; awsConnectionId: string }
   ) {
-    return this.deployments.createPlan(body);
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    return this.deployments.trigger(token, body);
   }
 
-  @Post("plans/:id/approve")
-  approve(@Param("id") id: string) {
-    return this.deployments.approvePlan(id);
+  @Get()
+  list(@Req() req: Request) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    return this.deployments.list(token);
   }
 
-  @Post("plans/:id/deploy")
-  deploy(
-    @Param("id") id: string,
-    @Body() body: { projectId: string; repoFullName: string; branch: string; awsConnectionId: string; actorUserId: string }
-  ) {
-    return this.deployments.deployApprovedPlan(id, body);
+  @Get(":id")
+  get(@Req() req: Request, @Param("id") id: string) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    return this.deployments.get(id, token);
   }
 }

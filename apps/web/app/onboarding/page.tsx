@@ -1,9 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, CircleDashed, Github, KeyRound, ScanLine, ShieldCheck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AppRoot } from "../../components/app";
 import { Mark } from "../../components/landing/primitives/mark";
 import { Button } from "../../components/ui/button";
+import { api } from "../../lib/api";
 
 interface StepConfig {
   icon: LucideIcon;
@@ -118,6 +121,15 @@ function StepProgress({ total, current }: { total: number; current: number }) {
 function ActiveStep({ step, index }: { step: StepConfig; index: number }) {
   const Icon = step.icon;
 
+  async function handleCta() {
+    try {
+      const { url } = await api.loginUrl();
+      window.location.href = url;
+    } catch {
+      window.location.href = "/";
+    }
+  }
+
   return (
     <div className="relative mt-6 overflow-hidden rounded-2xl border border-violet/[0.22] shadow-[0_0_80px_-20px_rgba(139,92,246,0.45)]">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-violet/[0.07] to-transparent" />
@@ -141,7 +153,7 @@ function ActiveStep({ step, index }: { step: StepConfig; index: number }) {
           {step.description}
         </p>
 
-        <Button size="lg" className="mt-6 w-full justify-center gap-2">
+        <Button size="lg" className="mt-6 w-full justify-center gap-2" onClick={handleCta}>
           <Icon className="h-4 w-4" />
           {step.cta ?? "Continue"}
           <ArrowRight className="h-4 w-4" />

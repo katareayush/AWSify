@@ -1,61 +1,131 @@
 import { Injectable } from "@nestjs/common";
-import { createDeploymentPlan } from "@awsify/templates";
-import { deploymentSuggestionSchema, type DeploymentPlan, type DeploymentSuggestion } from "@awsify/deployment-schemas";
+import { PrismaService } from "../prisma.service";
 import { QueueService } from "../queue/queue.service";
+import type { GithubService } from "../github/github.service";
+
+const SESSION_COOKIE = "aws_ify_session";
+
+function sanitizeAppName(repoFullName: string): string {
+  const name = repoFullName.split("/").pop() ?? "awsify-app";
+  return name.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-+|-+$/g, "").slice(0, 40).padEnd(3, "x");
+}
 
 @Injectable()
 export class DeploymentsService {
-  private readonly plans = new Map<string, DeploymentPlan>();
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly queue: QueueService,
+    private readonly github: GithubService
+  ) {}
 
-  constructor(private readonly queue: QueueService) {}
+  private getUserId(sessionToken: string | undefined): string | null {
+    if (!sessionToken) return null;
+    const session = this.github.verifySession(sessionToken);
+    return session?.userId ?? null;
+  }
 
-  createPlan(input: { projectId: string; appName: string; region: string; suggestion?: DeploymentSuggestion }) {
-    if (!input.suggestion) {
-      return {
-        status: "missing_suggestion",
-        note: "Create a plan only after repo scanning returns a validated DeploymentSuggestion."
-      };
-    }
+  async trigger(
+    sessionToken: string | undefined,
+    input: { repoId: string; branch: string; awsConnectionId: string }
+  ) {
+    const userId = this.getUserId(sessionToken);
+    if (!userId) return { error: "not_authenticated" };
 
-    const suggestion = deploymentSuggestionSchema.parse(input.suggestion);
+    const repo = await this.prisma.repository.findUnique({ where: { id: input.repoId } });
+    if (!repo) return { error: "repo_not_found" };
 
-    const plan = createDeploymentPlan({
-      projectId: input.projectId,
-      appName: input.appName,
-      region: input.region,
-      awsifyAccountId: process.env.AWSIFY_AWS_ACCOUNT_ID ?? "",
-      externalId: `awsify-${input.projectId}`,
-      suggestion
+    const slug = repo.fullName.replace(/[^a-z0-9-]/gi, "-").toLowerCase().slice(0, 50);
+
+    const project = await this.prisma.project.upsert({
+      where: { userId_slug: { userId, slug } },
+      create: { name: repo.fullName.split("/")[1] ?? repo.fullName, slug, branch: input.branch, userId, repositoryId: repo.id, awsConnectionId: input.awsConnectionId },
+      update: { awsConnectionId: input.awsConnectionId, branch: input.branch }
     });
 
-    this.plans.set(plan.id, plan);
-    return { plan };
-  }
+    const plan = await this.prisma.deploymentPlan.create({
+      data: {
+        projectId: project.id,
+        appName: sanitizeAppName(repo.fullName),
+        region: process.env.AWS_REGION ?? "us-east-1",
+        suggestion: {},
+        resources: [],
+        estimatedCost: { low: 0, high: 0, notes: [] },
+        status: "draft"
+      }
+    });
 
-  approvePlan(id: string) {
-    const plan = this.plans.get(id);
-    if (!plan) return { status: "not_found" };
-    const approved = { ...plan, status: "approved" as const };
-    this.plans.set(id, approved);
-    return { plan: approved };
-  }
+    const deployment = await this.prisma.deployment.create({
+      data: { projectId: project.id, planId: plan.id, actorUserId: userId, status: "queued", logs: [] }
+    });
 
-  async deployApprovedPlan(
-    approvedPlanId: string,
-    input: { projectId: string; repoFullName: string; branch: string; awsConnectionId: string; actorUserId: string }
-  ) {
-    const plan = this.plans.get(approvedPlanId);
-    if (!plan || plan.status !== "approved") return { status: "not_approved" };
-
-    const job = await this.queue.enqueueDeployment({
-      projectId: input.projectId,
-      repoFullName: input.repoFullName,
+    await this.queue.enqueueDeployment({
+      projectId: project.id,
+      repoFullName: repo.fullName,
       branch: input.branch,
       awsConnectionId: input.awsConnectionId,
-      approvedPlanId,
-      actorUserId: input.actorUserId
+      approvedPlanId: plan.id,
+      actorUserId: userId,
+      deploymentId: deployment.id
     });
 
-    return { status: "queued", jobId: job.id };
+    return { deploymentId: deployment.id };
+  }
+
+  async list(sessionToken: string | undefined) {
+    const userId = this.getUserId(sessionToken);
+    if (!userId) return { error: "not_authenticated" };
+
+    const deployments = await this.prisma.deployment.findMany({
+      where: { actorUserId: userId },
+      include: { project: { include: { repository: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 50
+    });
+
+    return {
+      deployments: deployments.map(d => ({
+        id: d.id,
+        status: d.status,
+        liveUrl: d.liveUrl,
+        failureReason: d.failureReason,
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt,
+        project: { name: d.project.name, repoFullName: d.project.repository.fullName, branch: d.project.branch }
+      }))
+    };
+  }
+
+  async get(id: string, sessionToken: string | undefined) {
+    const userId = this.getUserId(sessionToken);
+    if (!userId) return { error: "not_authenticated" };
+
+    const deployment = await this.prisma.deployment.findFirst({
+      where: { id, actorUserId: userId },
+      include: {
+        project: { include: { repository: true } },
+        plan: { include: { artifacts: true } }
+      }
+    });
+    if (!deployment) return { error: "not_found" };
+
+    return { deployment };
+  }
+
+  async updateStatus(
+    deploymentId: string,
+    update: { status?: string; liveUrl?: string; failureReason?: string; appendLog?: unknown }
+  ) {
+    const data: Record<string, unknown> = {};
+    if (update.status) data.status = update.status;
+    if (update.liveUrl !== undefined) data.liveUrl = update.liveUrl;
+    if (update.failureReason !== undefined) data.failureReason = update.failureReason;
+
+    if (update.appendLog) {
+      const current = await this.prisma.deployment.findUnique({ where: { id: deploymentId }, select: { logs: true } });
+      const logs = Array.isArray(current?.logs) ? current.logs : [];
+      data.logs = [...logs, update.appendLog];
+    }
+
+    await this.prisma.deployment.update({ where: { id: deploymentId }, data });
   }
 }

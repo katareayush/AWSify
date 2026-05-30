@@ -1,20 +1,18 @@
 import { Injectable } from "@nestjs/common";
 import { STSClient, AssumeRoleCommand } from "@aws-sdk/client-sts";
+import { PrismaService } from "../prisma.service";
 import { generateCloudFormationRoleTemplate } from "@awsify/templates";
 
 @Injectable()
 export class AwsService {
+  constructor(private readonly prisma: PrismaService) {}
+
   createConnectionTemplate() {
     const externalId = `awsify-${crypto.randomUUID()}`;
     const awsifyAccountId = process.env.AWSIFY_AWS_ACCOUNT_ID;
 
     if (!awsifyAccountId) {
-      return {
-        externalId,
-        template: null,
-        status: "missing_awsify_account_id",
-        note: "Set AWSIFY_AWS_ACCOUNT_ID before generating a customer CloudFormation role template."
-      };
+      return { externalId, template: null, status: "missing_awsify_account_id" };
     }
 
     return {
@@ -25,12 +23,7 @@ export class AwsService {
   }
 
   async validateConnection(input: { roleArn: string; externalId: string; region?: string }) {
-    if (!input.region) {
-      return {
-        status: "missing_region",
-        reason: "Provide an AWS region before validating the role."
-      };
-    }
+    if (!input.region) return { status: "missing_region" };
 
     const client = new STSClient({ region: input.region });
     try {
@@ -42,16 +35,34 @@ export class AwsService {
           DurationSeconds: 900
         })
       );
-
-      return {
-        status: "valid",
-        accessKeyIdPreview: response.Credentials?.AccessKeyId?.slice(0, 6)
-      };
+      return { status: "valid", accessKeyIdPreview: response.Credentials?.AccessKeyId?.slice(0, 6) };
     } catch (error) {
-      return {
-        status: "invalid",
-        reason: error instanceof Error ? error.message : "Unknown STS validation error"
-      };
+      return { status: "invalid", reason: error instanceof Error ? error.message : "Unknown STS error" };
     }
+  }
+
+  async saveConnection(userId: string, input: { roleArn: string; externalId: string; accountId: string; region: string }) {
+    const connection = await this.prisma.awsConnection.upsert({
+      where: { id: input.externalId },
+      create: {
+        id: input.externalId,
+        accountId: input.accountId,
+        roleArn: input.roleArn,
+        externalId: input.externalId,
+        defaultRegion: input.region,
+        status: "valid",
+        userId
+      },
+      update: { roleArn: input.roleArn, defaultRegion: input.region, status: "valid" }
+    });
+    return { connection };
+  }
+
+  async listConnections(userId: string) {
+    const connections = await this.prisma.awsConnection.findMany({
+      where: { userId },
+      select: { id: true, accountId: true, defaultRegion: true, status: true, roleArn: true, createdAt: true }
+    });
+    return { connections };
   }
 }

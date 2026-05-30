@@ -1,0 +1,102 @@
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/v1";
+
+async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    ...init,
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...init?.headers }
+  });
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json()).error ?? ""; } catch { /* ignore */ }
+    throw new Error(detail || `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+// ---- types ----------------------------------------------------------------
+
+export interface Me {
+  authenticated: boolean;
+  userId?: string;
+  githubLogin?: string;
+}
+
+export interface Repo {
+  id: string;
+  fullName: string;
+  defaultBranch: string;
+  private: boolean;
+}
+
+export interface AwsConnection {
+  id: string;
+  accountId: string;
+  defaultRegion: string;
+  status: "pending" | "valid" | "invalid";
+  roleArn: string;
+  createdAt: string;
+}
+
+export interface Deployment {
+  id: string;
+  status: string;
+  liveUrl: string | null;
+  failureReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  project: { name: string; repoFullName: string; branch: string };
+}
+
+export interface DeploymentDetail extends Deployment {
+  logs: Array<{ status: string; message: string; at: string }>;
+  plan: {
+    id: string;
+    appName: string;
+    region: string;
+    suggestion: Record<string, unknown>;
+    resources: Array<{ type: string; name: string; purpose: string }>;
+    estimatedCost: { low: number; high: number; notes: string[] };
+    artifacts: Array<{ kind: string; path: string; content: string; summary: string }>;
+    status: string;
+  };
+}
+
+// ---- api calls ------------------------------------------------------------
+
+export const api = {
+  me: () => req<Me>("/github/me"),
+
+  loginUrl: () => req<{ url: string }>("/github/login-url"),
+
+  appInstallUrl: () => req<{ url: string }>("/github/app-install-url"),
+
+  repositories: () => req<{ repositories: Repo[] }>("/github/repositories"),
+
+  cfnTemplate: () =>
+    req<{ externalId: string; template: string | null }>("/aws/cloudformation-template"),
+
+  validateConnection: (body: { roleArn: string; externalId: string; region: string }) =>
+    req<{ status: string; reason?: string }>("/aws/connections/validate", {
+      method: "POST",
+      body: JSON.stringify(body)
+    }),
+
+  saveConnection: (body: { roleArn: string; externalId: string; accountId: string; region: string }) =>
+    req<{ connection: AwsConnection }>("/aws/connections", {
+      method: "POST",
+      body: JSON.stringify(body)
+    }),
+
+  listConnections: () => req<{ connections: AwsConnection[] }>("/aws/connections"),
+
+  triggerDeploy: (body: { repoId: string; branch: string; awsConnectionId: string }) =>
+    req<{ deploymentId: string }>("/deployments/trigger", {
+      method: "POST",
+      body: JSON.stringify(body)
+    }),
+
+  listDeployments: () => req<{ deployments: Deployment[] }>("/deployments"),
+
+  getDeployment: (id: string) => req<{ deployment: DeploymentDetail }>(`/deployments/${id}`)
+};

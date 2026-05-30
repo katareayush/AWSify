@@ -35,23 +35,34 @@ export class DeploymentOrchestrator {
 
   async deploy(job: DeploymentJob) {
     const events: DeploymentEvent[] = [];
-    const emit = (status: DeploymentEvent["status"], message: string) => {
-      events.push({ status, message, at: new Date().toISOString() });
+    const emit = async (status: DeploymentEvent["status"], message: string) => {
+      const event = { status, message, at: new Date().toISOString() };
+      events.push(event);
       console.log(`[deployment:${job.projectId}] ${status}: ${message}`);
+      if (job.deploymentId) {
+        await this.prisma.deployment.update({
+          where: { id: job.deploymentId },
+          data: {
+            status: status as never,
+            logs: { push: event } as never
+          }
+        }).catch(() => {/* non-fatal — don't break deployment over a log write */});
+      }
     };
 
-    emit("queued", "Deployment job accepted by worker.");
+    try {
+    await emit("scanning", "Deployment job accepted by worker.");
 
     const repoPath = await this.cloneRepository(job.repoFullName, job.branch);
-    emit("scanning", "Repository cloned; running static scanner.");
+    await emit("scanning", "Repository cloned; running static scanner.");
 
     const scan = scanRepository(repoPath);
     const keyFiles = collectKeyFiles(repoPath);
-    emit("scanning", `Scan complete: ${scan.appType} → ${scan.computeTarget} (${scan.signals.length} signals). Sending to Claude.`);
+    await emit("scanning", `Scan complete: ${scan.appType} → ${scan.computeTarget} (${scan.signals.length} signals). Sending to Claude.`);
 
     const aiResult = await this.ai.recommendDeployment({ repoFullName: job.repoFullName, scan, keyFiles });
     const { suggestion } = aiResult;
-    emit("scanning", `AI recommendation: ${suggestion.appType} on ${suggestion.computeTarget} (confidence ${suggestion.confidence.toFixed(2)})`);
+    await emit("scanning", `AI recommendation: ${suggestion.appType} on ${suggestion.computeTarget} (confidence ${suggestion.confidence.toFixed(2)})`);
 
     const region = process.env.AWS_REGION;
     const awsifyAccountId = process.env.AWSIFY_AWS_ACCOUNT_ID;
@@ -68,34 +79,44 @@ export class DeploymentOrchestrator {
       suggestion
     });
 
+    // Persist the real plan data to the placeholder plan record
+    if (job.deploymentId) {
+      await this.prisma.deploymentPlan.update({
+        where: { id: job.approvedPlanId },
+        data: {
+          suggestion: suggestion as object,
+          resources: plan.resources as object[],
+          estimatedCost: plan.estimatedMonthlyCostUsd as object,
+          status: "approved"
+        }
+      }).catch(() => {});
+    }
+
     // Load customer AWS connection
     const connection = await this.prisma.awsConnection.findUnique({ where: { id: job.awsConnectionId } });
     if (!connection) throw new Error(`AWS connection ${job.awsConnectionId} not found.`);
 
-    emit("deploying", `Assuming customer role ${connection.roleArn}`);
+    await emit("deploying", `Assuming customer role ${connection.roleArn}`);
     const credentials = await this.assumeRole(connection.roleArn, connection.externalId, region);
 
     let imageUri: string | undefined;
 
     if (suggestion.computeTarget !== "s3-cloudfront") {
-      // Resolve the Dockerfile before building
       const dockerfilePath = await this.resolveDockerfile(repoPath, scan, aiResult, emit);
-      emit("deploying", `Dockerfile source: ${dockerfilePath}`);
-
-      emit("deploying", "Creating ECR repository and building container image.");
+      await emit("deploying", `Dockerfile source: ${dockerfilePath}`);
+      await emit("deploying", "Creating ECR repository and building container image.");
       const repositoryUri = await this.ensureEcrRepo(plan.appName, region, credentials);
       imageUri = `${repositoryUri}:${job.branch.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
-
       await this.buildAndPushImage(repoPath, imageUri, repositoryUri, region, credentials);
-      emit("deploying", `Image pushed: ${imageUri}`);
+      await emit("deploying", `Image pushed: ${imageUri}`);
     } else {
-      emit("deploying", "Static site: building assets.");
+      await emit("deploying", "Static site: building assets.");
       const pm = suggestion.packageManager === "pnpm" ? "pnpm" : suggestion.packageManager === "yarn" ? "yarn" : "npm";
       await execFileAsync(pm, ["run", "build"], { cwd: repoPath });
-      emit("deploying", "Static build complete.");
+      await emit("deploying", "Static build complete.");
     }
 
-    emit("deploying", `Running Pulumi stack (${suggestion.computeTarget}).`);
+    await emit("deploying", `Running Pulumi stack (${suggestion.computeTarget}).`);
     const outputs = await this.runPulumiStack(plan, imageUri, credentials, repoPath, emit);
 
     const liveUrl =
@@ -103,41 +124,34 @@ export class DeploymentOrchestrator {
         ? outputs.liveUrl.value
         : (outputs as Record<string, { value: string } | undefined>)["liveUrl"]?.value;
 
-    // For S3+CF: sync static files into the bucket
     if (suggestion.computeTarget === "s3-cloudfront" && outputs.bucketName?.value) {
-      emit("deploying", `Syncing static files to s3://${outputs.bucketName.value}`);
+      await emit("deploying", `Syncing static files to s3://${outputs.bucketName.value}`);
       const { statSync } = await import("node:fs");
-      const buildDir = ["dist", "out", "build", ".next/static"].find(d => {
+      const buildDir = ["dist", "out", "build"].find(d => {
         try { statSync(join(repoPath, d)); return true; } catch { return false; }
       }) ?? "dist";
-
-      await execFileAsync("aws", [
-        "s3", "sync", join(repoPath, buildDir), `s3://${outputs.bucketName.value}`,
-        "--delete", "--region", region
-      ], {
-        env: {
-          ...process.env,
-          AWS_ACCESS_KEY_ID: credentials.accessKeyId,
-          AWS_SECRET_ACCESS_KEY: credentials.secretAccessKey,
-          AWS_SESSION_TOKEN: credentials.sessionToken
-        }
+      await execFileAsync("aws", ["s3", "sync", join(repoPath, buildDir), `s3://${outputs.bucketName.value}`, "--delete", "--region", region], {
+        env: { ...process.env, AWS_ACCESS_KEY_ID: credentials.accessKeyId, AWS_SECRET_ACCESS_KEY: credentials.secretAccessKey, AWS_SESSION_TOKEN: credentials.sessionToken }
       });
-      emit("deploying", "Static files synced to S3.");
+      await emit("deploying", "Static files synced to S3.");
     }
 
-    emit("deployed", `Live at: ${liveUrl ?? "(URL pending DNS propagation)"}`);
+    await emit("deployed", `Live at: ${liveUrl ?? "(URL pending DNS propagation)"}`);
 
-    return {
-      status: "deployed",
-      liveUrl,
-      events,
-      planSummary: {
-        appType: suggestion.appType,
-        computeTarget: suggestion.computeTarget,
-        port: suggestion.port,
-        resources: plan.resources.map(r => r.type)
+    if (job.deploymentId && liveUrl) {
+      await this.prisma.deployment.update({ where: { id: job.deploymentId }, data: { liveUrl, status: "deployed" } }).catch(() => {});
+    }
+
+    return { status: "deployed", liveUrl, events };
+
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      await emit("failed", `Deployment failed: ${reason}`);
+      if (job.deploymentId) {
+        await this.prisma.deployment.update({ where: { id: job.deploymentId }, data: { status: "failed", failureReason: reason } }).catch(() => {});
       }
-    };
+      throw err;
+    }
   }
 
   /**
@@ -151,7 +165,7 @@ export class DeploymentOrchestrator {
     repoPath: string,
     scan: RepoScanResult,
     aiResult: AiRecommendationResult,
-    emit: (status: DeploymentEvent["status"], msg: string) => void
+    emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
   ): Promise<string> {
     if (scan.hasDockerfile) {
       emit("scanning", "Dockerfile already present in repository — using as-is.");
@@ -254,7 +268,7 @@ export class DeploymentOrchestrator {
     imageUri: string | undefined,
     credentials: AwsCredentials,
     _repoPath: string,
-    emit: (status: DeploymentEvent["status"], msg: string) => void
+    emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
   ) {
     const stateDir = join(tmpdir(), "awsify-state", plan.projectId);
     mkdirSync(stateDir, { recursive: true });

@@ -125,7 +125,8 @@ export const deploymentJobSchema = z.object({
   branch: z.string(),
   awsConnectionId: z.string(),
   approvedPlanId: z.string(),
-  actorUserId: z.string()
+  actorUserId: z.string(),
+  deploymentId: z.string().optional()
 });
 
 export type DeploymentJob = z.infer<typeof deploymentJobSchema>;
