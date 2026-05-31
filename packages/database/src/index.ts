@@ -6,6 +6,7 @@ export type {
   DeploymentPlan,
   GitHubInstallation,
   Project,
+  ProjectEnvVar,
   Repository,
   User
 } from "@prisma/client";

@@ -11,8 +11,7 @@ export const logoStripItems = [
   "Pulumi",
   "Anthropic",
   "GitHub",
-  "Docker",
-  "OpenTelemetry"
+  "Docker"
 ];
 
 export const pains = [
@@ -38,7 +37,7 @@ export const howItWorksSteps = [
   {
     n: "01",
     title: "Connect",
-    body: "Install the GitHub App. Add an AWS role via CloudFormation. Two minutes.",
+    body: "Install the GitHub App. Add an AWS role via CloudFormation.",
     code: `$ gh app install aws-ify
 $ aws cloudformation create-stack \\
     --stack-name aws-ify-role`
@@ -46,30 +45,30 @@ $ aws cloudformation create-stack \\
   {
     n: "02",
     title: "Scan",
-    body: "AWS-ify reads your repo: runtime, framework, env vars, dependencies, secrets.",
-    code: `→ detected: next.js 15
-→ runtime: node 20
-→ env: 4 required, 0 secrets
-→ db: postgres (prisma)`
+    body: "AWS-ify reads your repo: runtime, framework, scripts, port, env vars, and dependencies.",
+    code: `detected: next.js
+runtime: node
+env: required values found
+db: marked as planned`
   },
   {
     n: "03",
     title: "Plan",
     body: "An AI plan is validated against a strict schema and rendered into Pulumi templates.",
-    code: `plan #042
-  ecr.repository  ✓
-  ecs.service     ✓
-  alb.listener    ✓
-  cw.logGroup     ✓`
+    code: `plan generated
+  ecr.repository
+  ecs.service
+  alb.listener
+  cloudwatch.logGroup`
   },
   {
     n: "04",
     title: "Approve & ship",
     body: "Review the diff. One click. AWS-ify provisions the stack and returns the service URL.",
-    code: `→ applying...
-✓ stack: api-gateway
-✓ url: https://api-gw.app
-✓ time: 4m 12s`
+    code: `awaiting approval
+approve plan
+deploy to fargate
+return live url`
   }
 ];
 
@@ -111,28 +110,24 @@ jobs:
 
 export const resourceListItems: ReadonlyArray<readonly [string, string]> = [
   ["ECR repository", "immutable image tags"],
-  ["ECS cluster + service", "Fargate, 2 desired"],
-  ["Application load balancer", "TLS, HTTP/2"],
+  ["ECS cluster + service", "Fargate"],
+  ["Application load balancer", "public HTTP"],
   ["IAM task role", "scoped to ECR + logs"],
-  ["CloudWatch log group", "30-day retention"],
-  ["Secrets Manager", "from env.example"],
-  ["RDS subnet group", "isolated subnets"]
+  ["CloudWatch log group", "application logs"]
 ];
 
 export const costLines = [
-  { svc: "ECS Fargate", detail: "2× 0.5 vCPU · 1 GB · 720h", cost: 27.36 },
-  { svc: "Application LB", detail: "1× ALB · 100 GB egress", cost: 18.4 },
-  { svc: "CloudWatch Logs", detail: "5 GB ingest · 30d retention", cost: 2.75 },
-  { svc: "ECR storage", detail: "10 GB images", cost: 1.0 },
-  { svc: "RDS Postgres", detail: "db.t4g.micro · 20 GB", cost: 14.89 },
-  { svc: "Secrets Manager", detail: "4 secrets", cost: 1.6 }
+  { svc: "ECS Fargate", detail: "small always-on task", cost: 20 },
+  { svc: "Application LB", detail: "public HTTP entrypoint", cost: 18 },
+  { svc: "CloudWatch Logs", detail: "app log ingest", cost: 3 },
+  { svc: "ECR storage", detail: "container images", cost: 1 }
 ];
 
 export const costHighlights = [
   {
-    kpi: "±8%",
-    label: "Estimate accuracy",
-    body: "Backed by AWS pricing API with usage patterns from your plan."
+    kpi: "$20-80",
+    label: "MVP range",
+    body: "A conservative estimate for one small ECS Fargate service with ALB, ECR, and logs."
   },
   {
     kpi: "$0",
@@ -140,18 +135,17 @@ export const costHighlights = [
     body: "No resources exist before you click approve. Plans are dry-run by default."
   },
   {
-    kpi: "3",
-    label: "Right-size suggestions",
-    body: "AWS-ify flags over-provisioned tasks and idle resources after 7 days."
+    kpi: "1",
+    label: "Supported target",
+    body: "The first production path is intentionally limited to ECS Fargate."
   }
 ];
 
 export const securityBadges = [
-  "SOC2 Type II (in progress)",
-  "OIDC GitHub → AWS",
+  "GitHub App repo access",
   "Least-privilege IAM",
-  "Customer-managed KMS",
-  "Audit log export"
+  "User-approved deploys",
+  "Template-only infra"
 ];
 
 export const faqs = [
@@ -161,11 +155,11 @@ export const faqs = [
   },
   {
     q: "What stacks are supported today?",
-    a: "Node.js and Next.js services that build to a Docker image, deployed to ECS Fargate behind an ALB. RDS Postgres and S3 are first-class. More runtimes shipping monthly."
+    a: "Node.js backends and Next.js apps that build to a Docker image, deployed to ECS Fargate behind an ALB. PostgreSQL detection is shown in the plan, but RDS provisioning is not part of the first MVP path."
   },
   {
     q: "Can I edit the generated infrastructure code?",
-    a: "Yes. The Pulumi files are committed to your repo. You own them. AWS-ify will diff your edits against the next plan and respect them."
+    a: "The MVP shows generated Dockerfile, GitHub Actions, and Pulumi plan artifacts for review. Committing generated infra back to the repo comes after the first deployment path is stable."
   },
   {
     q: "How is this different from Terraform / Pulumi / SST?",
@@ -177,7 +171,7 @@ export const faqs = [
   },
   {
     q: "What happens if a deploy fails halfway?",
-    a: "AWS-ify wraps every apply in a transaction. Failed deploys roll back to the last known-good state, with a full event log in the dashboard."
+    a: "The worker records deployment events and marks the deployment failed with the reason. Full rollback automation is planned after the first ECS Fargate path is proven."
   }
 ];
 

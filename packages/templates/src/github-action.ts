@@ -1,4 +1,4 @@
-export function generateGithubAction(appName: string, region: string): string {
+export function generateGithubAction(appName: string, region: string, projectId: string): string {
   return `name: Deploy ${appName}
 
 on:
@@ -15,13 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Trigger AWSify deployment
+      - name: Trigger AWS-ify redeploy
         run: |
           curl -sS -X POST \\
             -H "Authorization: Bearer \${{ secrets.AWSIFY_API_TOKEN }}" \\
             -H "Content-Type: application/json" \\
-            -d '{"branch":"\${{ github.ref_name }}"}' \\
-            https://api.awsify.dev/v1/projects/\${{ vars.AWSIFY_PROJECT_ID }}/deploy
+            -d '{"projectId":"${projectId}","branch":"\${{ github.ref_name }}"}' \\
+            "\${{ vars.AWSIFY_API_URL }}/v1/deployments/redeploy"
         env:
           AWS_REGION: ${region}
 `;

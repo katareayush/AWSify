@@ -28,22 +28,11 @@ export function collectKeyFiles(root: string): KeyFile[] {
   tryRead("package.json");
   tryRead("tsconfig.json");
 
-  // Python projects
-  tryRead("requirements.txt");
-  tryRead("pyproject.toml");
-  tryRead("Pipfile");
-  tryRead("setup.py");
-
-  // Go projects
-  tryRead("go.mod");
-
   // Container
   tryRead("Dockerfile");
 
   // Framework configs
   tryRead("next.config.ts") || tryRead("next.config.mjs") || tryRead("next.config.js");
-  tryRead("vite.config.ts") || tryRead("vite.config.mjs") || tryRead("vite.config.js");
-  tryRead("astro.config.mjs") || tryRead("astro.config.ts");
 
   // Env templates
   tryRead(".env.example") || tryRead(".env.sample") || tryRead("env.example") || tryRead(".env.template");
@@ -51,8 +40,8 @@ export function collectKeyFiles(root: string): KeyFile[] {
   // First found entry point
   const entryPoints = [
     "src/index.ts", "src/main.ts", "src/server.ts", "src/app.ts",
-    "index.ts", "server.ts", "app.ts", "main.go",
-    "src/index.js", "index.js", "server.js", "main.py", "app.py"
+    "index.ts", "server.ts", "app.ts",
+    "src/index.js", "index.js", "server.js"
   ];
   for (const ep of entryPoints) {
     if (tryRead(ep)) break;
@@ -82,47 +71,13 @@ export function scanRepository(root: string): RepoScanResult {
   const signals: string[] = [];
   const hasDockerfile = existsSync(join(root, "Dockerfile"));
 
-  // --- Language / framework detection ---
-  const isPython =
-    existsSync(join(root, "requirements.txt")) ||
-    existsSync(join(root, "pyproject.toml")) ||
-    existsSync(join(root, "Pipfile")) ||
-    existsSync(join(root, "setup.py"));
-
-  const isGo = existsSync(join(root, "go.mod"));
-
   const hasPackageJson = existsSync(join(root, "package.json"));
 
-  if (isPython) signals.push("Python project detected");
-  if (isGo) signals.push("Go project detected");
   if (hasDockerfile) signals.push("Dockerfile present");
 
-  if (isPython) return scanPython(root, hasDockerfile, signals);
-  if (isGo) return scanGo(root, hasDockerfile, signals);
   if (hasPackageJson) return scanNode(root, hasDockerfile, signals);
 
-  // Fallback: Dockerfile-only app
-  if (hasDockerfile) {
-    signals.push("No recognised language root — using Dockerfile as sole signal");
-    return {
-      root,
-      packageManager: "unknown",
-      appType: "dockerfile-app",
-      computeTarget: "ecs-fargate",
-      buildCommand: "docker build -t app .",
-      startCommand: "docker run app",
-      installCommand: "",
-      port: 3000,
-      hasDockerfile: true,
-      envVars: [],
-      databaseRequired: false,
-      databaseEngine: undefined,
-      cacheRequired: false,
-      signals
-    };
-  }
-
-  throw new Error("Unable to detect project type. No package.json, requirements.txt, go.mod, or Dockerfile found.");
+  throw new Error("Unsupported project type. MVP currently requires a Node.js or Next.js repo with package.json.");
 }
 
 function scanNode(root: string, hasDockerfile: boolean, signals: string[]): RepoScanResult {
@@ -142,10 +97,12 @@ function scanNode(root: string, hasDockerfile: boolean, signals: string[]): Repo
   const isCra = Boolean(deps["react-scripts"]);
 
   const isStaticOnly = (isVite || isAstro || isCra) && !isNext && !isExpress && !hasServerEntryPoint(root, deps);
+  if (isStaticOnly) {
+    throw new Error("Static-only frontend repos are not supported in the ECS Fargate MVP yet. Select a Next.js app or Node.js backend.");
+  }
 
   if (isNext) signals.push("Next.js detected");
   if (isExpress) signals.push("Express detected");
-  if (isStaticOnly) signals.push("Static site build detected (Vite/Astro/CRA)");
 
   const envVars = findEnvVars(root, ["ts", "tsx", "js", "jsx", "mjs"]);
   const { databaseRequired, databaseEngine } = detectDatabase(deps, envVars);
@@ -155,12 +112,12 @@ function scanNode(root: string, hasDockerfile: boolean, signals: string[]): Repo
   if (cacheRequired) signals.push("Redis/cache dependency detected");
 
   const pm = packageManagerRun(packageManager);
-  const appType = isNext ? "nextjs-app" : isStaticOnly ? "static-site" : "node-backend";
-  const computeTarget: ComputeTarget = isStaticOnly ? "s3-cloudfront" : "ecs-fargate";
+  const appType = isNext ? "nextjs-app" : "node-backend";
+  const computeTarget: ComputeTarget = "ecs-fargate";
   const buildCommand = pkg.scripts?.build ? `${pm} build` : "npm run build";
-  const startCommand = isStaticOnly ? "" : (pkg.scripts?.start ? `${pm} start` : "node server.js");
+  const startCommand = pkg.scripts?.start ? `${pm} start` : "node server.js";
   const installCommand = packageManagerInstall(packageManager);
-  const port = isStaticOnly ? 0 : (detectPort(root, ["ts", "tsx", "js"]) ?? (isNext ? 3000 : 3000));
+  const port = detectPort(root, ["ts", "tsx", "js"]) ?? (isNext ? 3000 : 3000);
 
   return {
     root,
@@ -170,85 +127,6 @@ function scanNode(root: string, hasDockerfile: boolean, signals: string[]): Repo
     buildCommand,
     startCommand,
     installCommand,
-    port,
-    hasDockerfile,
-    envVars,
-    databaseRequired,
-    databaseEngine,
-    cacheRequired,
-    signals
-  };
-}
-
-function scanPython(root: string, hasDockerfile: boolean, signals: string[]): RepoScanResult {
-  const packageManager = detectPythonPackageManager(root);
-  const requirements = readFileSafe(join(root, "requirements.txt")) + readFileSafe(join(root, "pyproject.toml")) + readFileSafe(join(root, "Pipfile"));
-  const lower = requirements.toLowerCase();
-
-  const isFastapi = lower.includes("fastapi");
-  const isFlask = lower.includes("flask");
-  const isDjango = lower.includes("django");
-
-  if (isFastapi) signals.push("FastAPI detected");
-  if (isFlask) signals.push("Flask detected");
-  if (isDjango) signals.push("Django detected");
-
-  const envVars = findEnvVars(root, ["py"]);
-  const databaseRequired = lower.includes("psycopg") || lower.includes("sqlalchemy") || lower.includes("django") || lower.includes("pymysql") || lower.includes("pymongo") || envVars.some(v => v.name === "DATABASE_URL");
-  const databaseEngine = lower.includes("psycopg") || lower.includes("postgres") ? "postgresql" : lower.includes("mysql") || lower.includes("pymysql") ? "mysql" : lower.includes("pymongo") ? "mongodb" : undefined;
-  const cacheRequired = lower.includes("redis") || lower.includes("celery");
-
-  if (databaseRequired) signals.push(`Database dependency detected (${databaseEngine ?? "unknown"})`);
-  if (cacheRequired) signals.push("Redis/cache dependency detected");
-
-  const port = detectPort(root, ["py"]) ?? 8000;
-  const installCommand = packageManager === "poetry" ? "poetry install --no-root" : packageManager === "uv" ? "uv pip install -r requirements.txt" : "pip install -r requirements.txt";
-
-  const startCommand = isFastapi
-    ? `uvicorn main:app --host 0.0.0.0 --port ${port}`
-    : isFlask
-      ? `gunicorn app:app -b 0.0.0.0:${port}`
-      : isDjango
-        ? `gunicorn config.wsgi:application -b 0.0.0.0:${port}`
-        : `python main.py`;
-
-  return {
-    root,
-    packageManager,
-    appType: "python-backend",
-    computeTarget: "ecs-fargate",
-    buildCommand: packageManager === "poetry" ? "poetry build" : "pip install -r requirements.txt",
-    startCommand,
-    installCommand,
-    port,
-    hasDockerfile,
-    envVars,
-    databaseRequired,
-    databaseEngine,
-    cacheRequired,
-    signals
-  };
-}
-
-function scanGo(root: string, hasDockerfile: boolean, signals: string[]): RepoScanResult {
-  const goMod = readFileSafe(join(root, "go.mod"));
-  const envVars = findEnvVars(root, ["go"]);
-  const databaseRequired = goMod.includes("gorm") || goMod.includes("pgx") || goMod.includes("go-pg") || goMod.includes("database/sql") || envVars.some(v => v.name === "DATABASE_URL");
-  const databaseEngine = goMod.includes("postgres") || goMod.includes("pgx") ? "postgresql" : goMod.includes("mysql") ? "mysql" : undefined;
-  const cacheRequired = goMod.includes("go-redis") || goMod.includes("redis");
-  const port = detectPort(root, ["go"]) ?? 8080;
-
-  if (databaseRequired) signals.push(`Database dependency detected (${databaseEngine ?? "unknown"})`);
-  if (cacheRequired) signals.push("Redis/cache dependency detected");
-
-  return {
-    root,
-    packageManager: "go-modules",
-    appType: "go-backend",
-    computeTarget: "ecs-fargate",
-    buildCommand: "go build -o server .",
-    startCommand: "./server",
-    installCommand: "go mod download",
     port,
     hasDockerfile,
     envVars,
@@ -286,7 +164,7 @@ export function scanToSuggestion(scan: RepoScanResult): DeploymentSuggestion {
 
 function buildServices(scan: RepoScanResult): DeploymentSuggestion["services"] {
   const services: DeploymentSuggestion["services"] = [];
-  if (scan.appType === "nextjs-app" || scan.appType === "static-site") services.push("frontend");
+  if (scan.appType === "nextjs-app") services.push("frontend");
   else services.push("backend");
   if (scan.databaseRequired) services.push("database");
   if (scan.cacheRequired) services.push("cache");
@@ -298,12 +176,6 @@ function detectNodePackageManager(root: string): DeploymentSuggestion["packageMa
   if (existsSync(join(root, "yarn.lock"))) return "yarn";
   if (existsSync(join(root, "bun.lockb"))) return "bun";
   return "npm";
-}
-
-function detectPythonPackageManager(root: string): DeploymentSuggestion["packageManager"] {
-  if (existsSync(join(root, "pyproject.toml"))) return "poetry";
-  if (existsSync(join(root, "uv.lock"))) return "uv";
-  return "pip";
 }
 
 function packageManagerRun(pm: DeploymentSuggestion["packageManager"]): string {

@@ -1,7 +1,10 @@
 import { Worker } from "bullmq";
+import { loadEnv } from "@awsify/config";
 import { deploymentJobSchema } from "@awsify/deployment-schemas";
 import { DeploymentOrchestrator } from "./orchestrator";
 import { redisConnectionOptions } from "./redis-options";
+
+loadEnv();
 
 const orchestrator = new DeploymentOrchestrator();
 

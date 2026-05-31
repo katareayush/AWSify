@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Github, Loader2, Search } from "lucide-react";
+import { ArrowRight, Github, Loader2, RefreshCw, Search } from "lucide-react";
 import { PageHeading } from "../../components/page-heading";
 import { ProductShell } from "../../components/product-shell";
 import { Button } from "../../components/ui/button";
@@ -18,6 +18,7 @@ export default function RepositoriesPage() {
   const [query, setQuery] = useState("");
   const [deploying, setDeploying] = useState<string | null>(null);
   const [reposLoading, setReposLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!me?.authenticated) return;
@@ -32,6 +33,17 @@ export default function RepositoriesPage() {
       const { url } = await api.appInstallUrl();
       window.location.href = url;
     } catch { /* ignore */ }
+  }
+
+  async function handleRefreshRepos() {
+    setRefreshing(true);
+    try {
+      const result = await api.refreshRepositories();
+      setRepos(result.repositories);
+    } catch { /* ignore */ }
+    finally {
+      setRefreshing(false);
+    }
   }
 
   async function handleDeploy(repo: Repo) {
@@ -72,10 +84,16 @@ export default function RepositoriesPage() {
               : "Select a repository — AWS-ify will scan, plan, and deploy it to your AWS account."
           }
           action={
-            <Button variant="secondary" onClick={handleInstallApp}>
-              <Github className="h-4 w-4" />
-              Manage GitHub App
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={handleRefreshRepos} disabled={refreshing}>
+                {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Refresh
+              </Button>
+              <Button variant="secondary" onClick={handleInstallApp}>
+                <Github className="h-4 w-4" />
+                Manage GitHub App
+              </Button>
+            </div>
           }
         />
 

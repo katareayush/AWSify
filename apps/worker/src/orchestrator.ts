@@ -1,21 +1,21 @@
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { execFile, exec } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { createSign } from "node:crypto";
 import { promisify } from "node:util";
 import { createAiProvider } from "@awsify/ai";
+import { decryptSecret } from "@awsify/config";
 import { PrismaClient } from "@awsify/database";
-import type { DeploymentJob, DeploymentPlan } from "@awsify/deployment-schemas";
+import type { DeploymentJob, DeploymentPlan, DeploymentSuggestion, GeneratedArtifact } from "@awsify/deployment-schemas";
 import { collectKeyFiles, scanRepository, type RepoScanResult } from "@awsify/repo-scanner";
 import { createDeploymentPlan, generateDockerfile } from "@awsify/templates";
 import { createStack } from "@awsify/pulumi-templates";
-import type { AiRecommendationResult } from "@awsify/ai";
 import { ECRClient, CreateRepositoryCommand, DescribeRepositoriesCommand, GetAuthorizationTokenCommand } from "@aws-sdk/client-ecr";
 import { STSClient, AssumeRoleCommand } from "@aws-sdk/client-sts";
 import { LocalWorkspace, type PulumiFn } from "@pulumi/pulumi/automation";
 
 const execFileAsync = promisify(execFile);
-const execAsync = promisify(exec);
 
 export interface DeploymentEvent {
   status: "queued" | "scanning" | "awaiting_approval" | "deploying" | "deployed" | "failed";
@@ -40,29 +40,29 @@ export class DeploymentOrchestrator {
       events.push(event);
       console.log(`[deployment:${job.projectId}] ${status}: ${message}`);
       if (job.deploymentId) {
+        const current = await this.prisma.deployment.findUnique({
+          where: { id: job.deploymentId },
+          select: { logs: true }
+        }).catch(() => null);
+        const logs = Array.isArray(current?.logs) ? current.logs : [];
         await this.prisma.deployment.update({
           where: { id: job.deploymentId },
-          data: {
-            status: status as never,
-            logs: { push: event } as never
-          }
-        }).catch(() => {/* non-fatal — don't break deployment over a log write */});
+          data: { status: status as never, logs: [...logs, event] as never }
+        }).catch(() => {/* non-fatal: don't break deployment over a log write */});
       }
     };
 
     try {
     await emit("scanning", "Deployment job accepted by worker.");
 
-    const repoPath = await this.cloneRepository(job.repoFullName, job.branch);
+    const planRecord = await this.prisma.deploymentPlan.findUnique({
+      where: { id: job.approvedPlanId },
+      include: { artifacts: true }
+    });
+    if (!planRecord) throw new Error(`Deployment plan ${job.approvedPlanId} not found.`);
+
+    const repoPath = await this.cloneRepository(job);
     await emit("scanning", "Repository cloned; running static scanner.");
-
-    const scan = scanRepository(repoPath);
-    const keyFiles = collectKeyFiles(repoPath);
-    await emit("scanning", `Scan complete: ${scan.appType} → ${scan.computeTarget} (${scan.signals.length} signals). Sending to Claude.`);
-
-    const aiResult = await this.ai.recommendDeployment({ repoFullName: job.repoFullName, scan, keyFiles });
-    const { suggestion } = aiResult;
-    await emit("scanning", `AI recommendation: ${suggestion.appType} on ${suggestion.computeTarget} (confidence ${suggestion.confidence.toFixed(2)})`);
 
     const region = process.env.AWS_REGION;
     const awsifyAccountId = process.env.AWSIFY_AWS_ACCOUNT_ID;
@@ -70,27 +70,49 @@ export class DeploymentOrchestrator {
       throw new Error("AWS_REGION and AWSIFY_AWS_ACCOUNT_ID must be configured.");
     }
 
-    const plan = createDeploymentPlan({
-      projectId: job.projectId,
-      appName: sanitizeAppName(job.repoFullName),
-      region,
-      awsifyAccountId,
-      externalId: `awsify-${job.projectId}`,
-      suggestion
-    });
+    const scan = scanRepository(repoPath);
 
-    // Persist the real plan data to the placeholder plan record
-    if (job.deploymentId) {
+    if (planRecord.status !== "approved") {
+      const keyFiles = collectKeyFiles(repoPath);
+      await emit("scanning", `Scan complete: ${scan.appType} -> ${scan.computeTarget} (${scan.signals.length} signals). Sending to Claude.`);
+
+      const aiResult = await this.ai.recommendDeployment({ repoFullName: job.repoFullName, scan, keyFiles });
+      const { suggestion } = aiResult;
+      await emit("scanning", `AI recommendation: ${suggestion.appType} on ${suggestion.computeTarget} (confidence ${suggestion.confidence.toFixed(2)})`);
+
+      const plan = createDeploymentPlan({
+        projectId: job.projectId,
+        appName: sanitizeAppName(job.repoFullName),
+        region,
+        awsifyAccountId,
+        externalId: `awsify-${job.projectId}`,
+        suggestion
+      });
+
       await this.prisma.deploymentPlan.update({
         where: { id: job.approvedPlanId },
         data: {
           suggestion: suggestion as object,
           resources: plan.resources as object[],
           estimatedCost: plan.estimatedMonthlyCostUsd as object,
-          status: "approved"
+          status: "awaiting_approval",
+          artifacts: {
+            deleteMany: {},
+            create: plan.artifacts.map((artifact) => ({
+              kind: toDbArtifactKind(artifact.kind),
+              path: artifact.path,
+              content: artifact.content,
+              summary: artifact.summary
+            }))
+          }
         }
-      }).catch(() => {});
+      });
+      await emit("awaiting_approval", "Plan and preview artifacts are ready. Deployment is paused until user approval.");
+      return { status: "awaiting_approval", events };
     }
+
+    const plan = hydratePlan(planRecord);
+    await emit("deploying", "Approved plan loaded; starting AWS deployment.");
 
     // Load customer AWS connection
     const connection = await this.prisma.awsConnection.findUnique({ where: { id: job.awsConnectionId } });
@@ -99,42 +121,21 @@ export class DeploymentOrchestrator {
     await emit("deploying", `Assuming customer role ${connection.roleArn}`);
     const credentials = await this.assumeRole(connection.roleArn, connection.externalId, region);
 
-    let imageUri: string | undefined;
+    const dockerfilePath = await this.resolveDockerfile(repoPath, scan, plan, emit);
+    await emit("deploying", `Dockerfile source: ${dockerfilePath}`);
+    await emit("deploying", "Creating ECR repository and building container image.");
+    const repositoryUri = await this.ensureEcrRepo(plan.appName, region, credentials);
+    const imageUri = `${repositoryUri}:${job.branch.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
+    await this.buildAndPushImage(repoPath, imageUri, repositoryUri, region, credentials);
+    await emit("deploying", `Image pushed: ${imageUri}`);
 
-    if (suggestion.computeTarget !== "s3-cloudfront") {
-      const dockerfilePath = await this.resolveDockerfile(repoPath, scan, aiResult, emit);
-      await emit("deploying", `Dockerfile source: ${dockerfilePath}`);
-      await emit("deploying", "Creating ECR repository and building container image.");
-      const repositoryUri = await this.ensureEcrRepo(plan.appName, region, credentials);
-      imageUri = `${repositoryUri}:${job.branch.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
-      await this.buildAndPushImage(repoPath, imageUri, repositoryUri, region, credentials);
-      await emit("deploying", `Image pushed: ${imageUri}`);
-    } else {
-      await emit("deploying", "Static site: building assets.");
-      const pm = suggestion.packageManager === "pnpm" ? "pnpm" : suggestion.packageManager === "yarn" ? "yarn" : "npm";
-      await execFileAsync(pm, ["run", "build"], { cwd: repoPath });
-      await emit("deploying", "Static build complete.");
-    }
-
-    await emit("deploying", `Running Pulumi stack (${suggestion.computeTarget}).`);
+    await emit("deploying", `Running Pulumi stack (${plan.suggestion.computeTarget}).`);
     const outputs = await this.runPulumiStack(plan, imageUri, credentials, repoPath, emit);
 
     const liveUrl =
       typeof outputs.liveUrl?.value === "string"
         ? outputs.liveUrl.value
         : (outputs as Record<string, { value: string } | undefined>)["liveUrl"]?.value;
-
-    if (suggestion.computeTarget === "s3-cloudfront" && outputs.bucketName?.value) {
-      await emit("deploying", `Syncing static files to s3://${outputs.bucketName.value}`);
-      const { statSync } = await import("node:fs");
-      const buildDir = ["dist", "out", "build"].find(d => {
-        try { statSync(join(repoPath, d)); return true; } catch { return false; }
-      }) ?? "dist";
-      await execFileAsync("aws", ["s3", "sync", join(repoPath, buildDir), `s3://${outputs.bucketName.value}`, "--delete", "--region", region], {
-        env: { ...process.env, AWS_ACCESS_KEY_ID: credentials.accessKeyId, AWS_SECRET_ACCESS_KEY: credentials.secretAccessKey, AWS_SESSION_TOKEN: credentials.sessionToken }
-      });
-      await emit("deploying", "Static files synced to S3.");
-    }
 
     await emit("deployed", `Live at: ${liveUrl ?? "(URL pending DNS propagation)"}`);
 
@@ -155,42 +156,41 @@ export class DeploymentOrchestrator {
   }
 
   /**
-   * Three-tier Dockerfile resolution:
-   *   1. Repo already has one → use it, nothing to write.
-   *   2. AI detected non-standard structure → write AI-generated content.
-   *   3. Standard project → write static template content.
+   * Two-tier Dockerfile resolution:
+   *   1. Repo already has one: use it, nothing to write.
+   *   2. Otherwise write the approved AWS-ify template artifact.
    * Returns a short label for the emit log.
    */
   private async resolveDockerfile(
     repoPath: string,
     scan: RepoScanResult,
-    aiResult: AiRecommendationResult,
+    plan: DeploymentPlan,
     emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
   ): Promise<string> {
     if (scan.hasDockerfile) {
-      emit("scanning", "Dockerfile already present in repository — using as-is.");
+      await emit("scanning", "Dockerfile already present in repository - using as-is.");
       return "existing";
     }
 
-    if (aiResult.dockerfile) {
-      emit("scanning", "Non-standard structure detected — using AI-generated Dockerfile.");
-      writeFileSync(join(repoPath, "Dockerfile"), aiResult.dockerfile, "utf8");
-      return "ai-generated";
-    }
-
-    emit("scanning", "Standard project structure — using static Dockerfile template.");
-    writeFileSync(join(repoPath, "Dockerfile"), generateDockerfile(aiResult.suggestion), "utf8");
-    return "static-template";
+    await emit("scanning", "No Dockerfile in repository - using approved AWS-ify Dockerfile template.");
+    const artifact = plan.artifacts.find((item) => item.kind === "dockerfile");
+    writeFileSync(join(repoPath, "Dockerfile"), artifact?.content ?? generateDockerfile(plan.suggestion), "utf8");
+    return "awsify-template";
   }
 
-  private async cloneRepository(repoFullName: string, branch: string) {
+  private async cloneRepository(job: DeploymentJob) {
     const destination = mkdtempSync(join(tmpdir(), "awsify-repo-"));
-    const githubToken = process.env.GITHUB_TOKEN;
-    const repoUrl = githubToken
-      ? `https://x-access-token:${githubToken}@github.com/${repoFullName}.git`
-      : `https://github.com/${repoFullName}.git`;
+    const installation = await this.prisma.project.findUnique({
+      where: { id: job.projectId },
+      include: { repository: { include: { installation: true } } }
+    });
+    const installationId = installation?.repository.installation.installationId;
+    if (!installationId) throw new Error("GitHub App installation not found for selected repository.");
 
-    await execFileAsync("git", ["clone", "--depth", "1", "--branch", branch, repoUrl, destination], { timeout: 120_000 });
+    const githubToken = await createInstallationToken(installationId);
+    const repoUrl = `https://x-access-token:${githubToken}@github.com/${job.repoFullName}.git`;
+
+    await execFileAsync("git", ["clone", "--depth", "1", "--branch", job.branch, repoUrl, destination], { timeout: 120_000 });
     return destination;
   }
 
@@ -257,7 +257,7 @@ export class DeploymentOrchestrator {
     const [username, password] = authToken.split(":");
     const registry = repositoryUri.split("/")[0];
 
-    await execAsync(`echo '${password.replace(/'/g, "'\\''")}' | docker login --username ${username} --password-stdin ${registry}`, { timeout: 60_000 });
+    await dockerLogin(username, password, registry);
 
     await execFileAsync("docker", ["build", "-t", imageUri, repoPath], { timeout: 600_000 });
     await execFileAsync("docker", ["push", imageUri], { timeout: 300_000 });
@@ -273,8 +273,21 @@ export class DeploymentOrchestrator {
     const stateDir = join(tmpdir(), "awsify-state", plan.projectId);
     mkdirSync(stateDir, { recursive: true });
 
+    const storedEnvVars = await this.prisma.projectEnvVar.findMany({
+      where: { projectId: plan.projectId }
+    });
+    const storedByName = new Map(storedEnvVars.map((envVar) => [envVar.name, envVar]));
+    const missingRequiredEnv = plan.suggestion.envVars.filter((envVar) => envVar.required && !storedByName.has(envVar.name));
+    if (missingRequiredEnv.length > 0) {
+      throw new Error(`Deployment requires project env vars that are not stored yet: ${missingRequiredEnv.map((envVar) => envVar.name).join(", ")}`);
+    }
     const environment = Object.fromEntries(
-      plan.suggestion.envVars.map(v => [v.name, process.env[v.name] ?? ""])
+      plan.suggestion.envVars
+        .map((envVar) => {
+          const stored = storedByName.get(envVar.name);
+          return stored ? [envVar.name, decryptSecret(stored.encryptedValue)] : null;
+        })
+        .filter((entry): entry is [string, string] => entry !== null)
     );
 
     const program: PulumiFn = async () => {
@@ -287,7 +300,7 @@ export class DeploymentOrchestrator {
         workDir: stateDir,
         envVars: {
           PULUMI_BACKEND_URL: `file://${stateDir}`,
-          PULUMI_CONFIG_PASSPHRASE: "",
+          PULUMI_CONFIG_PASSPHRASE: requireEnv("PULUMI_CONFIG_PASSPHRASE"),
           AWS_ACCESS_KEY_ID: credentials.accessKeyId,
           AWS_SECRET_ACCESS_KEY: credentials.secretAccessKey,
           AWS_SESSION_TOKEN: credentials.sessionToken,
@@ -317,4 +330,99 @@ function sanitizeAppName(repoFullName: string) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 40)
     .padEnd(3, "x");
+}
+
+function hydratePlan(planRecord: {
+  id: string;
+  projectId: string;
+  appName: string;
+  region: string;
+  suggestion: unknown;
+  resources: unknown;
+  estimatedCost: unknown;
+  status: string;
+  artifacts: Array<{ kind: string; path: string; content: string; summary: string }>;
+}): DeploymentPlan {
+  return {
+    id: planRecord.id,
+    projectId: planRecord.projectId,
+    appName: planRecord.appName,
+    region: planRecord.region,
+    suggestion: planRecord.suggestion as DeploymentSuggestion,
+    resources: planRecord.resources as DeploymentPlan["resources"],
+    artifacts: planRecord.artifacts.map((artifact) => ({
+      kind: fromDbArtifactKind(artifact.kind),
+      path: artifact.path,
+      content: artifact.content,
+      summary: artifact.summary
+    })),
+    estimatedMonthlyCostUsd: planRecord.estimatedCost as DeploymentPlan["estimatedMonthlyCostUsd"],
+    requiresApproval: true,
+    status: "approved"
+  };
+}
+
+function toDbArtifactKind(kind: GeneratedArtifact["kind"]) {
+  if (kind === "github-action") return "github_action";
+  if (kind === "pulumi-preview") return "pulumi_preview";
+  if (kind === "cloudformation-role") return "cloudformation_role";
+  return kind;
+}
+
+function fromDbArtifactKind(kind: string): GeneratedArtifact["kind"] {
+  if (kind === "github_action") return "github-action";
+  if (kind === "pulumi_preview") return "pulumi-preview";
+  if (kind === "cloudformation_role") return "cloudformation-role";
+  return kind as GeneratedArtifact["kind"];
+}
+
+function dockerLogin(username: string, password: string, registry: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("docker", ["login", "--username", username, "--password-stdin", registry], {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    let stderr = "";
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`docker login failed: ${stderr.trim() || `exit ${code}`}`));
+    });
+    child.stdin.end(password);
+  });
+}
+
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} must be configured.`);
+  return value;
+}
+
+async function createInstallationToken(installationId: string): Promise<string> {
+  const appJwt = createGithubAppJwt();
+  const res = await fetch(`https://api.github.com/app/installations/${installationId}/access_tokens`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${appJwt}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28"
+    }
+  });
+  const data = (await res.json()) as { token?: string; message?: string };
+  if (!res.ok || !data.token) {
+    throw new Error(data.message ?? `Failed to create GitHub installation token for ${installationId}.`);
+  }
+  return data.token;
+}
+
+function createGithubAppJwt(now = Math.floor(Date.now() / 1000)): string {
+  const appId = requireEnv("GITHUB_APP_ID");
+  const privateKey = Buffer.from(requireEnv("GITHUB_APP_PRIVATE_KEY_BASE64"), "base64").toString("utf8");
+  const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({ iat: now - 60, exp: now + 540, iss: appId })).toString("base64url");
+  const signingInput = `${header}.${payload}`;
+  const signature = createSign("RSA-SHA256").update(signingInput).sign(privateKey, "base64url");
+  return `${signingInput}.${signature}`;
 }

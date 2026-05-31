@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { CheckCircle2, ChevronDown, ChevronUp, Cloud, ExternalLink, Loader2, ServerCrash, TerminalSquare } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Cloud, ExternalLink, KeyRound, Loader2, Play, RotateCw, Save, ServerCrash, TerminalSquare } from "lucide-react";
 import { PageHeading } from "../../../components/page-heading";
 import { ProductShell } from "../../../components/product-shell";
+import { Button } from "../../../components/ui/button";
 import { Panel } from "../../../components/ui/panel";
 import { useAuth } from "../../../lib/use-auth";
 import { api, type DeploymentDetail } from "../../../lib/api";
@@ -24,6 +25,12 @@ export default function DeploymentDetailPage() {
   const [detail, setDetail] = useState<DeploymentDetail | null>(null);
   const [fetching, setFetching] = useState(true);
   const [expandedArtifact, setExpandedArtifact] = useState<string | null>(null);
+  const [envValues, setEnvValues] = useState<Record<string, string>>({});
+  const [savingEnv, setSavingEnv] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [rotatingToken, setRotatingToken] = useState(false);
+  const [ciToken, setCiToken] = useState<{ token: string; secretName: string; variableName: string; projectId: string } | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -70,7 +77,7 @@ export default function DeploymentDetailPage() {
       <ProductShell active="Templates">
         <div className="flex items-center justify-center py-24 gap-2 text-white/40">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-[13px]">Loading deployment…</span>
+          <span className="text-[13px]">Loading deployment...</span>
         </div>
       </ProductShell>
     );
@@ -89,7 +96,52 @@ export default function DeploymentDetailPage() {
   const isLive = detail.status === "deployed";
   const isFailed = detail.status === "failed";
   const isRunning = POLLING_STATUSES.has(detail.status);
+  const isAwaitingApproval = detail.status === "awaiting_approval";
   const suggestion = detail.plan?.suggestion as Record<string, unknown> | null;
+  const envVars = Array.isArray(suggestion?.envVars)
+    ? suggestion.envVars as Array<{ name: string; required?: boolean; description?: string }>
+    : [];
+  const savedEnvNames = new Set((detail.projectEnvVars ?? []).map((envVar) => envVar.name));
+  const missingRequiredEnv = envVars.filter((envVar) => envVar.required !== false && !savedEnvNames.has(envVar.name));
+
+  async function saveEnvVars() {
+    setSavingEnv(true);
+    setActionError(null);
+    try {
+      await api.saveDeploymentEnv(id, envValues);
+      setEnvValues({});
+      await fetchDetail();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSavingEnv(false);
+    }
+  }
+
+  async function approveDeployment() {
+    setApproving(true);
+    setActionError(null);
+    try {
+      await api.approveDeployment(id);
+      await fetchDetail();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  async function rotateCiToken() {
+    setRotatingToken(true);
+    setActionError(null);
+    try {
+      setCiToken(await api.rotateDeploymentCiToken(id));
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRotatingToken(false);
+    }
+  }
 
   return (
     <ProductShell active="Templates">
@@ -97,7 +149,7 @@ export default function DeploymentDetailPage() {
         <PageHeading
           eyebrow={detail.project.repoFullName}
           title={detail.project.name}
-          description={`Branch: ${detail.project.branch} · Created ${new Date(detail.createdAt).toLocaleDateString()}`}
+          description={`Branch: ${detail.project.branch} - Created ${new Date(detail.createdAt).toLocaleDateString()}`}
           action={
             <span className={`rounded-full border px-3 py-1.5 text-[12px] font-medium ${statusColor(detail.status)}`}>
               {isRunning && <Loader2 className="inline h-3 w-3 animate-spin mr-1.5" />}
@@ -136,6 +188,32 @@ export default function DeploymentDetailPage() {
           </Panel>
         )}
 
+        {isAwaitingApproval && (
+          <Panel className="p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-violet-soft" />
+                  <p className="text-[14px] font-medium text-white">Plan is ready for review</p>
+                </div>
+                <p className="mt-2 max-w-2xl text-[13px] leading-[1.6] text-white/50">
+                  AWS-ify has generated the bounded ECS Fargate plan. Add required env vars, review artifacts, then approve to create AWS resources.
+                </p>
+                {actionError && (
+                  <p className="mt-3 font-mono text-[12px] text-red-400">{actionError}</p>
+                )}
+              </div>
+              <Button
+                onClick={approveDeployment}
+                disabled={approving || missingRequiredEnv.length > 0}
+              >
+                {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                Approve deploy
+              </Button>
+            </div>
+          </Panel>
+        )}
+
         <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
           {/* Logs */}
           <Panel className="p-5">
@@ -146,7 +224,7 @@ export default function DeploymentDetailPage() {
             </div>
             <div className="h-[360px] overflow-y-auto rounded-lg border border-white/[0.06] bg-black/40 p-4 font-mono text-[12px] leading-[1.7]">
               {detail.logs.length === 0 ? (
-                <span className="text-white/30">Waiting for logs…</span>
+                <span className="text-white/30">Waiting for logs...</span>
               ) : (
                 detail.logs.map((log, i) => (
                   <div key={i} className="flex gap-3">
@@ -167,6 +245,86 @@ export default function DeploymentDetailPage() {
 
           {/* Plan summary */}
           <div className="space-y-4">
+            {envVars.length > 0 && (
+              <Panel className="p-5">
+                <div className="mb-4 flex items-center gap-2">
+                  <KeyRound className="h-4 w-4 text-violet-soft" />
+                  <p className="text-[13px] font-medium text-white">Environment</p>
+                  <span className="ml-auto font-mono text-[11px] text-white/35">
+                    {savedEnvNames.size}/{envVars.length}
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {envVars.map((envVar) => {
+                    const saved = detail.projectEnvVars?.find((item) => item.name === envVar.name);
+                    return (
+                      <label key={envVar.name} className="block">
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <span className="font-mono text-[12px] text-white/70">{envVar.name}</span>
+                          <span className={saved ? "text-[11px] text-emerald-400/80" : "text-[11px] text-amber-400/80"}>
+                            {saved ? `saved ${saved.valuePreview ?? ""}` : envVar.required === false ? "optional" : "required"}
+                          </span>
+                        </div>
+                        <input
+                          value={envValues[envVar.name] ?? ""}
+                          onChange={(event) => setEnvValues((current) => ({ ...current, [envVar.name]: event.target.value }))}
+                          type="password"
+                          autoComplete="off"
+                          placeholder={saved ? "Leave blank to keep saved value" : "Enter value"}
+                          disabled={!isAwaitingApproval}
+                          className="h-9 w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40"
+                        />
+                        {envVar.description && (
+                          <p className="mt-1 text-[11px] text-white/35">{envVar.description}</p>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+                {isAwaitingApproval && (
+                  <Button
+                    className="mt-4 w-full"
+                    variant="secondary"
+                    onClick={saveEnvVars}
+                    disabled={savingEnv || Object.values(envValues).every((value) => value.length === 0)}
+                  >
+                    {savingEnv ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Save env vars
+                  </Button>
+                )}
+              </Panel>
+            )}
+
+            {detail.plan?.status === "approved" && (
+              <Panel className="p-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <RotateCw className="h-4 w-4 text-violet-soft" />
+                  <p className="text-[13px] font-medium text-white">GitHub Actions redeploy</p>
+                </div>
+                <p className="text-[12px] leading-[1.6] text-white/45">
+                  Generate a deploy token, add it as a GitHub secret named AWSIFY_API_TOKEN, and set AWSIFY_API_URL as a repository variable.
+                </p>
+                <Button
+                  className="mt-4 w-full"
+                  variant="secondary"
+                  onClick={rotateCiToken}
+                  disabled={rotatingToken}
+                >
+                  {rotatingToken ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+                  Generate token
+                </Button>
+                {ciToken && (
+                  <div className="mt-4 space-y-2 rounded-lg border border-white/[0.06] bg-black/35 p-3">
+                    <Row label="Secret" value={ciToken.secretName} />
+                    <Row label="Variable" value={ciToken.variableName} />
+                    <Row label="Project" value={ciToken.projectId} />
+                    <p className="break-all font-mono text-[11px] leading-[1.6] text-amber-300/90">{ciToken.token}</p>
+                    <p className="text-[11px] text-white/35">This token is shown once. Rotating it replaces the previous token.</p>
+                  </div>
+                )}
+              </Panel>
+            )}
+
             {suggestion && (
               <Panel className="p-5">
                 <p className="text-[13px] font-medium text-white mb-3">Scan results</p>
@@ -194,13 +352,13 @@ export default function DeploymentDetailPage() {
               <Panel className="p-5">
                 <p className="text-[13px] font-medium text-white mb-3">Cost estimate</p>
                 <p className="font-mono text-[20px] font-medium text-white">
-                  ${detail.plan.estimatedCost.low}–${detail.plan.estimatedCost.high}
+                  ${detail.plan.estimatedCost.low}-${detail.plan.estimatedCost.high}
                   <span className="ml-1 text-[13px] font-normal text-white/40">/mo</span>
                 </p>
                 {detail.plan.estimatedCost.notes.length > 0 && (
                   <ul className="mt-3 space-y-1">
                     {detail.plan.estimatedCost.notes.map((n, i) => (
-                      <li key={i} className="text-[12px] text-white/45">· {n}</li>
+                      <li key={i} className="text-[12px] text-white/45">- {n}</li>
                     ))}
                   </ul>
                 )}
@@ -217,7 +375,7 @@ export default function DeploymentDetailPage() {
                   {detail.plan.resources.map((r, i) => (
                     <div key={i} className="text-[12.5px]">
                       <p className="font-mono text-white/70">{r.name}</p>
-                      <p className="text-[11.5px] text-white/35">{r.type} · {r.purpose}</p>
+                      <p className="text-[11.5px] text-white/35">{r.type} - {r.purpose}</p>
                     </div>
                   ))}
                 </div>

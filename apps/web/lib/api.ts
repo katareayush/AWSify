@@ -50,6 +50,7 @@ export interface Deployment {
 
 export interface DeploymentDetail extends Deployment {
   logs: Array<{ status: string; message: string; at: string }>;
+  projectEnvVars: Array<{ name: string; valuePreview: string | null; required: boolean; updatedAt: string }>;
   plan: {
     id: string;
     appName: string;
@@ -72,6 +73,8 @@ export const api = {
   appInstallUrl: () => req<{ url: string }>("/github/app-install-url"),
 
   repositories: () => req<{ repositories: Repo[] }>("/github/repositories"),
+
+  refreshRepositories: () => req<{ repositories: Repo[] }>("/github/repositories/refresh"),
 
   cfnTemplate: () =>
     req<{ externalId: string; template: string | null }>("/aws/cloudformation-template"),
@@ -98,5 +101,21 @@ export const api = {
 
   listDeployments: () => req<{ deployments: Deployment[] }>("/deployments"),
 
-  getDeployment: (id: string) => req<{ deployment: DeploymentDetail }>(`/deployments/${id}`)
+  getDeployment: (id: string) => req<{ deployment: DeploymentDetail }>(`/deployments/${id}`),
+
+  saveDeploymentEnv: (id: string, env: Record<string, string>) =>
+    req<{ saved: string[] }>(`/deployments/${id}/env`, {
+      method: "POST",
+      body: JSON.stringify({ env })
+    }),
+
+  approveDeployment: (id: string) =>
+    req<{ deploymentId: string; status: string }>(`/deployments/${id}/approve`, {
+      method: "POST"
+    }),
+
+  rotateDeploymentCiToken: (id: string) =>
+    req<{ token: string; secretName: string; variableName: string; projectId: string }>(`/deployments/${id}/ci-token`, {
+      method: "POST"
+    })
 };

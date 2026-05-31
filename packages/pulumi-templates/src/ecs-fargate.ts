@@ -1,8 +1,6 @@
 import * as aws from "@pulumi/aws";
 import * as pulumi from "@pulumi/pulumi";
 import type { DeploymentPlan } from "@awsify/deployment-schemas";
-import { createRdsInstance } from "./rds.js";
-import { createElastiCacheRedis } from "./elasticache.js";
 
 export interface EcsFargateInput {
   plan: DeploymentPlan;
@@ -57,6 +55,7 @@ export function createEcsFargateStack(input: EcsFargateInput): EcsFargateOutputs
   const cluster = new aws.ecs.Cluster(`${appName}-cluster`, { name: `${appName}-cluster` });
 
   const executionRole = new aws.iam.Role(`${appName}-exec-role`, {
+    name: `awsify-${appName}-exec-role`,
     assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({ Service: "ecs-tasks.amazonaws.com" })
   });
   new aws.iam.RolePolicyAttachment(`${appName}-exec-policy`, {
@@ -65,39 +64,9 @@ export function createEcsFargateStack(input: EcsFargateInput): EcsFargateOutputs
   });
 
   const taskRole = new aws.iam.Role(`${appName}-task-role`, {
+    name: `awsify-${appName}-task-role`,
     assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({ Service: "ecs-tasks.amazonaws.com" })
   });
-
-  // Optional RDS
-  let extraEnv: Record<string, pulumi.Input<string>> = {};
-  if (input.plan.suggestion.database.required && input.plan.suggestion.database.engine !== "mongodb") {
-    const rds = createRdsInstance({
-      appName,
-      engine: input.plan.suggestion.database.engine ?? "postgresql",
-      instanceClass: input.plan.suggestion.database.instanceClass,
-      vpcId: vpc.id,
-      subnetIds,
-      allowedSecurityGroupId: taskSg.id
-    });
-    extraEnv = {
-      ...extraEnv,
-      DATABASE_URL: pulumi.interpolate`postgresql://awsify:${rds.secretArn}@${rds.endpoint}/${appName.replace(/-/g, "_")}`
-    };
-  }
-
-  // Optional ElastiCache
-  if (input.plan.suggestion.cache.required) {
-    const redis = createElastiCacheRedis({
-      appName,
-      nodeType: input.plan.suggestion.cache.nodeType,
-      vpcId: vpc.id,
-      subnetIds,
-      allowedSecurityGroupId: taskSg.id
-    });
-    extraEnv = { ...extraEnv, REDIS_URL: pulumi.interpolate`rediss://${redis.endpoint}:${redis.port}` };
-  }
-
-  const allEnv = { ...input.environment, ...extraEnv };
 
   const targetGroup = new aws.lb.TargetGroup(`${appName}-tg`, {
     vpcId: vpc.id,
@@ -129,7 +98,7 @@ export function createEcsFargateStack(input: EcsFargateInput): EcsFargateOutputs
     executionRoleArn: executionRole.arn,
     taskRoleArn: taskRole.arn,
     containerDefinitions: pulumi
-      .all([input.imageUri, logGroup.name, pulumi.output(allEnv)])
+      .all([input.imageUri, logGroup.name, pulumi.output(input.environment)])
       .apply(([imageUri, logGroupName, env]) =>
         JSON.stringify([{
           name: appName,

@@ -1,21 +1,8 @@
 import { z } from "zod";
 
-export const supportedAppTypeSchema = z.enum([
-  "node-backend",
-  "nextjs-app",
-  "python-backend",
-  "go-backend",
-  "static-site",
-  "dockerfile-app"
-]);
+export const supportedAppTypeSchema = z.enum(["node-backend", "nextjs-app"]);
 
-export const computeTargetSchema = z.enum([
-  "ecs-fargate",
-  "ecs-ec2",
-  "ec2-instance",
-  "lambda",
-  "s3-cloudfront"
-]);
+export const computeTargetSchema = z.enum(["ecs-fargate"]);
 
 export const supportedServiceSchema = z.enum(["frontend", "backend", "database", "worker", "cache"]);
 
@@ -30,7 +17,7 @@ export const deploymentSuggestionSchema = z.object({
   appType: supportedAppTypeSchema,
   computeTarget: computeTargetSchema.default("ecs-fargate"),
   services: z.array(supportedServiceSchema).min(1),
-  packageManager: z.enum(["npm", "pnpm", "yarn", "bun", "pip", "poetry", "uv", "go-modules", "unknown"]),
+  packageManager: z.enum(["npm", "pnpm", "yarn", "bun"]),
   buildCommand: z.string().min(1).max(200),
   startCommand: z.string().min(1).max(200),
   installCommand: z.string().min(1).max(200),
@@ -77,28 +64,12 @@ export const deploymentPlanSchema = z.object({
   resources: z.array(
     z.object({
       type: z.enum([
-        // Container / ECS
         "ecr.repository",
         "ecs.cluster",
         "ecs.service",
         "ecs.taskDefinition",
-        // Load balancing
         "elasticloadbalancingv2.loadBalancer",
         "elasticloadbalancingv2.targetGroup",
-        // EC2
-        "ec2.instance",
-        "ec2.launchTemplate",
-        "autoscaling.group",
-        // Lambda
-        "lambda.function",
-        "apigateway.httpApi",
-        // Static hosting
-        "s3.bucket",
-        "cloudfront.distribution",
-        // Database / Cache
-        "rds.dbInstance",
-        "elasticache.replicationGroup",
-        // Shared infra
         "cloudwatch.logGroup",
         "iam.role",
         "ec2.securityGroup"

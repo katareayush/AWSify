@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { STSClient, AssumeRoleCommand } from "@aws-sdk/client-sts";
 import { PrismaService } from "../prisma.service";
 import { generateCloudFormationRoleTemplate } from "@awsify/templates";
@@ -7,8 +8,8 @@ import { generateCloudFormationRoleTemplate } from "@awsify/templates";
 export class AwsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  createConnectionTemplate() {
-    const externalId = `awsify-${crypto.randomUUID()}`;
+  createConnectionTemplate(userId: string) {
+    const externalId = createExternalId(userId);
     const awsifyAccountId = process.env.AWSIFY_AWS_ACCOUNT_ID;
 
     if (!awsifyAccountId) {
@@ -22,8 +23,9 @@ export class AwsService {
     };
   }
 
-  async validateConnection(input: { roleArn: string; externalId: string; region?: string }) {
+  async validateConnection(userId: string, input: { roleArn: string; externalId: string; region?: string }) {
     if (!input.region) return { status: "missing_region" };
+    if (!verifyExternalId(userId, input.externalId)) return { status: "invalid_external_id" };
 
     const client = new STSClient({ region: input.region });
     try {
@@ -42,6 +44,7 @@ export class AwsService {
   }
 
   async saveConnection(userId: string, input: { roleArn: string; externalId: string; accountId: string; region: string }) {
+    if (!verifyExternalId(userId, input.externalId)) return { error: "invalid_external_id" };
     const connection = await this.prisma.awsConnection.upsert({
       where: { id: input.externalId },
       create: {
@@ -65,4 +68,30 @@ export class AwsService {
     });
     return { connections };
   }
+}
+
+function createExternalId(userId: string): string {
+  const nonce = randomUUID();
+  const payload = `awsify:${userId}:${nonce}`;
+  const signature = signExternalId(payload);
+  return `${payload}:${signature}`;
+}
+
+function verifyExternalId(userId: string, externalId: string): boolean {
+  const parts = externalId.split(":");
+  if (parts.length !== 4) return false;
+  const [prefix, externalUserId, nonce, signature] = parts;
+  if (prefix !== "awsify" || externalUserId !== userId || !nonce || !signature) return false;
+  const expected = signExternalId(`awsify:${externalUserId}:${nonce}`);
+  try {
+    return timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
+function signExternalId(payload: string): string {
+  const salt = process.env.AWSIFY_EXTERNAL_ID_SALT;
+  if (!salt || salt.length < 8) throw new Error("AWSIFY_EXTERNAL_ID_SALT must be configured.");
+  return createHmac("sha256", salt).update(payload).digest("base64url");
 }

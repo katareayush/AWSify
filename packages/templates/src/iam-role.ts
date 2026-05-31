@@ -6,7 +6,7 @@ export function generateCloudFormationRoleTemplate(input: {
   const roleName = input.roleName ?? "AWSifyDeploymentRole";
 
   return `AWSTemplateFormatVersion: "2010-09-09"
-Description: AWSify deployment role — grants AWSify the permissions needed to deploy and manage your infrastructure.
+Description: AWS-ify deployment role - grants only the permissions needed for the ECS Fargate MVP.
 Parameters: {}
 Resources:
   AWSifyDeploymentRole:
@@ -24,44 +24,88 @@ Resources:
               StringEquals:
                 sts:ExternalId: ${input.externalId}
       Policies:
-        - PolicyName: AWSifyFullDeployPolicy
+        - PolicyName: AWSifyEcsFargateDeployPolicy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              # Container & ECS (Fargate + EC2)
-              - Effect: Allow
-                Action: ["ecr:*", "ecs:*"]
-                Resource: "*"
-              # Load balancing
-              - Effect: Allow
-                Action: ["elasticloadbalancing:*"]
-                Resource: "*"
-              # EC2 (instances, networking, ASGs)
+              # ECR repositories and images created for approved deployments.
               - Effect: Allow
                 Action:
-                  - ec2:*
-                  - autoscaling:*
+                  - ecr:CreateRepository
+                  - ecr:DescribeRepositories
+                  - ecr:DeleteRepository
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                  - ecr:BatchGetImage
+                  - ecr:DescribeImages
                 Resource: "*"
-              # Lambda + API Gateway
+              # ECS Fargate cluster, service, and task definition lifecycle.
               - Effect: Allow
                 Action:
-                  - lambda:*
-                  - apigateway:*
-                  - execute-api:*
+                  - ecs:CreateCluster
+                  - ecs:DescribeClusters
+                  - ecs:DeleteCluster
+                  - ecs:RegisterTaskDefinition
+                  - ecs:DeregisterTaskDefinition
+                  - ecs:DescribeTaskDefinition
+                  - ecs:CreateService
+                  - ecs:UpdateService
+                  - ecs:DeleteService
+                  - ecs:DescribeServices
+                  - ecs:ListTasks
+                  - ecs:DescribeTasks
                 Resource: "*"
-              # Static hosting
+              # VPC discovery and security groups for the public ALB and Fargate tasks.
               - Effect: Allow
-                Action: ["s3:*", "cloudfront:*"]
+                Action:
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeInternetGateways
+                  - ec2:CreateSecurityGroup
+                  - ec2:DeleteSecurityGroup
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:RevokeSecurityGroupEgress
+                  - ec2:CreateTags
+                  - ec2:DeleteTags
                 Resource: "*"
-              # Database
+              # Public HTTP load balancer.
               - Effect: Allow
-                Action: ["rds:*", "elasticache:*"]
+                Action:
+                  - elasticloadbalancing:CreateLoadBalancer
+                  - elasticloadbalancing:DeleteLoadBalancer
+                  - elasticloadbalancing:DescribeLoadBalancers
+                  - elasticloadbalancing:CreateTargetGroup
+                  - elasticloadbalancing:DeleteTargetGroup
+                  - elasticloadbalancing:DescribeTargetGroups
+                  - elasticloadbalancing:CreateListener
+                  - elasticloadbalancing:DeleteListener
+                  - elasticloadbalancing:DescribeListeners
+                  - elasticloadbalancing:ModifyListener
+                  - elasticloadbalancing:ModifyTargetGroup
+                  - elasticloadbalancing:AddTags
+                  - elasticloadbalancing:RemoveTags
                 Resource: "*"
               # Observability
               - Effect: Allow
-                Action: ["logs:*", "cloudwatch:*", "xray:*"]
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:DeleteLogGroup
+                  - logs:DescribeLogGroups
+                  - logs:PutRetentionPolicy
+                  - logs:TagResource
+                  - logs:UntagResource
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:DeleteAlarms
+                  - cloudwatch:DescribeAlarms
                 Resource: "*"
-              # IAM (scoped — only roles AWSify creates)
+              # IAM roles AWS-ify creates for ECS task execution.
               - Effect: Allow
                 Action:
                   - iam:CreateRole
@@ -72,23 +116,7 @@ Resources:
                   - iam:DeleteRolePolicy
                   - iam:AttachRolePolicy
                   - iam:DetachRolePolicy
-                  - iam:CreateInstanceProfile
-                  - iam:DeleteInstanceProfile
-                  - iam:AddRoleToInstanceProfile
-                  - iam:RemoveRoleFromInstanceProfile
-                Resource: "*"
-              # ACM (for HTTPS)
-              - Effect: Allow
-                Action: ["acm:*"]
-                Resource: "*"
-              # Route 53 (optional custom domains)
-              - Effect: Allow
-                Action: ["route53:*"]
-                Resource: "*"
-              # Secrets (for injecting env vars)
-              - Effect: Allow
-                Action: ["secretsmanager:*", "ssm:*"]
-                Resource: "*"
+                Resource: !Sub "arn:aws:iam::\${AWS::AccountId}:role/awsify-*"
 Outputs:
   RoleArn:
     Value: !GetAtt AWSifyDeploymentRole.Arn

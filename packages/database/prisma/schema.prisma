@@ -61,7 +61,7 @@ model GitHubInstallation {
 
 model Repository {
   id                String             @id @default(cuid())
-  githubId          String             @unique
+  githubId          String
   fullName          String
   defaultBranch     String
   private           Boolean
@@ -70,6 +70,8 @@ model Repository {
   projects          Project[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
+
+  @@unique([installationId, githubId])
 }
 
 model AwsConnection {
@@ -98,12 +100,28 @@ model Project {
   repository        Repository      @relation(fields: [repositoryId], references: [id])
   awsConnectionId   String?
   awsConnection     AwsConnection?  @relation(fields: [awsConnectionId], references: [id])
+  deployTokenHash   String?
   plans             DeploymentPlan[]
   deployments       Deployment[]
+  envVars           ProjectEnvVar[]
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
   @@unique([userId, slug])
+}
+
+model ProjectEnvVar {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name            String
+  encryptedValue  String
+  valuePreview    String?
+  required        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([projectId, name])
 }
 
 model DeploymentPlan {

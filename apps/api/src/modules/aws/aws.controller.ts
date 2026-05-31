@@ -13,13 +13,19 @@ export class AwsController {
   ) {}
 
   @Get("cloudformation-template")
-  cloudFormationTemplate() {
-    return this.aws.createConnectionTemplate();
+  cloudFormationTemplate(@Req() req: Request) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    const session = token ? this.github.verifySession(token) : null;
+    if (!session) return { error: "not_authenticated" };
+    return this.aws.createConnectionTemplate(session.userId);
   }
 
   @Post("connections/validate")
-  validateConnection(@Body() body: { roleArn: string; externalId: string; region?: string }) {
-    return this.aws.validateConnection(body);
+  validateConnection(@Req() req: Request, @Body() body: { roleArn: string; externalId: string; region?: string }) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    const session = token ? this.github.verifySession(token) : null;
+    if (!session) return { error: "not_authenticated" };
+    return this.aws.validateConnection(session.userId, body);
   }
 
   @Post("connections")

@@ -1,7 +1,10 @@
 import "reflect-metadata";
 import cookieParser from "cookie-parser";
+import { loadEnv } from "@awsify/config";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./modules/app.module";
+
+loadEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
