@@ -34,7 +34,8 @@ Return a single JSON object. No markdown fences, no prose.
 - cache.required=true when a Redis / cache dependency is present
 - envVars: only variables found via process.env.VAR or .env.example
 - confidence: 0.9+ unambiguous, 0.6 reasonable assumptions, 0.4 unclear
-- port must be a real HTTP port exposed by the container`;
+- port must be a real HTTP port exposed by the container
+- healthPath should be an app health endpoint if detected, otherwise "/"`;
 
 export class ClaudeAiProvider implements AiProvider {
   private readonly client: Anthropic;
@@ -70,7 +71,7 @@ export class ClaudeAiProvider implements AiProvider {
             "",
             "Return only the JSON suggestion. Do not return a Dockerfile.",
             "",
-            'JSON shape: {"appType":"...","computeTarget":"...","services":[...],"packageManager":"...","buildCommand":"...","startCommand":"...","installCommand":"...","port":3000,"hasDockerfile":false,"envVars":[{"name":"VAR","required":true}],"database":{"required":false},"cache":{"required":false},"confidence":0.9,"notes":[]}'
+            'JSON shape: {"appType":"...","computeTarget":"...","services":[...],"packageManager":"...","buildCommand":"...","startCommand":"...","installCommand":"...","port":3000,"healthPath":"/health","hasDockerfile":false,"envVars":[{"name":"VAR","required":true}],"database":{"required":false},"cache":{"required":false},"confidence":0.9,"notes":[]}'
           ].join("\n")
         }
       ]

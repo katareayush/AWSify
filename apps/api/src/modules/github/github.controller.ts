@@ -71,8 +71,7 @@ export class GithubController {
     });
     res.clearCookie(OAUTH_STATE_COOKIE);
 
-    const webUrl = process.env.WEB_URL ?? "http://localhost:3000";
-    res.redirect(`${webUrl}/dashboard`);
+    res.redirect(`${requiredEnv("APP_URL")}/dashboard`);
   }
 
   @Get("repositories")
@@ -109,8 +108,7 @@ export class GithubController {
     }
 
     res.clearCookie(APP_INSTALL_STATE_COOKIE);
-    const webUrl = process.env.WEB_URL ?? "http://localhost:3000";
-    res.redirect(`${webUrl}/repositories`);
+    res.redirect(`${requiredEnv("APP_URL")}/repositories`);
   }
 
   @Get("me")
@@ -121,4 +119,10 @@ export class GithubController {
     if (!session) return { authenticated: false };
     return { authenticated: true, userId: session.userId, githubLogin: session.githubLogin };
   }
+}
+
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is required.`);
+  return value;
 }

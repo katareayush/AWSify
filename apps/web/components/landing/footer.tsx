@@ -29,7 +29,7 @@ function Brand() {
         Owned by you. Built for teams shipping in production.
       </p>
       <p className="mt-6 font-mono text-[11px] text-white/30">
-        © {new Date().getFullYear()} AWS-ify Labs · status: operational
+        © {new Date().getFullYear()} AWS-ify Labs · <Link href="/status" className="transition-colors hover:text-white/55">status</Link>
       </p>
     </div>
   );

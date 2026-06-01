@@ -226,7 +226,7 @@ export default function ConnectionsPage() {
         <Panel className="p-5">
           <div className="flex gap-3 text-[13px] leading-[1.6] text-white/55">
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-violet-soft" />
-            <p>The IAM role grants AWS-ify permissions to create ECS, EC2, Lambda, RDS, S3, and CloudFront resources on your behalf. Review the CloudFormation template before deploying it.</p>
+            <p>The IAM role grants AWS-ify permissions for the MVP deployment path: ECR images, ECS Fargate services, an Application Load Balancer, CloudWatch logs, and the IAM roles those tasks need. Review the CloudFormation template before deploying it.</p>
           </div>
         </Panel>
       </div>

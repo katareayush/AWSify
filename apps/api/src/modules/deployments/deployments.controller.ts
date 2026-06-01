@@ -45,6 +45,16 @@ export class DeploymentsController {
     return this.deployments.saveEnvVars(id, token, body);
   }
 
+  @Post(":id/runtime")
+  saveRuntimeSettings(
+    @Req() req: Request,
+    @Param("id") id: string,
+    @Body() body: { port?: number; healthPath?: string }
+  ) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    return this.deployments.saveRuntimeSettings(id, token, body);
+  }
+
   @Post(":id/ci-token")
   rotateCiToken(@Req() req: Request, @Param("id") id: string) {
     const token = req.cookies?.[SESSION_COOKIE] as string | undefined;

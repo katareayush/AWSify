@@ -3,10 +3,10 @@ import { z } from "zod";
 
 export const appEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  APP_URL: z.string().url().default("http://localhost:3000"),
-  API_URL: z.string().url().default("http://localhost:4000"),
+  APP_URL: z.string().url(),
+  API_URL: z.string().url(),
   DATABASE_URL: z.string().min(1),
-  REDIS_URL: z.string().url().default("redis://localhost:6379"),
+  REDIS_URL: z.string().url(),
   SESSION_SECRET: z.string().min(16),
   GITHUB_CLIENT_ID: z.string().min(1),
   GITHUB_CLIENT_SECRET: z.string().min(1),

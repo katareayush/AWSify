@@ -1,4 +1,5 @@
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/v1";
+const BASE = process.env.NEXT_PUBLIC_API_URL;
+if (!BASE) throw new Error("NEXT_PUBLIC_API_URL is required.");
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -6,12 +7,11 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     credentials: "include",
     headers: { "Content-Type": "application/json", ...init?.headers }
   });
-  if (!res.ok) {
-    let detail = "";
-    try { detail = (await res.json()).error ?? ""; } catch { /* ignore */ }
-    throw new Error(detail || `HTTP ${res.status}`);
-  }
-  return res.json() as Promise<T>;
+  let data: unknown = null;
+  try { data = await res.json(); } catch { /* ignore */ }
+  const error = data && typeof data === "object" && "error" in data ? String((data as { error: unknown }).error) : "";
+  if (!res.ok || error) throw new Error(error || `HTTP ${res.status}`);
+  return data as T;
 }
 
 // ---- types ----------------------------------------------------------------
@@ -60,6 +60,7 @@ export interface DeploymentDetail extends Deployment {
     estimatedCost: { low: number; high: number; notes: string[] };
     artifacts: Array<{ kind: string; path: string; content: string; summary: string }>;
     status: string;
+    updatedAt: string;
   };
 }
 
@@ -80,7 +81,7 @@ export const api = {
     req<{ externalId: string; template: string | null }>("/aws/cloudformation-template"),
 
   validateConnection: (body: { roleArn: string; externalId: string; region: string }) =>
-    req<{ status: string; reason?: string }>("/aws/connections/validate", {
+    req<{ status: string; reason?: string; accountId?: string; arn?: string }>("/aws/connections/validate", {
       method: "POST",
       body: JSON.stringify(body)
     }),
@@ -107,6 +108,12 @@ export const api = {
     req<{ saved: string[] }>(`/deployments/${id}/env`, {
       method: "POST",
       body: JSON.stringify({ env })
+    }),
+
+  saveDeploymentRuntime: (id: string, body: { port: number; healthPath: string }) =>
+    req<{ suggestion: Record<string, unknown> }>(`/deployments/${id}/runtime`, {
+      method: "POST",
+      body: JSON.stringify(body)
     }),
 
   approveDeployment: (id: string) =>

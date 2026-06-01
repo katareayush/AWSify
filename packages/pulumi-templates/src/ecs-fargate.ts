@@ -20,6 +20,7 @@ export interface EcsFargateOutputs {
 export function createEcsFargateStack(input: EcsFargateInput): EcsFargateOutputs {
   const appName = input.plan.appName;
   const port = input.plan.suggestion.port;
+  const healthPath = input.plan.suggestion.healthPath || "/";
 
   const vpc = aws.ec2.getVpcOutput({ default: true });
   const subnetIds = aws.ec2.getSubnetsOutput({ filters: [{ name: "vpc-id", values: [vpc.id] }] }).ids;
@@ -73,7 +74,7 @@ export function createEcsFargateStack(input: EcsFargateInput): EcsFargateOutputs
     port,
     protocol: "HTTP",
     targetType: "ip",
-    healthCheck: { path: "/", matcher: "200-399", interval: 30, timeout: 5, healthyThreshold: 2, unhealthyThreshold: 3 }
+    healthCheck: { path: healthPath, matcher: "200-399", interval: 30, timeout: 5, healthyThreshold: 2, unhealthyThreshold: 3 }
   });
 
   const alb = new aws.lb.LoadBalancer(`${appName}-alb`, {

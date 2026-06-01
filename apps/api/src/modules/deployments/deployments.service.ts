@@ -179,6 +179,43 @@ export class DeploymentsService {
     return { saved: entries.map(([name]) => name) };
   }
 
+  async saveRuntimeSettings(
+    deploymentId: string,
+    sessionToken: string | undefined,
+    input: { port?: number; healthPath?: string }
+  ) {
+    const userId = this.getUserId(sessionToken);
+    if (!userId) return { error: "not_authenticated" };
+
+    const deployment = await this.prisma.deployment.findFirst({
+      where: { id: deploymentId, actorUserId: userId },
+      include: { plan: true }
+    });
+    if (!deployment) return { error: "not_found" };
+    if (deployment.plan.status !== "awaiting_approval") return { error: "plan_not_awaiting_approval" };
+
+    const suggestion = deploymentSuggestionSchema.safeParse(deployment.plan.suggestion);
+    if (!suggestion.success) return { error: "plan_not_ready" };
+
+    const port = input.port ?? suggestion.data.port;
+    const healthPath = input.healthPath ?? suggestion.data.healthPath;
+    if (!Number.isInteger(port) || port < 1 || port > 65535) return { error: "invalid_port" };
+    if (!/^\/[A-Za-z0-9/_\-.]*$/.test(healthPath)) return { error: "invalid_health_path" };
+
+    const nextSuggestion = {
+      ...suggestion.data,
+      port,
+      healthPath
+    };
+
+    await this.prisma.deploymentPlan.update({
+      where: { id: deployment.planId },
+      data: { suggestion: nextSuggestion as object }
+    });
+
+    return { suggestion: nextSuggestion };
+  }
+
   async rotateCiToken(deploymentId: string, sessionToken: string | undefined) {
     const userId = this.getUserId(sessionToken);
     if (!userId) return { error: "not_authenticated" };

@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { STSClient, AssumeRoleCommand } from "@aws-sdk/client-sts";
+import { STSClient, AssumeRoleCommand, GetCallerIdentityCommand } from "@aws-sdk/client-sts";
 import { PrismaService } from "../prisma.service";
 import { generateCloudFormationRoleTemplate } from "@awsify/templates";
 
@@ -37,7 +37,22 @@ export class AwsService {
           DurationSeconds: 900
         })
       );
-      return { status: "valid", accessKeyIdPreview: response.Credentials?.AccessKeyId?.slice(0, 6) };
+      if (!response.Credentials) return { status: "invalid", reason: "STS AssumeRole returned no credentials." };
+      const assumed = new STSClient({
+        region: input.region,
+        credentials: {
+          accessKeyId: response.Credentials.AccessKeyId!,
+          secretAccessKey: response.Credentials.SecretAccessKey!,
+          sessionToken: response.Credentials.SessionToken!
+        }
+      });
+      const identity = await assumed.send(new GetCallerIdentityCommand({}));
+      return {
+        status: "valid",
+        accountId: identity.Account,
+        arn: identity.Arn,
+        accessKeyIdPreview: response.Credentials.AccessKeyId?.slice(0, 6)
+      };
     } catch (error) {
       return { status: "invalid", reason: error instanceof Error ? error.message : "Unknown STS error" };
     }
@@ -45,6 +60,11 @@ export class AwsService {
 
   async saveConnection(userId: string, input: { roleArn: string; externalId: string; accountId: string; region: string }) {
     if (!verifyExternalId(userId, input.externalId)) return { error: "invalid_external_id" };
+    const validation = await this.validateConnection(userId, input);
+    if (validation.status !== "valid") return { error: "aws_validation_failed", validation };
+    if (validation.accountId && validation.accountId !== input.accountId) {
+      return { error: `account_id_mismatch: expected ${validation.accountId}` };
+    }
     const connection = await this.prisma.awsConnection.upsert({
       where: { id: input.externalId },
       create: {

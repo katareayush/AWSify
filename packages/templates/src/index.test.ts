@@ -18,6 +18,7 @@ describe("createDeploymentPlan", () => {
         startCommand: "npm start",
         installCommand: "npm ci",
         port: 3000,
+        healthPath: "/health",
         hasDockerfile: false,
         envVars: [],
         database: { required: false },

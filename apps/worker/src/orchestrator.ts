@@ -137,6 +137,11 @@ export class DeploymentOrchestrator {
         ? outputs.liveUrl.value
         : (outputs as Record<string, { value: string } | undefined>)["liveUrl"]?.value;
 
+    if (liveUrl) {
+      await emit("deploying", `Checking service health at ${liveUrl}${plan.suggestion.healthPath}`);
+      await waitForHttpHealth(liveUrl, plan.suggestion.healthPath, emit);
+    }
+
     await emit("deployed", `Live at: ${liveUrl ?? "(URL pending DNS propagation)"}`);
 
     if (job.deploymentId && liveUrl) {
@@ -146,7 +151,7 @@ export class DeploymentOrchestrator {
     return { status: "deployed", liveUrl, events };
 
     } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
+      const reason = explainDeploymentError(err);
       await emit("failed", `Deployment failed: ${reason}`);
       if (job.deploymentId) {
         await this.prisma.deployment.update({ where: { id: job.deploymentId }, data: { status: "failed", failureReason: reason } }).catch(() => {});
@@ -190,18 +195,27 @@ export class DeploymentOrchestrator {
     const githubToken = await createInstallationToken(installationId);
     const repoUrl = `https://x-access-token:${githubToken}@github.com/${job.repoFullName}.git`;
 
-    await execFileAsync("git", ["clone", "--depth", "1", "--branch", job.branch, repoUrl, destination], { timeout: 120_000 });
+    try {
+      await execFileAsync("git", ["clone", "--depth", "1", "--branch", job.branch, repoUrl, destination], { timeout: 120_000 });
+    } catch (error) {
+      throw new Error(`GitHub clone failed. Check GitHub App repository access and branch "${job.branch}". ${extractProcessError(error)}`);
+    }
     return destination;
   }
 
   private async assumeRole(roleArn: string, externalId: string, region: string): Promise<AwsCredentials> {
     const sts = new STSClient({ region });
-    const response = await sts.send(new AssumeRoleCommand({
-      RoleArn: roleArn,
-      RoleSessionName: "awsify-deployment",
-      ExternalId: externalId,
-      DurationSeconds: 3600
-    }));
+    let response;
+    try {
+      response = await sts.send(new AssumeRoleCommand({
+        RoleArn: roleArn,
+        RoleSessionName: "awsify-deployment",
+        ExternalId: externalId,
+        DurationSeconds: 3600
+      }));
+    } catch (error) {
+      throw new Error(`AWS role assumption failed. Recreate the CloudFormation role or verify the external ID. ${extractProcessError(error)}`);
+    }
 
     if (!response.Credentials) throw new Error("STS AssumeRole returned no credentials.");
     return {
@@ -257,10 +271,23 @@ export class DeploymentOrchestrator {
     const [username, password] = authToken.split(":");
     const registry = repositoryUri.split("/")[0];
 
-    await dockerLogin(username, password, registry);
+    try {
+      await dockerLogin(username, password, registry);
+    } catch (error) {
+      throw new Error(`Docker login to ECR failed. Check ECR permissions on the AWS-ify role. ${extractProcessError(error)}`);
+    }
 
-    await execFileAsync("docker", ["build", "-t", imageUri, repoPath], { timeout: 600_000 });
-    await execFileAsync("docker", ["push", imageUri], { timeout: 300_000 });
+    try {
+      await execFileAsync("docker", ["build", "-t", imageUri, repoPath], { timeout: 600_000 });
+    } catch (error) {
+      throw new Error(`Docker build failed. Check the Dockerfile, build command, and package install step. ${extractProcessError(error)}`);
+    }
+
+    try {
+      await execFileAsync("docker", ["push", imageUri], { timeout: 300_000 });
+    } catch (error) {
+      throw new Error(`Docker push to ECR failed. Check ECR push permissions and repository access. ${extractProcessError(error)}`);
+    }
   }
 
   private async runPulumiStack(
@@ -311,12 +338,17 @@ export class DeploymentOrchestrator {
 
     await stack.setConfig("aws:region", { value: plan.region });
 
-    const result = await stack.up({
-      onOutput: msg => {
-        const trimmed = msg.trim();
-        if (trimmed) emit("deploying", trimmed);
-      }
-    });
+    let result;
+    try {
+      result = await stack.up({
+        onOutput: msg => {
+          const trimmed = msg.trim();
+          if (trimmed) emit("deploying", trimmed);
+        }
+      });
+    } catch (error) {
+      throw new Error(`Pulumi apply failed. Check AWS role permissions, default VPC availability, and ECS/ALB quotas. ${extractProcessError(error)}`);
+    }
 
     return result.outputs as Record<string, { value: string }>;
   }
@@ -398,6 +430,70 @@ function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} must be configured.`);
   return value;
+}
+
+async function waitForHttpHealth(
+  liveUrl: string,
+  healthPath: string,
+  emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
+): Promise<void> {
+  const url = new URL(healthPath || "/", liveUrl);
+  let lastError = "";
+
+  for (let attempt = 1; attempt <= 20; attempt += 1) {
+    try {
+      const response = await fetch(url, { method: "GET" });
+      if (response.status >= 200 && response.status < 400) {
+        await emit("deploying", `Health check passed with HTTP ${response.status}.`);
+        return;
+      }
+      lastError = `HTTP ${response.status}`;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+
+    if (attempt === 1 || attempt % 5 === 0) {
+      await emit("deploying", `Waiting for healthy response (${attempt}/20): ${lastError}`);
+    }
+    await sleep(15_000);
+  }
+
+  throw new Error(`ALB health check failed at ${url.toString()}. Last result: ${lastError}. Confirm the app listens on the configured port and responds on the health path.`);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function explainDeploymentError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/Cannot connect to the Docker daemon|docker daemon/i.test(message)) {
+    return "Docker is not running on the worker machine. Start Docker and retry the deployment.";
+  }
+  if (/no basic auth credentials|denied|authorization/i.test(message) && /docker|ecr/i.test(message)) {
+    return `Container registry authentication failed. ${message}`;
+  }
+  if (/AccessDenied|not authorized|UnauthorizedOperation/i.test(message)) {
+    return `AWS permission denied. Update the CloudFormation role permissions and retry. ${message}`;
+  }
+  if (/Target group|health check|healthy response|ALB/i.test(message)) {
+    return message;
+  }
+  if (/branch|clone|repository/i.test(message)) {
+    return message;
+  }
+  return message;
+}
+
+function extractProcessError(error: unknown): string {
+  if (error && typeof error === "object") {
+    const maybe = error as { stderr?: unknown; stdout?: unknown; message?: unknown };
+    const stderr = typeof maybe.stderr === "string" ? maybe.stderr.trim() : "";
+    const stdout = typeof maybe.stdout === "string" ? maybe.stdout.trim() : "";
+    const message = typeof maybe.message === "string" ? maybe.message.trim() : "";
+    return [stderr, stdout, message].filter(Boolean).join(" ").slice(0, 1000);
+  }
+  return String(error);
 }
 
 async function createInstallationToken(installationId: string): Promise<string> {

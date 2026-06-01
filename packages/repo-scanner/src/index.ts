@@ -59,6 +59,7 @@ export interface RepoScanResult {
   startCommand: string;
   installCommand: string;
   port: number;
+  healthPath: string;
   hasDockerfile: boolean;
   envVars: DeploymentSuggestion["envVars"];
   databaseRequired: boolean;
@@ -118,6 +119,7 @@ function scanNode(root: string, hasDockerfile: boolean, signals: string[]): Repo
   const startCommand = pkg.scripts?.start ? `${pm} start` : "node server.js";
   const installCommand = packageManagerInstall(packageManager);
   const port = detectPort(root, ["ts", "tsx", "js"]) ?? (isNext ? 3000 : 3000);
+  const healthPath = detectHealthPath(root, ["ts", "tsx", "js", "jsx", "mjs"]);
 
   return {
     root,
@@ -128,6 +130,7 @@ function scanNode(root: string, hasDockerfile: boolean, signals: string[]): Repo
     startCommand,
     installCommand,
     port,
+    healthPath,
     hasDockerfile,
     envVars,
     databaseRequired,
@@ -147,6 +150,7 @@ export function scanToSuggestion(scan: RepoScanResult): DeploymentSuggestion {
     startCommand: scan.startCommand,
     installCommand: scan.installCommand,
     port: scan.port,
+    healthPath: scan.healthPath,
     hasDockerfile: scan.hasDockerfile,
     envVars: scan.envVars,
     database: scan.databaseRequired
@@ -208,6 +212,21 @@ function detectDatabase(
 
 function detectRedis(deps: Record<string, string | undefined>): boolean {
   return Boolean(deps.ioredis || deps.redis || deps.bullmq || deps["@bull-board/express"]);
+}
+
+function detectHealthPath(root: string, extensions: string[]): string {
+  const files = collectSourceFiles(root, extensions).slice(0, 60);
+  const candidates = ["/health", "/healthz", "/api/health", "/ready", "/status"];
+  for (const file of files) {
+    const content = readFileSafe(file);
+    const found = candidates.find((path) =>
+      content.includes(`"${path}"`) ||
+      content.includes(`'${path}'`) ||
+      content.includes(`\`${path}\``)
+    );
+    if (found) return found;
+  }
+  return "/";
 }
 
 function hasServerEntryPoint(root: string, deps: Record<string, string | undefined>): boolean {

@@ -22,6 +22,7 @@ export const deploymentSuggestionSchema = z.object({
   startCommand: z.string().min(1).max(200),
   installCommand: z.string().min(1).max(200),
   port: z.number().int().min(0).max(65535),
+  healthPath: z.string().regex(/^\/[A-Za-z0-9/_\-.]*$/).default("/"),
   hasDockerfile: z.boolean(),
   envVars: z.array(envVarSchema),
   database: z

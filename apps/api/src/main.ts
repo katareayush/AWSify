@@ -4,12 +4,12 @@ import { loadEnv } from "@awsify/config";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./modules/app.module";
 
-loadEnv();
+const env = loadEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({
-    origin: process.env.APP_URL ?? "http://localhost:3000",
+    origin: env.APP_URL,
     credentials: true
   });
   app.use(cookieParser());

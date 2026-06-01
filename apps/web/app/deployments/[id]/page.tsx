@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { CheckCircle2, ChevronDown, ChevronUp, Cloud, ExternalLink, KeyRound, Loader2, Play, RotateCw, Save, ServerCrash, TerminalSquare } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Cloud, ExternalLink, HeartPulse, KeyRound, Loader2, Play, RotateCw, Save, ServerCrash, TerminalSquare } from "lucide-react";
 import { PageHeading } from "../../../components/page-heading";
+import { InfraDiagram } from "../../../components/infra-diagram";
 import { ProductShell } from "../../../components/product-shell";
 import { Button } from "../../../components/ui/button";
 import { Panel } from "../../../components/ui/panel";
@@ -26,7 +27,9 @@ export default function DeploymentDetailPage() {
   const [fetching, setFetching] = useState(true);
   const [expandedArtifact, setExpandedArtifact] = useState<string | null>(null);
   const [envValues, setEnvValues] = useState<Record<string, string>>({});
+  const [runtimeValues, setRuntimeValues] = useState<{ port: string; healthPath: string }>({ port: "", healthPath: "/" });
   const [savingEnv, setSavingEnv] = useState(false);
+  const [savingRuntime, setSavingRuntime] = useState(false);
   const [approving, setApproving] = useState(false);
   const [rotatingToken, setRotatingToken] = useState(false);
   const [ciToken, setCiToken] = useState<{ token: string; secretName: string; variableName: string; projectId: string } | null>(null);
@@ -72,6 +75,15 @@ export default function DeploymentDetailPage() {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [detail?.logs.length]);
 
+  useEffect(() => {
+    const suggestion = detail?.plan?.suggestion as Record<string, unknown> | undefined;
+    if (!suggestion) return;
+    setRuntimeValues({
+      port: String(suggestion.port ?? ""),
+      healthPath: String(suggestion.healthPath ?? "/")
+    });
+  }, [detail?.plan?.id, detail?.plan?.updatedAt]);
+
   if (loading || fetching) {
     return (
       <ProductShell active="Templates">
@@ -115,6 +127,22 @@ export default function DeploymentDetailPage() {
       setActionError(err instanceof Error ? err.message : String(err));
     } finally {
       setSavingEnv(false);
+    }
+  }
+
+  async function saveRuntimeSettings() {
+    setSavingRuntime(true);
+    setActionError(null);
+    try {
+      await api.saveDeploymentRuntime(id, {
+        port: Number(runtimeValues.port),
+        healthPath: runtimeValues.healthPath || "/"
+      });
+      await fetchDetail();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSavingRuntime(false);
     }
   }
 
@@ -243,8 +271,75 @@ export default function DeploymentDetailPage() {
             </div>
           </Panel>
 
+          <div className="space-y-5">
+            <Panel className="p-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <p className="text-[14px] font-medium tracking-tight text-white">Infrastructure path</p>
+                <span className="font-mono text-[10.5px] uppercase tracking-wider text-white/35">ECS Fargate MVP</span>
+              </div>
+              <InfraDiagram />
+            </Panel>
+
+            <Panel className="p-5">
+              <p className="text-[14px] font-medium tracking-tight text-white">Timeline</p>
+              <div className="mt-4 space-y-3">
+                {buildTimeline(detail.logs, detail.status).map((item) => (
+                  <div key={item.label} className="flex items-start gap-3">
+                    <span className={`mt-1 h-2.5 w-2.5 rounded-full ${item.state === "done" ? "bg-emerald-400" : item.state === "active" ? "bg-violet-soft" : item.state === "failed" ? "bg-red-400" : "bg-white/20"}`} />
+                    <div>
+                      <p className="text-[12.5px] font-medium text-white/75">{item.label}</p>
+                      <p className="mt-0.5 text-[11.5px] text-white/35">{item.detail}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          </div>
+
           {/* Plan summary */}
           <div className="space-y-4">
+            {suggestion && (
+              <Panel className="p-5">
+                <div className="mb-4 flex items-center gap-2">
+                  <HeartPulse className="h-4 w-4 text-violet-soft" />
+                  <p className="text-[13px] font-medium text-white">Runtime check</p>
+                </div>
+                <div className="grid gap-3">
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] text-white/40">Container port</span>
+                    <input
+                      value={runtimeValues.port}
+                      onChange={(event) => setRuntimeValues((current) => ({ ...current, port: event.target.value }))}
+                      inputMode="numeric"
+                      disabled={!isAwaitingApproval}
+                      className="h-9 w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] text-white/40">Health path</span>
+                    <input
+                      value={runtimeValues.healthPath}
+                      onChange={(event) => setRuntimeValues((current) => ({ ...current, healthPath: event.target.value }))}
+                      placeholder="/"
+                      disabled={!isAwaitingApproval}
+                      className="h-9 w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40"
+                    />
+                  </label>
+                </div>
+                {isAwaitingApproval && (
+                  <Button
+                    className="mt-4 w-full"
+                    variant="secondary"
+                    onClick={saveRuntimeSettings}
+                    disabled={savingRuntime || !runtimeValues.port || !runtimeValues.healthPath.startsWith("/")}
+                  >
+                    {savingRuntime ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Save runtime
+                  </Button>
+                )}
+              </Panel>
+            )}
+
             {envVars.length > 0 && (
               <Panel className="p-5">
                 <div className="mb-4 flex items-center gap-2">
@@ -337,6 +432,9 @@ export default function DeploymentDetailPage() {
                   )}
                   {!!suggestion.port && (
                     <Row label="Port" value={String(suggestion.port)} />
+                  )}
+                  {!!suggestion.healthPath && (
+                    <Row label="Health path" value={String(suggestion.healthPath)} />
                   )}
                   {!!suggestion.packageManager && (
                     <Row label="Package manager" value={String(suggestion.packageManager)} />
@@ -435,4 +533,44 @@ function Row({ label, value }: { label: string; value: string }) {
       <dd className="font-mono text-white/70 text-right">{value}</dd>
     </div>
   );
+}
+
+function buildTimeline(logs: DeploymentDetail["logs"], status: string) {
+  const messages = logs.map((log) => log.message.toLowerCase());
+  const has = (needle: string) => messages.some((message) => message.includes(needle));
+  const failed = status === "failed";
+  const deployed = status === "deployed";
+
+  return [
+    {
+      label: "Queued",
+      detail: "Deployment job created.",
+      state: logs.length > 0 ? "done" : "pending"
+    },
+    {
+      label: "Repository scan",
+      detail: "Clone repo, detect runtime, env vars, port, and health path.",
+      state: has("scan complete") || has("plan and preview") || deployed ? "done" : status === "scanning" ? "active" : "pending"
+    },
+    {
+      label: "Approval",
+      detail: "Review generated artifacts and approve infra changes.",
+      state: status === "awaiting_approval" ? "active" : has("approved plan loaded") || deployed ? "done" : "pending"
+    },
+    {
+      label: "Image build",
+      detail: "Build Docker image and push it to ECR.",
+      state: has("image pushed") || deployed ? "done" : status === "deploying" && has("creating ecr") ? "active" : "pending"
+    },
+    {
+      label: "AWS apply",
+      detail: "Run the approved Pulumi ECS Fargate template.",
+      state: has("health check") || deployed ? "done" : status === "deploying" && has("running pulumi") ? "active" : "pending"
+    },
+    {
+      label: "Health check",
+      detail: "Poll the public ALB URL until the approved health path responds.",
+      state: failed ? "failed" : deployed ? "done" : status === "deploying" && has("checking service health") ? "active" : "pending"
+    }
+  ];
 }

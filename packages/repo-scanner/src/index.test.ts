@@ -14,12 +14,13 @@ describe("repo scanner", () => {
         dependencies: { express: "^4.18.0" }
       })
     );
-    writeFileSync(join(root, "server.js"), "app.listen(process.env.PORT || 8080); process.env.DATABASE_URL;");
+    writeFileSync(join(root, "server.js"), "app.get('/health', (_req, res) => res.send('ok')); app.listen(process.env.PORT || 8080); process.env.DATABASE_URL;");
 
     const suggestion = scanToSuggestion(scanRepository(root));
 
     expect(suggestion.appType).toBe("node-backend");
     expect(suggestion.port).toBe(8080);
+    expect(suggestion.healthPath).toBe("/health");
     expect(suggestion.envVars.map((envVar) => envVar.name)).toContain("DATABASE_URL");
   });
 

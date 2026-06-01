@@ -197,10 +197,7 @@ export const footerColumns = [
   {
     title: "Company",
     links: [
-      ["Changelog", "#"],
-      ["Status", "#"],
-      ["Privacy", "#"],
-      ["Terms", "#"]
+      ["Status", "/status"]
     ] as ReadonlyArray<readonly [string, string]>
   }
 ];
