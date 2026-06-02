@@ -59,12 +59,12 @@ export function TopBar() {
       <div className="flex items-center gap-2">
         {me?.authenticated ? (
           <>
-            <Link href="/repositories">
-              <Button variant="secondary">
+            <Button asChild variant="secondary">
+              <Link href="/repositories">
                 <Plus className="h-4 w-4" />
                 New deploy
-              </Button>
-            </Link>
+              </Link>
+            </Button>
             <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.1] bg-white/[0.06] text-[12px] font-medium text-white/80">
               {me.githubLogin?.[0]?.toUpperCase() ?? "?"}
             </div>

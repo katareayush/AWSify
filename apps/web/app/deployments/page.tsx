@@ -47,12 +47,12 @@ export default function DeploymentsPage() {
               <p className="mx-auto mt-2 max-w-md text-[13px] leading-[1.6] text-white/55">
                 Select a connected repository and deploy it. AWS-ify generates a plan before creating any AWS resources.
               </p>
-              <Link href="/repositories" className="mt-5 inline-flex">
-                <Button variant="secondary">
+              <Button asChild variant="secondary" className="mt-5">
+                <Link href="/repositories">
                   Choose repository
                   <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
           ) : (
             <div className="divide-y divide-white/[0.05]">

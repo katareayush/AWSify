@@ -46,18 +46,18 @@ export default function DashboardPage() {
           description="Connect GitHub and AWS, then select a repository to create the first deployment."
           action={
             <>
-              <Link href="/connections">
-                <Button variant="secondary">
+              <Button asChild variant="secondary">
+                <Link href="/connections">
                   <KeyRound className="h-4 w-4" />
                   {awsDone ? "Manage connections" : "Connect AWS"}
-                </Button>
-              </Link>
-              <Link href="/repositories">
-                <Button>
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href="/repositories">
                   New deployment
                   <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </>
           }
         />
@@ -84,12 +84,12 @@ export default function DashboardPage() {
                   <p className="mx-auto mt-2 max-w-md text-[13px] leading-[1.6] text-white/55">
                     Connect GitHub and AWS, then pick a repository to deploy.
                   </p>
-                  <Link href="/repositories" className="mt-5 inline-flex">
-                    <Button variant="secondary">
+                  <Button asChild variant="secondary" className="mt-5">
+                    <Link href="/repositories">
                       Select repository
                       <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                 </div>
               ) : (
                 deployments.map(d => (

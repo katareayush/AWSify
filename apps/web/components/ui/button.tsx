@@ -1,9 +1,10 @@
 import { cva, type VariantProps } from "class-variance-authority";
+import { cloneElement, isValidElement, type ReactElement } from "react";
 import type * as React from "react";
 import { cn } from "../../lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 text-[13px] font-medium tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex h-9 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 text-[13px] font-medium tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
@@ -30,8 +31,24 @@ const buttonVariants = cva(
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+}
 
-export function Button({ className, variant, size, ...props }: ButtonProps) {
-  return <button className={cn(buttonVariants({ variant, size, className }))} {...props} />;
+export function Button({ className, variant, size, asChild, children, ...props }: ButtonProps) {
+  const classes = cn(buttonVariants({ variant, size, className }));
+
+  if (asChild && isValidElement(children)) {
+    const child = children as ReactElement<{ className?: string }>;
+    return cloneElement(child, {
+      ...props,
+      className: cn(classes, child.props.className)
+    } as React.HTMLAttributes<HTMLElement>);
+  }
+
+  return (
+    <button className={classes} {...props}>
+      {children}
+    </button>
+  );
 }

@@ -3,6 +3,8 @@ export { AppBackdrop } from "./backdrop";
 export { CommandPalette } from "./command-palette";
 export { PageTransition } from "./page-transition";
 export { Sidebar } from "./sidebar";
+export { SidebarProvider, useSidebar } from "./sidebar-context";
+export { SidebarToggle } from "./sidebar-toggle";
 export { TopBar } from "./top-bar";
 export { navItems } from "./nav-data";
 export type { NavItem } from "./nav-data";
