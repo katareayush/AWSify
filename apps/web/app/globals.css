@@ -23,11 +23,11 @@
 html,
 body {
   min-height: 100%;
+  background-color: #050505;
 }
 
 body {
   margin: 0;
-  background: hsl(var(--background));
   color: hsl(var(--foreground));
   font-feature-settings:
     "cv02" 1,
@@ -65,14 +65,6 @@ select {
   color: #fff;
 }
 
-/* Paint html + body black when the landing page is mounted so over-scroll
-   (rubber-band on macOS/iOS, top/bottom whitespace) doesn't reveal the
-   light theme behind it. Other routes keep their own background. */
-html:has(.landing-root),
-html:has(.landing-root) body {
-  background-color: #050505;
-}
-
 html:has(.landing-root) {
   color-scheme: dark;
   overscroll-behavior-y: none;
@@ -100,11 +92,6 @@ html:has(.landing-root) {
 .app-root ::selection {
   background: rgba(139, 92, 246, 0.35);
   color: #fff;
-}
-
-html:has(.app-root),
-html:has(.app-root) body {
-  background-color: #050505;
 }
 
 html:has(.app-root) {
@@ -276,6 +263,33 @@ html:has(.app-root) {
   100% { transform: translateY(100%); opacity: 0; }
 }
 
+/* ── Page transition + command palette ─────────────────────────────────── */
+
+.animate-page-in {
+  animation: pageIn 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+@keyframes pageIn {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-palette-fade {
+  animation: paletteFade 150ms ease-out both;
+}
+@keyframes paletteFade {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.animate-palette-in {
+  animation: paletteIn 180ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  transform-origin: top center;
+}
+@keyframes paletteIn {
+  0%   { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-grid-drift,
   .animate-float,
@@ -284,7 +298,10 @@ html:has(.app-root) {
   .animate-pulse-slow,
   .text-gradient-sweep,
   .scan-line::after,
-  .shimmer {
+  .shimmer,
+  .animate-page-in,
+  .animate-palette-fade,
+  .animate-palette-in {
     animation: none !important;
   }
 }

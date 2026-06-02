@@ -1,4 +1,4 @@
-import { AppRoot, Sidebar, TopBar } from "./app";
+import { AppRoot, PageTransition, Sidebar, TopBar } from "./app";
 
 interface ProductShellProps {
   children: React.ReactNode;
@@ -13,7 +13,9 @@ export function ProductShell({ children, active = "Deployments" }: ProductShellP
         <section className="min-w-0">
           <TopBar />
           <div className="px-4 py-6 sm:px-8 sm:py-8">
-            <div className="mx-auto max-w-7xl">{children}</div>
+            <div className="mx-auto max-w-7xl">
+              <PageTransition>{children}</PageTransition>
+            </div>
           </div>
         </section>
       </div>
