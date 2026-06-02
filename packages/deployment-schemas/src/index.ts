@@ -6,6 +6,21 @@ export const computeTargetSchema = z.enum(["ecs-fargate"]);
 
 export const supportedServiceSchema = z.enum(["frontend", "backend", "database", "worker", "cache"]);
 
+const HEALTH_PATH_PATTERN = /^\/[A-Za-z0-9/_\-.]*$/;
+
+export function isValidHealthPath(value: string): boolean {
+  if (!HEALTH_PATH_PATTERN.test(value)) return false;
+  const segments = value.split("/");
+  return !segments.includes("..");
+}
+
+export const healthPathSchema = z
+  .string()
+  .refine(isValidHealthPath, {
+    message: "must start with / and contain only safe URL path characters (no '..' segments)"
+  })
+  .default("/");
+
 export const envVarSchema = z.object({
   name: z.string().regex(/^[A-Z_][A-Z0-9_]*$/),
   required: z.boolean().default(true),
@@ -22,7 +37,7 @@ export const deploymentSuggestionSchema = z.object({
   startCommand: z.string().min(1).max(200),
   installCommand: z.string().min(1).max(200),
   port: z.number().int().min(0).max(65535),
-  healthPath: z.string().regex(/^\/[A-Za-z0-9/_\-.]*$/).default("/"),
+  healthPath: healthPathSchema,
   hasDockerfile: z.boolean(),
   envVars: z.array(envVarSchema),
   database: z

@@ -14,6 +14,7 @@ import { createStack } from "@awsify/pulumi-templates";
 import { ECRClient, CreateRepositoryCommand, DescribeRepositoriesCommand, GetAuthorizationTokenCommand } from "@aws-sdk/client-ecr";
 import { STSClient, AssumeRoleCommand } from "@aws-sdk/client-sts";
 import { LocalWorkspace, type PulumiFn } from "@pulumi/pulumi/automation";
+import { redactSecrets } from "./redact";
 
 const execFileAsync = promisify(execFile);
 
@@ -35,7 +36,8 @@ export class DeploymentOrchestrator {
 
   async deploy(job: DeploymentJob) {
     const events: DeploymentEvent[] = [];
-    const emit = async (status: DeploymentEvent["status"], message: string) => {
+    const emit = async (status: DeploymentEvent["status"], rawMessage: string) => {
+      const message = redactSecrets(rawMessage);
       const event = { status, message, at: new Date().toISOString() };
       events.push(event);
       console.log(`[deployment:${job.projectId}] ${status}: ${message}`);
@@ -151,7 +153,7 @@ export class DeploymentOrchestrator {
     return { status: "deployed", liveUrl, events };
 
     } catch (err) {
-      const reason = explainDeploymentError(err);
+      const reason = redactSecrets(explainDeploymentError(err));
       await emit("failed", `Deployment failed: ${reason}`);
       if (job.deploymentId) {
         await this.prisma.deployment.update({ where: { id: job.deploymentId }, data: { status: "failed", failureReason: reason } }).catch(() => {});
@@ -491,9 +493,10 @@ function extractProcessError(error: unknown): string {
     const stderr = typeof maybe.stderr === "string" ? maybe.stderr.trim() : "";
     const stdout = typeof maybe.stdout === "string" ? maybe.stdout.trim() : "";
     const message = typeof maybe.message === "string" ? maybe.message.trim() : "";
-    return [stderr, stdout, message].filter(Boolean).join(" ").slice(0, 1000);
+    const combined = [stderr, stdout, message].filter(Boolean).join(" ").slice(0, 1000);
+    return redactSecrets(combined);
   }
-  return String(error);
+  return redactSecrets(String(error));
 }
 
 async function createInstallationToken(installationId: string): Promise<string> {

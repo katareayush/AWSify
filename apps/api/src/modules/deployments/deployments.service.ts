@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { encryptSecret, previewSecret } from "@awsify/config";
-import { deploymentSuggestionSchema } from "@awsify/deployment-schemas";
+import { deploymentSuggestionSchema, isValidHealthPath } from "@awsify/deployment-schemas";
 import { PrismaService } from "../prisma.service";
 import { QueueService } from "../queue/queue.service";
 import type { GithubService } from "../github/github.service";
@@ -200,7 +200,7 @@ export class DeploymentsService {
     const port = input.port ?? suggestion.data.port;
     const healthPath = input.healthPath ?? suggestion.data.healthPath;
     if (!Number.isInteger(port) || port < 1 || port > 65535) return { error: "invalid_port" };
-    if (!/^\/[A-Za-z0-9/_\-.]*$/.test(healthPath)) return { error: "invalid_health_path" };
+    if (!isValidHealthPath(healthPath)) return { error: "invalid_health_path" };
 
     const nextSuggestion = {
       ...suggestion.data,
