@@ -1,4 +1,6 @@
 import "reflect-metadata";
+import { resolve } from "node:path";
+try { process.loadEnvFile(resolve(process.cwd(), "../../.env")); } catch {}
 import cookieParser from "cookie-parser";
 import { loadEnv } from "@awsify/config";
 import { NestFactory } from "@nestjs/core";

@@ -4,7 +4,7 @@ import { encryptSecret, previewSecret } from "@awsify/config";
 import { deploymentSuggestionSchema, isValidHealthPath } from "@awsify/deployment-schemas";
 import { PrismaService } from "../prisma.service";
 import { QueueService } from "../queue/queue.service";
-import type { GithubService } from "../github/github.service";
+import { GithubService } from "../github/github.service";
 
 const SESSION_COOKIE = "aws_ify_session";
 

@@ -6,7 +6,7 @@ import { createSign } from "node:crypto";
 import { promisify } from "node:util";
 import { createAiProvider } from "@awsify/ai";
 import { decryptSecret } from "@awsify/config";
-import { PrismaClient } from "@awsify/database";
+import { PrismaClient, createPrismaAdapter } from "@awsify/database";
 import type { DeploymentJob, DeploymentPlan, DeploymentSuggestion, GeneratedArtifact } from "@awsify/deployment-schemas";
 import { collectKeyFiles, scanRepository, type RepoScanResult } from "@awsify/repo-scanner";
 import { createDeploymentPlan, generateDockerfile } from "@awsify/templates";
@@ -32,7 +32,7 @@ interface AwsCredentials {
 
 export class DeploymentOrchestrator {
   private readonly ai = createAiProvider({ anthropicApiKey: process.env.ANTHROPIC_API_KEY });
-  private readonly prisma = new PrismaClient();
+  private readonly prisma = new PrismaClient({ adapter: createPrismaAdapter() });
 
   async deploy(job: DeploymentJob) {
     const events: DeploymentEvent[] = [];

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CircleDashed, Github, KeyRound, ScanLine, ShieldCheck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -120,13 +121,18 @@ function StepProgress({ total, current }: { total: number; current: number }) {
 
 function ActiveStep({ step, index }: { step: StepConfig; index: number }) {
   const Icon = step.icon;
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   async function handleCta() {
+    setError(null);
+    setLoading(true);
     try {
       const { url } = await api.loginUrl();
       window.location.href = url;
-    } catch {
-      window.location.href = "/";
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to reach the API. Is it running?");
+      setLoading(false);
     }
   }
 
@@ -153,10 +159,16 @@ function ActiveStep({ step, index }: { step: StepConfig; index: number }) {
           {step.description}
         </p>
 
-        <Button size="lg" className="mt-6 w-full justify-center gap-2" onClick={handleCta}>
+        {error && (
+          <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-400">
+            {error}
+          </p>
+        )}
+
+        <Button size="lg" className="mt-6 w-full justify-center gap-2" onClick={handleCta} disabled={loading}>
           <Icon className="h-4 w-4" />
-          {step.cta ?? "Continue"}
-          <ArrowRight className="h-4 w-4" />
+          {loading ? "Redirecting…" : (step.cta ?? "Continue")}
+          {!loading && <ArrowRight className="h-4 w-4" />}
         </Button>
       </div>
     </div>
