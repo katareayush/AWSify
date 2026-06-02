@@ -2,14 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { CheckCircle2, ChevronDown, ChevronUp, Cloud, ExternalLink, HeartPulse, KeyRound, Loader2, Play, RotateCw, Save, ServerCrash, TerminalSquare } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Cloud, ExternalLink, GitPullRequest, HeartPulse, KeyRound, Loader2, Play, RotateCw, Save, ServerCrash, TerminalSquare } from "lucide-react";
 import { PageHeading } from "../../../components/page-heading";
 import { InfraDiagram } from "../../../components/infra-diagram";
 import { ProductShell } from "../../../components/product-shell";
 import { Button } from "../../../components/ui/button";
 import { Panel } from "../../../components/ui/panel";
 import { useAuth } from "../../../lib/use-auth";
-import { api, type DeploymentDetail } from "../../../lib/api";
+import { api, type CommitArtifactsResponse, type DeploymentDetail } from "../../../lib/api";
 
 const POLLING_STATUSES = new Set(["queued", "scanning", "deploying"]);
 
@@ -33,6 +33,8 @@ export default function DeploymentDetailPage() {
   const [approving, setApproving] = useState(false);
   const [rotatingToken, setRotatingToken] = useState(false);
   const [ciToken, setCiToken] = useState<{ token: string; secretName: string; variableName: string; projectId: string } | null>(null);
+  const [committingArtifacts, setCommittingArtifacts] = useState(false);
+  const [commitResult, setCommitResult] = useState<CommitArtifactsResponse | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -168,6 +170,18 @@ export default function DeploymentDetailPage() {
       setActionError(err instanceof Error ? err.message : String(err));
     } finally {
       setRotatingToken(false);
+    }
+  }
+
+  async function commitArtifacts() {
+    setCommittingArtifacts(true);
+    setActionError(null);
+    try {
+      setCommitResult(await api.commitDeploymentArtifacts(id));
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCommittingArtifacts(false);
     }
   }
 
@@ -386,6 +400,45 @@ export default function DeploymentDetailPage() {
                     {savingEnv ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                     Save env vars
                   </Button>
+                )}
+              </Panel>
+            )}
+
+            {detail.plan?.artifacts && detail.plan.artifacts.length > 0 && (
+              <Panel className="p-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <GitPullRequest className="h-4 w-4 text-violet-soft" />
+                  <p className="text-[13px] font-medium text-white">Commit deploy files</p>
+                </div>
+                <p className="text-[12px] leading-[1.6] text-white/45">
+                  Push the generated Dockerfile, workflow, and Pulumi files to a new branch and open a pull request against <span className="font-mono text-white/70">{detail.project.branch}</span>.
+                </p>
+                <Button
+                  className="mt-4 w-full"
+                  variant="secondary"
+                  onClick={commitArtifacts}
+                  disabled={committingArtifacts}
+                >
+                  {committingArtifacts ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitPullRequest className="h-4 w-4" />}
+                  {commitResult ? "Re-open PR" : "Open pull request"}
+                </Button>
+                {commitResult && (
+                  <div className="mt-4 space-y-2 rounded-lg border border-white/[0.06] bg-black/35 p-3">
+                    <Row label="Branch" value={commitResult.branch} />
+                    <Row label="PR #" value={String(commitResult.prNumber)} />
+                    <a
+                      href={commitResult.prUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-[12px] text-violet-soft hover:underline"
+                    >
+                      View on GitHub
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                    <p className="text-[11px] leading-[1.55] text-white/35">
+                      Committed: {commitResult.committed.join(", ")}
+                    </p>
+                  </div>
                 )}
               </Panel>
             )}

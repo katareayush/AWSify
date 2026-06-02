@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, FileCode2 } from "lucide-react";
 import { PageHeading } from "../../components/page-heading";
 import { ProductShell } from "../../components/product-shell";
 import { Button } from "../../components/ui/button";
 import { Panel } from "../../components/ui/panel";
+import { Pagination } from "../../components/ui/pagination";
 import { useAuth } from "../../lib/use-auth";
 import { api, type Deployment } from "../../lib/api";
+
+const PAGE_SIZE = 10;
 
 function statusColor(s: string) {
   if (s === "deployed") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
@@ -20,11 +23,17 @@ function statusColor(s: string) {
 export default function DeploymentsPage() {
   const { me, loading } = useAuth();
   const [deployments, setDeployments] = useState<Deployment[]>([]);
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     if (!me?.authenticated) return;
     api.listDeployments().then(r => setDeployments(r.deployments)).catch(() => {});
   }, [me?.authenticated]);
+
+  const paginated = useMemo(
+    () => deployments.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [deployments, page]
+  );
 
   if (loading) return null;
 
@@ -55,35 +64,44 @@ export default function DeploymentsPage() {
               </Button>
             </div>
           ) : (
-            <div className="divide-y divide-white/[0.05]">
-              {deployments.map(d => (
-                <Link
-                  key={d.id}
-                  href={`/deployments/${d.id}`}
-                  className="grid gap-3 py-4 text-[13.5px] transition-colors hover:bg-white/[0.02] sm:grid-cols-[1fr_180px_130px]"
-                >
-                  <div>
-                    <p className="font-medium text-white">{d.project.name}</p>
-                    <p className="mt-1 font-mono text-[11px] text-white/45">{d.project.repoFullName} · {d.project.branch}</p>
-                  </div>
-                  <div>
-                    {d.liveUrl ? (
-                      <p className="truncate text-[12px] text-violet-soft">{d.liveUrl}</p>
-                    ) : (
-                      <p className="text-[12px] text-white/40">—</p>
-                    )}
-                    <p className="mt-1 font-mono text-[11px] text-white/45">
-                      {new Date(d.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center sm:justify-end">
-                    <span className={`rounded-full border px-2.5 py-1 text-[11px] ${statusColor(d.status)}`}>
-                      {d.status}
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
+            <>
+              <div className="divide-y divide-white/[0.05]">
+                {paginated.map(d => (
+                  <Link
+                    key={d.id}
+                    href={`/deployments/${d.id}`}
+                    className="grid gap-3 py-4 text-[13.5px] transition-colors hover:bg-white/[0.02] sm:grid-cols-[1fr_180px_130px]"
+                  >
+                    <div>
+                      <p className="font-medium text-white">{d.project.name}</p>
+                      <p className="mt-1 font-mono text-[11px] text-white/45">{d.project.repoFullName} · {d.project.branch}</p>
+                    </div>
+                    <div>
+                      {d.liveUrl ? (
+                        <p className="truncate text-[12px] text-violet-soft">{d.liveUrl}</p>
+                      ) : (
+                        <p className="text-[12px] text-white/40">—</p>
+                      )}
+                      <p className="mt-1 font-mono text-[11px] text-white/45">
+                        {new Date(d.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center sm:justify-end">
+                      <span className={`rounded-full border px-2.5 py-1 text-[11px] ${statusColor(d.status)}`}>
+                        {d.status}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              <Pagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                total={deployments.length}
+                onPageChange={setPage}
+                label="deployments"
+              />
+            </>
           )}
         </Panel>
       </div>

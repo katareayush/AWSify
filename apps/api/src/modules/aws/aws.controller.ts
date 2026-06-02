@@ -1,9 +1,8 @@
 import { Body, Controller, Get, Post, Req } from "@nestjs/common";
 import type { Request } from "express";
 import { GithubService } from "../github/github.service";
+import { SESSION_COOKIE } from "../github/session-cookie";
 import { AwsService } from "./aws.service";
-
-const SESSION_COOKIE = "aws_ify_session";
 
 @Controller("aws")
 export class AwsController {

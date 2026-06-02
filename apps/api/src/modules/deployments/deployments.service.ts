@@ -4,9 +4,8 @@ import { encryptSecret, previewSecret } from "@awsify/config";
 import { deploymentSuggestionSchema, isValidHealthPath } from "@awsify/deployment-schemas";
 import { PrismaService } from "../prisma.service";
 import { QueueService } from "../queue/queue.service";
+import { GithubCommitService } from "../github/github-commit.service";
 import { GithubService } from "../github/github.service";
-
-const SESSION_COOKIE = "aws_ify_session";
 
 function sanitizeAppName(repoFullName: string): string {
   const name = repoFullName.split("/").pop() ?? "awsify-app";
@@ -18,13 +17,20 @@ export class DeploymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly queue: QueueService,
-    private readonly github: GithubService
+    private readonly github: GithubService,
+    private readonly githubCommit: GithubCommitService
   ) {}
 
   private getUserId(sessionToken: string | undefined): string | null {
     if (!sessionToken) return null;
     const session = this.github.verifySession(sessionToken);
     return session?.userId ?? null;
+  }
+
+  async commitArtifactsToRepo(deploymentId: string, sessionToken: string | undefined) {
+    const userId = this.getUserId(sessionToken);
+    if (!userId) return { error: "not_authenticated" };
+    return this.githubCommit.commitDeploymentArtifacts(deploymentId, userId);
   }
 
   async trigger(

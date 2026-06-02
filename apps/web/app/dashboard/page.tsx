@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Cloud, Github, KeyRound, ShieldCheck, TerminalSquare } from "lucide-react";
 import { PageHeading } from "../../components/page-heading";
 import { ProductShell } from "../../components/product-shell";
 import { SetupStep } from "../../components/setup-step";
 import { Button } from "../../components/ui/button";
 import { Panel } from "../../components/ui/panel";
+import { Pagination } from "../../components/ui/pagination";
 import { useAuth } from "../../lib/use-auth";
 import { api, type Deployment, type AwsConnection } from "../../lib/api";
+
+const PAGE_SIZE = 5;
 
 function statusColor(s: string) {
   if (s === "deployed") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
@@ -22,12 +25,18 @@ export default function DashboardPage() {
   const { me, loading } = useAuth();
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [connections, setConnections] = useState<AwsConnection[]>([]);
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     if (!me?.authenticated) return;
     api.listDeployments().then(r => setDeployments(r.deployments)).catch(() => {});
     api.listConnections().then(r => setConnections(r.connections)).catch(() => {});
   }, [me?.authenticated]);
+
+  const paginatedDeployments = useMemo(
+    () => deployments.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [deployments, page]
+  );
 
   if (loading) return null;
 
@@ -92,7 +101,7 @@ export default function DashboardPage() {
                   </Button>
                 </div>
               ) : (
-                deployments.map(d => (
+                paginatedDeployments.map(d => (
                   <Link
                     key={d.id}
                     href={`/deployments/${d.id}`}
@@ -121,6 +130,13 @@ export default function DashboardPage() {
                 ))
               )}
             </div>
+            <Pagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={deployments.length}
+              onPageChange={setPage}
+              label="deployments"
+            />
           </Panel>
 
           <div className="space-y-3">

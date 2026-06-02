@@ -7,6 +7,7 @@ import { Button } from "../ui/button";
 import { Mark } from "../landing/primitives/mark";
 import { api, type Me } from "../../lib/api";
 import { CommandPalette } from "./command-palette";
+import { SidebarToggle } from "./sidebar-toggle";
 
 export function TopBar() {
   const [me, setMe] = useState<Me | null>(null);
@@ -45,6 +46,9 @@ export function TopBar() {
         <Link href="/" className="lg:hidden">
           <Mark />
         </Link>
+        <div className="hidden lg:flex">
+          <SidebarToggle />
+        </div>
         <button
           type="button"
           onClick={openPalette}

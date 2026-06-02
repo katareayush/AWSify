@@ -1,13 +1,17 @@
 import { Controller, Get, Query, Req, Res } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { GithubService } from "./github.service";
-
-const SESSION_COOKIE = "aws_ify_session";
-const OAUTH_STATE_COOKIE = "aws_ify_oauth_state";
-const APP_INSTALL_STATE_COOKIE = "aws_ify_app_install_state";
-const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
-const APP_INSTALL_STATE_MAX_AGE_MS = 10 * 60 * 1000;
+import {
+  APP_INSTALL_STATE_COOKIE,
+  OAUTH_STATE_COOKIE,
+  SESSION_COOKIE,
+  appInstallStateCookieOptions,
+  appUrl,
+  clearAuthCookie,
+  oauthStateCookieOptions,
+  redirectWithError,
+  sessionCookieOptions
+} from "./session-cookie";
 
 @Controller("github")
 export class GithubController {
@@ -17,12 +21,7 @@ export class GithubController {
   loginUrl(@Res({ passthrough: true }) res: Response) {
     const login = this.github.createOAuthLoginUrl();
     if (!login) return { error: "GITHUB_CLIENT_ID or API_URL not configured." };
-    res.cookie(OAUTH_STATE_COOKIE, this.github.signOAuthState(login.state), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: OAUTH_STATE_MAX_AGE_MS
-    });
+    res.cookie(OAUTH_STATE_COOKIE, this.github.signOAuthState(login.state), oauthStateCookieOptions());
     return { url: login.url };
   }
 
@@ -31,12 +30,7 @@ export class GithubController {
     const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
     const install = this.github.createAppInstallUrlForSession(token);
     if ("error" in install) return { error: install.error };
-    res.cookie(APP_INSTALL_STATE_COOKIE, this.github.signOAuthState(install.state), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: APP_INSTALL_STATE_MAX_AGE_MS
-    });
+    res.cookie(APP_INSTALL_STATE_COOKIE, this.github.signOAuthState(install.state), appInstallStateCookieOptions());
     return { url: install.url };
   }
 
@@ -48,30 +42,31 @@ export class GithubController {
     @Res() res: Response
   ) {
     if (!code) {
-      res.status(400).json({ error: "missing_code" });
+      redirectWithError(res, "/", "missing_code");
       return;
     }
     const signedState = req.cookies?.[OAUTH_STATE_COOKIE] as string | undefined;
     if (!this.github.verifyOAuthState(state, signedState)) {
-      res.status(400).json({ error: "invalid_oauth_state" });
+      redirectWithError(res, "/", "invalid_oauth_state");
       return;
     }
 
-    const result = await this.github.exchangeOAuthCode(code);
+    let result;
+    try {
+      result = await this.github.exchangeOAuthCode(code);
+    } catch {
+      redirectWithError(res, "/", "github_auth_error");
+      return;
+    }
     if (!result) {
-      res.status(401).json({ error: "github_auth_failed" });
+      redirectWithError(res, "/", "github_auth_failed");
       return;
     }
 
-    res.cookie(SESSION_COOKIE, result.sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: SESSION_MAX_AGE_MS
-    });
-    res.clearCookie(OAUTH_STATE_COOKIE);
+    res.cookie(SESSION_COOKIE, result.sessionToken, sessionCookieOptions());
+    clearAuthCookie(res, OAUTH_STATE_COOKIE);
 
-    res.redirect(`${requiredEnv("APP_URL")}/dashboard`);
+    res.redirect(`${appUrl()}/dashboard`);
   }
 
   @Get("repositories")
@@ -96,19 +91,21 @@ export class GithubController {
   ) {
     const signedState = req.cookies?.[APP_INSTALL_STATE_COOKIE] as string | undefined;
     if (!this.github.verifyOAuthState(state, signedState)) {
-      res.status(400).json({ error: "invalid_app_install_state" });
+      redirectWithError(res, "/repositories", "invalid_app_install_state");
       return;
     }
 
     const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
     const result = await this.github.syncInstallationForSession(token, installationId);
-    if ("error" in result) {
-      res.status(result.error === "not_authenticated" ? 401 : 400).json(result);
+    if ("error" in result && result.error) {
+      const errorCode = result.error;
+      const path = errorCode === "not_authenticated" ? "/" : "/repositories";
+      redirectWithError(res, path, errorCode);
       return;
     }
 
-    res.clearCookie(APP_INSTALL_STATE_COOKIE);
-    res.redirect(`${requiredEnv("APP_URL")}/repositories`);
+    clearAuthCookie(res, APP_INSTALL_STATE_COOKIE);
+    res.redirect(`${appUrl()}/repositories`);
   }
 
   @Get("me")
@@ -119,10 +116,10 @@ export class GithubController {
     if (!session) return { authenticated: false };
     return { authenticated: true, userId: session.userId, githubLogin: session.githubLogin };
   }
-}
 
-function requiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is required.`);
-  return value;
+  @Get("logout")
+  logout(@Res({ passthrough: true }) res: Response) {
+    clearAuthCookie(res, SESSION_COOKIE);
+    return { ok: true };
+  }
 }

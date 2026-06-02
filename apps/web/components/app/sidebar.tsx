@@ -4,7 +4,6 @@ import Link from "next/link";
 import { Mark } from "../landing/primitives/mark";
 import { navItems } from "./nav-data";
 import { useSidebar } from "./sidebar-context";
-import { SidebarToggle } from "./sidebar-toggle";
 
 interface SidebarProps {
   active: string;
@@ -15,7 +14,9 @@ export function Sidebar({ active }: SidebarProps) {
   return (
     <aside
       data-collapsed={collapsed}
-      className="group/sidebar relative z-10 hidden border-r border-white/[0.06] bg-white/[0.015] backdrop-blur-xl transition-[width] duration-200 ease-out lg:flex lg:flex-col"
+      className={`group/sidebar z-30 hidden border-r border-white/[0.06] bg-[#0a0a0d]/95 backdrop-blur-xl transition-[width] duration-200 ease-out lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col ${
+        collapsed ? "lg:w-16" : "lg:w-[260px]"
+      }`}
     >
       <SidebarBrand collapsed={collapsed} />
       <SidebarNav active={active} collapsed={collapsed} />
@@ -26,17 +27,16 @@ export function Sidebar({ active }: SidebarProps) {
 
 function SidebarBrand({ collapsed }: { collapsed: boolean }) {
   return (
-    <div className={`flex h-16 items-center border-b border-white/[0.06] ${collapsed ? "justify-center px-2" : "justify-between px-5"}`}>
-      <Link href="/" className="flex items-center gap-2.5 min-w-0" title="AWS-ify">
+    <div className={`flex h-16 items-center border-b border-white/[0.06] ${collapsed ? "justify-center px-2" : "px-5"}`}>
+      <Link href="/" className="flex min-w-0 items-center gap-2.5" title="AWS-ify">
         <Mark />
         {!collapsed && (
-          <div className="leading-tight min-w-0">
+          <div className="min-w-0 leading-tight">
             <p className="truncate text-[14px] font-medium tracking-tight text-white">AWS-ify</p>
             <p className="truncate text-[11px] text-white/40">Personal workspace</p>
           </div>
         )}
       </Link>
-      {!collapsed && <SidebarToggle />}
     </div>
   );
 }
@@ -93,16 +93,11 @@ function SidebarNavItem({
 function SidebarFooter({ collapsed }: { collapsed: boolean }) {
   if (collapsed) {
     return (
-      <div className="border-t border-white/[0.06] p-2">
-        <div className="flex items-center justify-center" title="All systems operational">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          </span>
-        </div>
-        <div className="mt-2 flex justify-center">
-          <SidebarToggle />
-        </div>
+      <div className="flex justify-center border-t border-white/[0.06] p-3" title="All systems operational">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+        </span>
       </div>
     );
   }

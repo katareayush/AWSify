@@ -124,5 +124,17 @@ export const api = {
   rotateDeploymentCiToken: (id: string) =>
     req<{ token: string; secretName: string; variableName: string; projectId: string }>(`/deployments/${id}/ci-token`, {
       method: "POST"
+    }),
+
+  commitDeploymentArtifacts: (id: string) =>
+    req<CommitArtifactsResponse>(`/deployments/${id}/commit-artifacts`, {
+      method: "POST"
     })
 };
+
+export interface CommitArtifactsResponse {
+  prUrl: string;
+  prNumber: number;
+  branch: string;
+  committed: string[];
+}

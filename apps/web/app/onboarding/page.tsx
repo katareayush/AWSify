@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CircleDashed, Github, KeyRound, ScanLine, ShieldCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, CircleDashed, Github, KeyRound, Loader2, ScanLine, ShieldCheck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AppRoot } from "../../components/app";
 import { Mark } from "../../components/landing/primitives/mark";
@@ -46,8 +47,29 @@ const steps: StepConfig[] = [
 ];
 
 export default function OnboardingPage() {
+  const router = useRouter();
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const active = steps[0];
   const pending = steps.slice(1);
+
+  useEffect(() => {
+    api.me()
+      .then((me) => {
+        if (me.authenticated) router.replace("/dashboard");
+        else setCheckingAuth(false);
+      })
+      .catch(() => setCheckingAuth(false));
+  }, [router]);
+
+  if (checkingAuth) {
+    return (
+      <AppRoot>
+        <div className="flex min-h-screen items-center justify-center text-white/40">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+      </AppRoot>
+    );
+  }
 
   return (
     <AppRoot>

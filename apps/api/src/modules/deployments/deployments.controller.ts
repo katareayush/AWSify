@@ -1,8 +1,7 @@
 import { Body, Controller, Get, Headers, Param, Post, Req } from "@nestjs/common";
 import type { Request } from "express";
+import { SESSION_COOKIE } from "../github/session-cookie";
 import { DeploymentsService } from "./deployments.service";
-
-const SESSION_COOKIE = "aws_ify_session";
 
 @Controller("deployments")
 export class DeploymentsController {
@@ -59,6 +58,12 @@ export class DeploymentsController {
   rotateCiToken(@Req() req: Request, @Param("id") id: string) {
     const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
     return this.deployments.rotateCiToken(id, token);
+  }
+
+  @Post(":id/commit-artifacts")
+  commitArtifacts(@Req() req: Request, @Param("id") id: string) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    return this.deployments.commitArtifactsToRepo(id, token);
   }
 
   @Post("redeploy")

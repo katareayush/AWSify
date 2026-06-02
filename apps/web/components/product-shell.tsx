@@ -34,13 +34,13 @@ function ShellLayout({ children, active }: { children: React.ReactNode; active: 
   }, [toggle]);
 
   return (
-    <div
-      className={`grid min-h-screen transition-[grid-template-columns] duration-200 ease-out ${
-        collapsed ? "lg:grid-cols-[64px_1fr]" : "lg:grid-cols-[260px_1fr]"
-      }`}
-    >
+    <div className="min-h-screen">
       <Sidebar active={active} />
-      <section className="min-w-0">
+      <section
+        className={`flex min-h-screen min-w-0 flex-col transition-[padding-left] duration-200 ease-out ${
+          collapsed ? "lg:pl-16" : "lg:pl-[260px]"
+        }`}
+      >
         <TopBar />
         <div className="px-4 py-6 sm:px-8 sm:py-8">
           <div className="mx-auto max-w-7xl">

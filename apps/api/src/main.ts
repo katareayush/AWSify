@@ -10,11 +10,13 @@ const env = loadEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.use(cookieParser());
   app.enableCors({
     origin: env.APP_URL,
-    credentials: true
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
   });
-  app.use(cookieParser());
   app.setGlobalPrefix("v1");
   await app.listen(process.env.PORT ? Number(process.env.PORT) : 4000);
 }

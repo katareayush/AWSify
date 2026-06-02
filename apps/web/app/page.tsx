@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import {
+  AuthErrorBanner,
   Backdrop,
   CostEstimation,
   FAQ,
@@ -17,6 +19,9 @@ import {
 export default function LandingPage() {
   return (
     <main className="landing-root relative min-h-screen overflow-x-hidden">
+      <Suspense fallback={null}>
+        <AuthErrorBanner />
+      </Suspense>
       <Backdrop />
       <Nav />
       <Hero />
