@@ -2,24 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Cloud, Github, KeyRound, ShieldCheck, TerminalSquare } from "lucide-react";
-import { PageHeading } from "../../components/page-heading";
+import { ArrowRight, CheckCircle2, Cloud, KeyRound, TerminalSquare } from "lucide-react";
 import { ProductShell } from "../../components/product-shell";
-import { SetupStep } from "../../components/setup-step";
+import { DeploymentRow } from "../../components/dashboard/deployment-row";
+import { SetupBanner } from "../../components/dashboard/setup-banner";
+import { StatStrip, type StatItem } from "../../components/dashboard/stat-strip";
 import { Button } from "../../components/ui/button";
-import { Panel } from "../../components/ui/panel";
 import { Pagination } from "../../components/ui/pagination";
 import { useAuth } from "../../lib/use-auth";
 import { api, type Deployment, type AwsConnection } from "../../lib/api";
 
-const PAGE_SIZE = 5;
-
-function statusColor(s: string) {
-  if (s === "deployed") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
-  if (s === "failed") return "border-red-500/30 bg-red-500/10 text-red-400";
-  if (s === "deploying") return "border-violet/30 bg-violet/10 text-violet-soft";
-  return "border-white/[0.08] bg-white/[0.04] text-white/65";
-}
+const PAGE_SIZE = 6;
 
 export default function DashboardPage() {
   const { me, loading } = useAuth();
@@ -29,150 +22,99 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!me?.authenticated) return;
-    api.listDeployments().then(r => setDeployments(r.deployments)).catch(() => {});
-    api.listConnections().then(r => setConnections(r.connections)).catch(() => {});
+    api.listDeployments().then((r) => setDeployments(r.deployments)).catch(() => {});
+    api.listConnections().then((r) => setConnections(r.connections)).catch(() => {});
   }, [me?.authenticated]);
 
-  const paginatedDeployments = useMemo(
+  const paginated = useMemo(
     () => deployments.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
     [deployments, page]
   );
 
   if (loading) return null;
 
-  const liveCount = deployments.filter(d => d.status === "deployed").length;
-  const pendingCount = deployments.filter(d => ["queued", "scanning", "deploying"].includes(d.status)).length;
-
-  const githubDone = me?.authenticated;
+  const liveCount = deployments.filter((d) => d.status === "deployed").length;
+  const pendingCount = deployments.filter((d) => ["queued", "scanning", "deploying"].includes(d.status)).length;
+  const githubDone = Boolean(me?.authenticated);
   const awsDone = connections.length > 0;
+  const canDeploy = githubDone && awsDone;
+
+  const stats: StatItem[] = [
+    { icon: Cloud, label: "Live", value: String(liveCount) },
+    { icon: TerminalSquare, label: "In progress", value: String(pendingCount) },
+    { icon: CheckCircle2, label: "Total", value: String(deployments.length) },
+    { icon: KeyRound, label: "AWS accounts", value: String(connections.length) }
+  ];
 
   return (
     <ProductShell active="Deployments">
-      <div className="space-y-5">
-        <PageHeading
-          eyebrow="Control plane"
-          title="Deployments"
-          description="Connect GitHub and AWS, then select a repository to create the first deployment."
-          action={
-            <>
-              <Button asChild variant="secondary">
-                <Link href="/connections">
-                  <KeyRound className="h-4 w-4" />
-                  {awsDone ? "Manage connections" : "Connect AWS"}
-                </Link>
-              </Button>
-              <Button asChild>
-                <Link href="/repositories">
-                  New deployment
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            </>
-          }
-        />
-
-        <div className="grid gap-3 md:grid-cols-4">
-          <Metric icon={Github} label="GitHub" value={githubDone ? "Connected" : "Not connected"} />
-          <Metric icon={KeyRound} label="AWS accounts" value={String(connections.length)} />
-          <Metric icon={TerminalSquare} label="In progress" value={String(pendingCount)} />
-          <Metric icon={Cloud} label="Live services" value={String(liveCount)} />
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-[22px] font-medium tracking-tight text-white">Deployments</h1>
+          <Button asChild>
+            <Link href="/repositories">
+              New deployment
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
-          <Panel className="p-6">
-            <div className="flex items-center justify-between">
-              <p className="text-[14px] font-medium tracking-tight text-white">Recent deployments</p>
-              <span className="font-mono text-[10.5px] uppercase tracking-wider text-white/35">
-                {me?.githubLogin ?? "workspace"}
-              </span>
-            </div>
-            <div className="mt-5 divide-y divide-white/[0.05]">
-              {deployments.length === 0 ? (
-                <div className="py-14 text-center">
-                  <p className="text-[14px] font-medium text-white">No deployments yet</p>
-                  <p className="mx-auto mt-2 max-w-md text-[13px] leading-[1.6] text-white/55">
-                    Connect GitHub and AWS, then pick a repository to deploy.
-                  </p>
-                  <Button asChild variant="secondary" className="mt-5">
-                    <Link href="/repositories">
-                      Select repository
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
-              ) : (
-                paginatedDeployments.map(d => (
-                  <Link
-                    key={d.id}
-                    href={`/deployments/${d.id}`}
-                    className="grid gap-3 py-4 text-[13.5px] transition-colors hover:bg-white/[0.02] sm:grid-cols-[1fr_180px_130px]"
-                  >
-                    <div>
-                      <p className="font-medium text-white">{d.project.name}</p>
-                      <p className="mt-1 font-mono text-[11px] text-white/45">{d.project.repoFullName} · {d.project.branch}</p>
-                    </div>
-                    <div>
-                      {d.liveUrl ? (
-                        <p className="truncate text-violet-soft text-[12px]">{d.liveUrl}</p>
-                      ) : (
-                        <p className="text-white/40 text-[12px]">—</p>
-                      )}
-                      <p className="mt-1 font-mono text-[11px] text-white/45">
-                        {new Date(d.updatedAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="flex items-center sm:justify-end">
-                      <span className={`rounded-full border px-2.5 py-1 text-[11px] ${statusColor(d.status)}`}>
-                        {d.status}
-                      </span>
-                    </div>
-                  </Link>
-                ))
-              )}
-            </div>
-            <Pagination
-              page={page}
-              pageSize={PAGE_SIZE}
-              total={deployments.length}
-              onPageChange={setPage}
-              label="deployments"
-            />
-          </Panel>
+        <SetupBanner githubDone={githubDone} awsDone={awsDone} />
 
-          <div className="space-y-3">
-            <SetupStep
-              icon={Github}
-              title="Connect GitHub"
-              description="Install the GitHub App and select repositories AWS-ify can scan."
-              state={githubDone ? "done" : "pending"}
-            />
-            <SetupStep
-              icon={KeyRound}
-              title="Connect AWS"
-              description="Create the CloudFormation role and validate the returned ARN."
-              state={awsDone ? "done" : "pending"}
-            />
-            <SetupStep
-              icon={ShieldCheck}
-              title="Deploy a repository"
-              description="Pick a repo and AWS-ify scans, plans, and deploys it."
-              state={liveCount > 0 ? "done" : "pending"}
-            />
+        <StatStrip items={stats} />
+
+        <div className="rounded-xl border border-white/[0.06]">
+          <div className="flex items-center justify-between border-b border-white/[0.05] px-5 py-3">
+            <p className="text-[13px] text-white/80">Recent deployments</p>
+            {deployments.length > 0 && (
+              <Link
+                href="/deployments"
+                className="text-[12px] text-white/45 transition-colors hover:text-white"
+              >
+                View all
+              </Link>
+            )}
           </div>
+
+          {deployments.length === 0 ? (
+            <EmptyState canDeploy={canDeploy} />
+          ) : (
+            <>
+              <div className="divide-y divide-white/[0.04]">
+                {paginated.map((d) => (
+                  <DeploymentRow key={d.id} deployment={d} />
+                ))}
+              </div>
+              <div className="px-5 pb-3">
+                <Pagination
+                  page={page}
+                  pageSize={PAGE_SIZE}
+                  total={deployments.length}
+                  onPageChange={setPage}
+                  label="deployments"
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </ProductShell>
   );
 }
 
-function Metric({ icon: Icon, label, value }: { icon: typeof Github; label: string; value: string }) {
+function EmptyState({ canDeploy }: { canDeploy: boolean }) {
   return (
-    <Panel className="p-5">
-      <div className="flex items-center gap-2">
-        <Icon className="h-3.5 w-3.5 text-violet-soft" />
-        <p className="font-mono text-[10.5px] uppercase tracking-wider text-white/45">{label}</p>
-      </div>
-      <p className="mt-4 font-mono text-[22px] font-medium tracking-tight text-white">{value}</p>
-    </Panel>
+    <div className="px-5 py-12 text-center">
+      <p className="text-[13px] text-white/55">No deployments yet</p>
+      {canDeploy && (
+        <Link
+          href="/repositories"
+          className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] text-white/70 transition-colors hover:text-white"
+        >
+          Select repository
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      )}
+    </div>
   );
 }

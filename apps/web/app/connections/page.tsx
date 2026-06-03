@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clipboard, Github, KeyRound, Loader2, ShieldCheck } from "lucide-react";
-import { PageHeading } from "../../components/page-heading";
+import { Clipboard, Github, KeyRound, Loader2 } from "lucide-react";
 import { ProductShell } from "../../components/product-shell";
-import { SetupStep } from "../../components/setup-step";
 import { Button } from "../../components/ui/button";
-import { Panel } from "../../components/ui/panel";
 import { useAuth } from "../../lib/use-auth";
 import { api, type AwsConnection } from "../../lib/api";
 
@@ -24,8 +21,8 @@ export default function ConnectionsPage() {
 
   useEffect(() => {
     if (!me?.authenticated) return;
-    api.listConnections().then(r => setConnections(r.connections)).catch(() => {});
-    api.cfnTemplate().then(r => {
+    api.listConnections().then((r) => setConnections(r.connections)).catch(() => {});
+    api.cfnTemplate().then((r) => {
       setExternalId(r.externalId);
       setTemplate(r.template);
     }).catch(() => {});
@@ -86,157 +83,159 @@ export default function ConnectionsPage() {
 
   return (
     <ProductShell active="Connections">
-      <div className="space-y-5">
-        <PageHeading
-          eyebrow="Connections"
-          title="GitHub and AWS access"
-          description="AWS-ify keeps source access and cloud execution separate. GitHub App permissions scan repositories; AWS role assumptions execute approved deployments."
-        />
+      <div className="space-y-6">
+        <h1 className="text-[22px] font-medium tracking-tight text-white">Connections</h1>
 
-        <div className="grid gap-5 xl:grid-cols-[1fr_380px]">
-          <div className="space-y-4">
-            {/* GitHub */}
-            <Panel className="p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Github className="h-4 w-4 text-violet-soft" />
-                    <p className="text-[14px] font-medium tracking-tight text-white">GitHub App</p>
-                  </div>
-                  <p className="mt-3 max-w-xl text-[13.5px] leading-[1.6] text-white/55">
-                    Install AWS-ify on the organization or personal account that owns the repositories you want to deploy.
-                  </p>
+        <Section
+          icon={<Github className="h-4 w-4 text-white/55" />}
+          title="GitHub"
+          status={githubDone ? "Connected" : "Not connected"}
+          statusTone={githubDone ? "ok" : "muted"}
+        >
+          {githubDone ? (
+            <p className="text-[13px] text-white/55">
+              Signed in as <span className="text-white/80">@{me.githubLogin}</span>
+            </p>
+          ) : (
+            <Button variant="secondary" onClick={handleInstallApp}>
+              <Github className="h-4 w-4" />
+              Install GitHub App
+            </Button>
+          )}
+        </Section>
+
+        <Section
+          icon={<KeyRound className="h-4 w-4 text-white/55" />}
+          title="AWS IAM role"
+          status={connections.length > 0 ? `${connections.length} connected` : "Not connected"}
+          statusTone={connections.length > 0 ? "ok" : "muted"}
+        >
+          {connections.length > 0 && (
+            <div className="mb-4 divide-y divide-white/[0.04] rounded-lg border border-white/[0.05]">
+              {connections.map((c) => (
+                <div key={c.id} className="flex items-center justify-between px-4 py-3 text-[12.5px]">
+                  <span className="font-mono text-white/75">{c.accountId}</span>
+                  <span className="text-white/40">{c.defaultRegion} · {c.status}</span>
                 </div>
-                <StatusBadge tone={githubDone ? "violet" : "muted"}>
-                  {githubDone ? "Connected" : "Not connected"}
-                </StatusBadge>
-              </div>
-              {githubDone ? (
-                <p className="mt-4 text-[13px] text-white/45">
-                  Signed in as <span className="text-white/70">@{me.githubLogin}</span>
-                </p>
-              ) : (
-                <Button className="mt-5" variant="secondary" onClick={handleInstallApp}>
-                  <Github className="h-4 w-4" />
-                  Install GitHub App
-                </Button>
-              )}
-            </Panel>
+              ))}
+            </div>
+          )}
 
-            {/* AWS */}
-            <Panel className="p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <KeyRound className="h-4 w-4 text-violet-soft" />
-                    <p className="text-[14px] font-medium tracking-tight text-white">AWS IAM role</p>
-                  </div>
-                  <p className="mt-3 max-w-xl text-[13.5px] leading-[1.6] text-white/55">
-                    Deploy the generated CloudFormation template in your AWS account, then paste the output RoleArn here.
-                  </p>
-                </div>
-                <StatusBadge tone={connections.length > 0 ? "violet" : "muted"}>
-                  {connections.length > 0 ? `${connections.length} connected` : "Not connected"}
-                </StatusBadge>
-              </div>
-
-              {connections.length > 0 && (
-                <div className="mt-4 divide-y divide-white/[0.05]">
-                  {connections.map(c => (
-                    <div key={c.id} className="py-3 text-[13px]">
-                      <p className="font-mono text-white/70">{c.accountId}</p>
-                      <p className="mt-1 text-white/40">{c.defaultRegion} · {c.status}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-5 grid gap-3">
-                <label className="block">
-                  <span className="font-mono text-[10.5px] uppercase tracking-wider text-white/45">External ID</span>
-                  <div className="mt-2 flex h-10 items-center justify-between rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 text-[13px] text-white/55">
-                    <span className="font-mono text-[12px]">{externalId || "Loading…"}</span>
-                    <button
-                      onClick={() => externalId && navigator.clipboard.writeText(externalId)}
-                      className="hover:text-white/80 transition-colors"
-                    >
-                      <Clipboard className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </label>
-                <label className="block">
-                  <span className="font-mono text-[10.5px] uppercase tracking-wider text-white/45">AWS Account ID</span>
-                  <input
-                    value={accountId}
-                    onChange={e => setAccountId(e.target.value)}
-                    className="mt-2 h-10 w-full rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-violet/40"
-                    placeholder="123456789012"
-                  />
-                </label>
-                <label className="block">
-                  <span className="font-mono text-[10.5px] uppercase tracking-wider text-white/45">Role ARN</span>
-                  <input
-                    value={roleArn}
-                    onChange={e => setRoleArn(e.target.value)}
-                    className="mt-2 h-10 w-full rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-violet/40"
-                    placeholder="arn:aws:iam::123456789012:role/AWSifyDeploymentRole"
-                  />
-                </label>
-                <label className="block">
-                  <span className="font-mono text-[10.5px] uppercase tracking-wider text-white/45">Region</span>
-                  <input
-                    value={region}
-                    onChange={e => setRegion(e.target.value)}
-                    className="mt-2 h-10 w-full rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-violet/40"
-                    placeholder="us-east-1"
-                  />
-                </label>
-              </div>
-
-              {validationResult && (
-                <div className={`mt-4 rounded-lg border px-4 py-3 text-[13px] ${validationResult.status === "valid" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-red-500/30 bg-red-500/10 text-red-400"}`}>
-                  {validationResult.status === "valid" ? "✓ Role validated successfully" : `✗ ${validationResult.reason ?? "Validation failed"}`}
-                </div>
-              )}
-
-              <div className="mt-5 flex gap-2">
-                <Button variant="secondary" onClick={handleDownloadTemplate} disabled={!template}>
-                  Download template
-                </Button>
-                <Button variant="secondary" onClick={handleValidate} disabled={!roleArn || validating}>
-                  {validating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Validate role"}
-                </Button>
-                <Button
-                  onClick={handleSave}
-                  disabled={validationResult?.status !== "valid" || saving || !accountId}
+          <div className="grid gap-3">
+            <Field label="External ID">
+              <div className="flex h-9 items-center justify-between rounded-md border border-white/[0.08] bg-white/[0.02] px-3 text-[12.5px] text-white/55">
+                <span className="truncate font-mono">{externalId || "Loading…"}</span>
+                <button
+                  type="button"
+                  onClick={() => externalId && navigator.clipboard.writeText(externalId)}
+                  className="ml-2 shrink-0 text-white/40 transition-colors hover:text-white/80"
                 >
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save connection"}
-                </Button>
+                  <Clipboard className="h-3.5 w-3.5" />
+                </button>
               </div>
-            </Panel>
+            </Field>
+            <Field label="AWS account ID">
+              <Input value={accountId} onChange={setAccountId} placeholder="123456789012" />
+            </Field>
+            <Field label="Role ARN">
+              <Input value={roleArn} onChange={setRoleArn} placeholder="arn:aws:iam::123456789012:role/AWSifyDeploymentRole" />
+            </Field>
+            <Field label="Region">
+              <Input value={region} onChange={setRegion} placeholder="us-east-1" />
+            </Field>
           </div>
 
-          <div className="space-y-3">
-            <SetupStep icon={Github} title="Source permissions" description="Repo contents and metadata only." state={githubDone ? "done" : "pending"} />
-            <SetupStep icon={ShieldCheck} title="External ID trust" description="Prevents confused-deputy role assumption." state={externalId ? "done" : "pending"} />
-            <SetupStep icon={KeyRound} title="AWS execution role" description="Used only after plan approval." state={connections.length > 0 ? "done" : "pending"} />
-          </div>
-        </div>
+          {validationResult && (
+            <div
+              className={`mt-4 rounded-md border px-3 py-2 text-[12.5px] ${
+                validationResult.status === "valid"
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                  : "border-red-500/30 bg-red-500/10 text-red-300"
+              }`}
+            >
+              {validationResult.status === "valid"
+                ? "Role validated"
+                : validationResult.reason ?? "Validation failed"}
+            </div>
+          )}
 
-        <Panel className="p-5">
-          <div className="flex gap-3 text-[13px] leading-[1.6] text-white/55">
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-violet-soft" />
-            <p>The IAM role grants AWS-ify permissions for the MVP deployment path: ECR images, ECS Fargate services, an Application Load Balancer, CloudWatch logs, and the IAM roles those tasks need. Review the CloudFormation template before deploying it.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={handleDownloadTemplate} disabled={!template}>
+              Download template
+            </Button>
+            <Button variant="secondary" onClick={handleValidate} disabled={!roleArn || validating}>
+              {validating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Validate"}
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={validationResult?.status !== "valid" || saving || !accountId}
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save connection"}
+            </Button>
           </div>
-        </Panel>
+        </Section>
+
+        <p className="text-[12px] leading-[1.6] text-white/40">
+          The IAM role grants only the permissions required for the ECS Fargate deployment path: ECR images, ECS services, an ALB, CloudWatch logs, and the scoped task roles. Review the CloudFormation template before deploying.
+        </p>
       </div>
     </ProductShell>
   );
 }
 
-function StatusBadge({ children, tone = "muted" }: { children: React.ReactNode; tone?: "muted" | "violet" }) {
-  const styles = tone === "violet"
-    ? "border-violet/30 bg-violet/10 text-violet-soft"
-    : "border-white/[0.08] bg-white/[0.04] text-white/65";
-  return <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] ${styles}`}>{children}</span>;
+interface SectionProps {
+  icon: React.ReactNode;
+  title: string;
+  status: string;
+  statusTone: "ok" | "muted";
+  children: React.ReactNode;
+}
+
+function Section({ icon, title, status, statusTone, children }: SectionProps) {
+  return (
+    <div className="rounded-xl border border-white/[0.06]">
+      <div className="flex items-center justify-between border-b border-white/[0.05] px-5 py-3">
+        <div className="flex items-center gap-2.5">
+          {icon}
+          <p className="text-[13px] font-medium text-white">{title}</p>
+        </div>
+        <span
+          className={`text-[11.5px] ${
+            statusTone === "ok" ? "text-emerald-300" : "text-white/40"
+          }`}
+        >
+          {status}
+        </span>
+      </div>
+      <div className="px-5 py-4">{children}</div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="text-[11px] text-white/45">{label}</span>
+      <div className="mt-1.5">{children}</div>
+    </label>
+  );
+}
+
+function Input({
+  value,
+  onChange,
+  placeholder
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="h-9 w-full rounded-md border border-white/[0.08] bg-white/[0.02] px-3 text-[12.5px] text-white outline-none placeholder:text-white/25 focus:border-white/20"
+    />
+  );
 }
