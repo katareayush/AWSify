@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowRight, Github, KeyRound, Loader2, ScanLine, ShieldCheck } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AlertTriangle, ArrowRight, Github, KeyRound, Loader2, ScanLine, ShieldCheck, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AppRoot } from "../../components/app";
 import { Mark } from "../../components/landing/primitives/mark";
@@ -24,8 +24,18 @@ const steps: StepConfig[] = [
   { icon: ShieldCheck, title: "Review plan", description: "Inspect resources, files, and cost range before anything deploys." }
 ];
 
+const ERROR_MESSAGES: Record<string, string> = {
+  missing_code: "GitHub did not return an authorization code. Try signing in again.",
+  invalid_oauth_state: "The login attempt expired or was tampered with. Please retry sign-in.",
+  github_auth_error: "Could not reach GitHub to complete sign-in. Check your network and retry.",
+  github_auth_failed: "GitHub refused the authorization code. Please try again.",
+  not_authenticated: "Your session expired. Please sign in again."
+};
+
 export default function OnboardingPage() {
   const router = useRouter();
+  const params = useSearchParams();
+  const authError = params.get("error");
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -39,6 +49,10 @@ export default function OnboardingPage() {
       .catch(() => setCheckingAuth(false));
   }, [router]);
 
+  useEffect(() => {
+    setError(authError ? ERROR_MESSAGES[authError] ?? `Sign-in failed: ${authError}` : null);
+  }, [authError]);
+
   async function handleSignIn() {
     setError(null);
     setLoading(true);
@@ -49,6 +63,14 @@ export default function OnboardingPage() {
       setError(e instanceof Error ? e.message : "Could not reach the API.");
       setLoading(false);
     }
+  }
+
+  function dismissError() {
+    setError(null);
+    const next = new URLSearchParams(params.toString());
+    next.delete("error");
+    const query = next.toString();
+    router.replace(query ? `/onboarding?${query}` : "/onboarding");
   }
 
   if (checkingAuth) {
@@ -75,11 +97,7 @@ export default function OnboardingPage() {
               AWS-ify uses your GitHub identity. Once signed in we&apos;ll install the GitHub App and connect your AWS account.
             </p>
 
-            {error && (
-              <p className="mt-5 rounded-md border border-red-500/20 bg-red-500/[0.06] px-3 py-2 text-[12.5px] text-red-300">
-                {error}
-              </p>
-            )}
+            {error && <AuthErrorMessage message={error} onDismiss={dismissError} />}
 
             <Button
               size="lg"
@@ -101,6 +119,23 @@ export default function OnboardingPage() {
         </main>
       </div>
     </AppRoot>
+  );
+}
+
+function AuthErrorMessage({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div className="mt-5 flex items-start gap-2.5 rounded-md border border-red-500/20 bg-red-500/[0.06] px-3 py-2.5 text-red-300">
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+      <p className="flex-1 text-[12.5px] leading-[1.5]">{message}</p>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss sign-in error"
+        className="-m-1 rounded p-1 text-red-300/70 transition-colors hover:bg-red-500/10 hover:text-red-200"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
   );
 }
 

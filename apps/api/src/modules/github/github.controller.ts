@@ -42,24 +42,25 @@ export class GithubController {
     @Res() res: Response
   ) {
     if (!code) {
-      redirectWithError(res, "/", "missing_code");
+      redirectWithError(res, "/onboarding", "missing_code");
       return;
     }
     const signedState = req.cookies?.[OAUTH_STATE_COOKIE] as string | undefined;
     if (!this.github.verifyOAuthState(state, signedState)) {
-      redirectWithError(res, "/", "invalid_oauth_state");
+      redirectWithError(res, "/onboarding", "invalid_oauth_state");
       return;
     }
 
     let result;
     try {
       result = await this.github.exchangeOAuthCode(code);
-    } catch {
-      redirectWithError(res, "/", "github_auth_error");
+    } catch (err) {
+      console.error("[github/callback] exchangeOAuthCode threw:", err);
+      redirectWithError(res, "/onboarding", "github_auth_error");
       return;
     }
     if (!result) {
-      redirectWithError(res, "/", "github_auth_failed");
+      redirectWithError(res, "/onboarding", "github_auth_failed");
       return;
     }
 
@@ -99,7 +100,7 @@ export class GithubController {
     const result = await this.github.syncInstallationForSession(token, installationId);
     if ("error" in result && result.error) {
       const errorCode = result.error;
-      const path = errorCode === "not_authenticated" ? "/" : "/repositories";
+      const path = errorCode === "not_authenticated" ? "/onboarding" : "/repositories";
       redirectWithError(res, path, errorCode);
       return;
     }
