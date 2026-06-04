@@ -38,7 +38,7 @@ function ShellLayout({ children, active }: { children: React.ReactNode; active: 
       <Sidebar active={active} />
       <section
         className={`flex min-h-screen min-w-0 flex-col transition-[padding-left] duration-200 ease-out ${
-          collapsed ? "lg:pl-16" : "lg:pl-[260px]"
+          collapsed ? "lg:pl-0" : "lg:pl-[260px]"
         }`}
       >
         <TopBar />

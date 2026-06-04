@@ -13,43 +13,44 @@ export function Sidebar({ active }: SidebarProps) {
   const { collapsed } = useSidebar();
   return (
     <aside
+      aria-hidden={collapsed}
       data-collapsed={collapsed}
-      className={`group/sidebar z-30 hidden border-r border-white/[0.06] bg-[#0a0a0d]/95 backdrop-blur-xl transition-[width] duration-200 ease-out lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col ${
-        collapsed ? "lg:w-16" : "lg:w-[260px]"
+      inert={collapsed}
+      className={`group/sidebar z-30 hidden w-[260px] border-r bg-[#0a0a0d]/95 backdrop-blur-xl transition-[transform,opacity,border-color] duration-200 ease-out lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col ${
+        collapsed
+          ? "lg:-translate-x-full lg:border-transparent lg:opacity-0"
+          : "lg:translate-x-0 lg:border-white/[0.06] lg:opacity-100"
       }`}
     >
-      <SidebarBrand collapsed={collapsed} />
-      <SidebarNav active={active} collapsed={collapsed} />
-      <SidebarFooter collapsed={collapsed} />
+      <SidebarBrand />
+      <SidebarNav active={active} />
+      <SidebarFooter />
     </aside>
   );
 }
 
-function SidebarBrand({ collapsed }: { collapsed: boolean }) {
+function SidebarBrand() {
   return (
-    <div className={`flex h-16 items-center border-b border-white/[0.06] ${collapsed ? "justify-center px-2" : "px-5"}`}>
+    <div className="flex h-16 items-center border-b border-white/[0.06] px-5">
       <Link href="/" className="flex min-w-0 items-center gap-2.5" title="AWS-ify">
         <Mark />
-        {!collapsed && (
-          <div className="min-w-0 leading-tight">
-            <p className="truncate text-[14px] font-medium tracking-tight text-white">AWS-ify</p>
-            <p className="truncate text-[11px] text-white/40">Personal workspace</p>
-          </div>
-        )}
+        <div className="min-w-0 leading-tight">
+          <p className="truncate text-[14px] font-medium tracking-tight text-white">AWS-ify</p>
+          <p className="truncate text-[11px] text-white/40">Personal workspace</p>
+        </div>
       </Link>
     </div>
   );
 }
 
-function SidebarNav({ active, collapsed }: { active: string; collapsed: boolean }) {
+function SidebarNav({ active }: { active: string }) {
   return (
-    <nav className={`flex-1 space-y-0.5 py-4 ${collapsed ? "px-2" : "px-3"}`}>
+    <nav className="flex-1 space-y-0.5 px-3 py-4">
       {navItems.map((item) => (
         <SidebarNavItem
           key={item.label}
           item={item}
           active={item.label === active}
-          collapsed={collapsed}
         />
       ))}
     </nav>
@@ -58,20 +59,15 @@ function SidebarNav({ active, collapsed }: { active: string; collapsed: boolean 
 
 function SidebarNavItem({
   item,
-  active,
-  collapsed
+  active
 }: {
   item: (typeof navItems)[number];
   active: boolean;
-  collapsed: boolean;
 }) {
   return (
     <Link
       href={item.href}
-      title={collapsed ? item.label : undefined}
-      className={`group relative flex h-9 items-center rounded-lg text-[13.5px] transition-colors ${
-        collapsed ? "justify-center px-0" : "gap-2.5 px-3"
-      } ${
+      className={`group relative flex h-9 items-center gap-2.5 rounded-lg px-3 text-[13.5px] transition-colors ${
         active
           ? "bg-white/[0.06] text-white"
           : "text-white/55 hover:bg-white/[0.03] hover:text-white"
@@ -85,22 +81,12 @@ function SidebarNavItem({
           active ? "text-violet-soft" : "text-white/45 group-hover:text-white/75"
         }`}
       />
-      {!collapsed && <span className="truncate">{item.label}</span>}
+      <span className="truncate">{item.label}</span>
     </Link>
   );
 }
 
-function SidebarFooter({ collapsed }: { collapsed: boolean }) {
-  if (collapsed) {
-    return (
-      <div className="flex justify-center border-t border-white/[0.06] p-3" title="All systems operational">
-        <span className="relative flex h-1.5 w-1.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-        </span>
-      </div>
-    );
-  }
+function SidebarFooter() {
   return (
     <div className="border-t border-white/[0.06] p-4">
       <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
