@@ -117,9 +117,8 @@ function verifyExternalId(userId: string, externalId: string): boolean {
 }
 
 function buildLaunchStackUrl(externalId: string): string | null {
-  const apiUrl = process.env.API_URL;
-  if (!apiUrl) return null;
-  const templateUrl = `${apiUrl.replace(/\/$/, "")}/v1/aws/cloudformation-template/public`;
+  const templateUrl = process.env.AWSIFY_TEMPLATE_S3_URL;
+  if (!templateUrl) return null;
   const region = process.env.AWS_REGION ?? "us-east-1";
   const params = new URLSearchParams({
     templateURL: templateUrl,
