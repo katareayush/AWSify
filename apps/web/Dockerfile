@@ -9,10 +9,13 @@ COPY packages/deployment-schemas/package.json packages/deployment-schemas/
 RUN pnpm install --frozen-lockfile --filter @awsify/web... --filter @awsify/deployment-schemas
 
 FROM deps AS build
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 COPY packages/deployment-schemas packages/deployment-schemas
 COPY apps/web apps/web
-RUN pnpm --filter @awsify/deployment-schemas build \
- && pnpm --filter @awsify/web build
+RUN test -n "$NEXT_PUBLIC_API_URL" \
+ || (echo "NEXT_PUBLIC_API_URL build-arg is required" && exit 1)
+RUN pnpm exec turbo run build --filter=@awsify/web...
 
 FROM node:22-alpine AS runtime
 WORKDIR /app
