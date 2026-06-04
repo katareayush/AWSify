@@ -411,7 +411,9 @@ export default function DeploymentDetailPage() {
                   <p className="text-[13px] font-medium text-white">Commit deploy files</p>
                 </div>
                 <p className="text-[12px] leading-[1.6] text-white/45">
-                  Push the generated Dockerfile, workflow, and Pulumi files to a new branch and open a pull request against <span className="font-mono text-white/70">{detail.project.branch}</span>.
+                  {commitResult
+                    ? <>Branch <span className="font-mono text-white/70">{commitResult.branch}</span> already exists with these files. Clicking again will update the same branch and PR &mdash; safe to re-run.</>
+                    : <>Push the generated Dockerfile, workflow, and Pulumi files to a new branch and open a pull request against <span className="font-mono text-white/70">{detail.project.branch}</span>.</>}
                 </p>
                 <Button
                   className="mt-4 w-full"
@@ -420,7 +422,9 @@ export default function DeploymentDetailPage() {
                   disabled={committingArtifacts}
                 >
                   {committingArtifacts ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitPullRequest className="h-4 w-4" />}
-                  {commitResult ? "Re-open PR" : "Open pull request"}
+                  {committingArtifacts
+                    ? (commitResult ? "Updating branch…" : "Pushing…")
+                    : (commitResult ? "Update branch" : "Open pull request")}
                 </Button>
                 {commitResult && (
                   <div className="mt-4 space-y-2 rounded-lg border border-white/[0.06] bg-black/35 p-3">

@@ -280,13 +280,19 @@ export class DeploymentOrchestrator {
     }
 
     try {
-      await execFileAsync("docker", ["build", "-t", imageUri, repoPath], { timeout: 600_000 });
+      await execFileAsync("docker", ["build", "-t", imageUri, repoPath], {
+        timeout: 600_000,
+        maxBuffer: 50 * 1024 * 1024
+      });
     } catch (error) {
       throw new Error(`Docker build failed. Check the Dockerfile, build command, and package install step. ${extractProcessError(error)}`);
     }
 
     try {
-      await execFileAsync("docker", ["push", imageUri], { timeout: 300_000 });
+      await execFileAsync("docker", ["push", imageUri], {
+        timeout: 300_000,
+        maxBuffer: 20 * 1024 * 1024
+      });
     } catch (error) {
       throw new Error(`Docker push to ECR failed. Check ECR push permissions and repository access. ${extractProcessError(error)}`);
     }
@@ -490,10 +496,13 @@ function explainDeploymentError(error: unknown): string {
 function extractProcessError(error: unknown): string {
   if (error && typeof error === "object") {
     const maybe = error as { stderr?: unknown; stdout?: unknown; message?: unknown };
-    const stderr = typeof maybe.stderr === "string" ? maybe.stderr.trim() : "";
-    const stdout = typeof maybe.stdout === "string" ? maybe.stdout.trim() : "";
-    const message = typeof maybe.message === "string" ? maybe.message.trim() : "";
-    const combined = [stderr, stdout, message].filter(Boolean).join(" ").slice(0, 1000);
+    const stderr = typeof maybe.stderr === "string" ? maybe.stderr : "";
+    const stdout = typeof maybe.stdout === "string" ? maybe.stdout : "";
+    const message = typeof maybe.message === "string" ? maybe.message : "";
+    // BuildKit / npm / pulumi write the actual failure reason at the very end of
+    // their output. Keep the TAIL, not the head, capped at ~4KB.
+    const tail = (s: string) => s.trim().split("\n").slice(-60).join("\n").slice(-4000);
+    const combined = [tail(stderr), tail(stdout), message].filter(Boolean).join("\n").slice(-4000);
     return redactSecrets(combined);
   }
   return redactSecrets(String(error));

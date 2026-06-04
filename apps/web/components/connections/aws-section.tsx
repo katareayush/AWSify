@@ -30,18 +30,10 @@ export function AwsSection() {
     setConnecting(true);
     setError(null);
     try {
-      const result = await api.saveConnection({ roleArn: roleArn.trim(), externalId });
-      if ("connection" in result) {
-        const r = await api.listConnections();
-        setConnections(r.connections);
-        setRoleArn("");
-      } else {
-        const reason =
-          (result as { validation?: { reason?: string } }).validation?.reason ??
-          (result as { error?: string }).error ??
-          "Could not connect to AWS.";
-        setError(reason);
-      }
+      await api.saveConnection({ roleArn: roleArn.trim(), externalId });
+      const r = await api.listConnections();
+      setConnections(r.connections);
+      setRoleArn("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not connect to AWS.");
     } finally {

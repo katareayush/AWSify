@@ -1,3 +1,5 @@
+import { humanizeError } from "./error-messages";
+
 const BASE = process.env.NEXT_PUBLIC_API_URL;
 if (!BASE) throw new Error("NEXT_PUBLIC_API_URL is required.");
 
@@ -9,8 +11,17 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   });
   let data: unknown = null;
   try { data = await res.json(); } catch { /* ignore */ }
-  const error = data && typeof data === "object" && "error" in data ? String((data as { error: unknown }).error) : "";
-  if (!res.ok || error) throw new Error(error || `HTTP ${res.status}`);
+  if (data && typeof data === "object" && "error" in data) {
+    const errObj = data as { error: unknown; detail?: unknown; validation?: { reason?: unknown } };
+    const code = String(errObj.error);
+    const detail = typeof errObj.detail === "string" ? errObj.detail : "";
+    const reason = typeof errObj.validation?.reason === "string" ? errObj.validation.reason : "";
+    const composite = [code, detail, reason].filter(Boolean).join(": ");
+    throw new Error(humanizeError(composite));
+  }
+  if (!res.ok) {
+    throw new Error(humanizeError(`HTTP ${res.status}`));
+  }
   return data as T;
 }
 
