@@ -18,11 +18,7 @@ COPY packages/deployment-schemas packages/deployment-schemas
 COPY packages/templates packages/templates
 COPY apps/api apps/api
 RUN pnpm --filter @awsify/database prisma:generate \
- && pnpm --filter @awsify/config build \
- && pnpm --filter @awsify/database build \
- && pnpm --filter @awsify/deployment-schemas build \
- && pnpm --filter @awsify/templates build \
- && pnpm --filter @awsify/api build
+ && pnpm exec turbo run build --filter=@awsify/api...
 
 FROM base AS runtime
 ENV NODE_ENV=production

@@ -26,14 +26,7 @@ COPY packages/pulumi-templates packages/pulumi-templates
 COPY packages/templates packages/templates
 COPY apps/worker apps/worker
 RUN pnpm --filter @awsify/database prisma:generate \
- && pnpm --filter @awsify/ai build \
- && pnpm --filter @awsify/config build \
- && pnpm --filter @awsify/database build \
- && pnpm --filter @awsify/deployment-schemas build \
- && pnpm --filter @awsify/repo-scanner build \
- && pnpm --filter @awsify/pulumi-templates build \
- && pnpm --filter @awsify/templates build \
- && pnpm --filter @awsify/worker build
+ && pnpm exec turbo run build --filter=@awsify/worker...
 
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production
