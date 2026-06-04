@@ -49,7 +49,8 @@ COPY --from=build /repo/packages/deployment-schemas packages/deployment-schemas
 COPY --from=build /repo/packages/repo-scanner packages/repo-scanner
 COPY --from=build /repo/packages/pulumi-templates packages/pulumi-templates
 COPY --from=build /repo/packages/templates packages/templates
-RUN pnpm install --frozen-lockfile --filter @awsify/worker... \
- && pnpm --filter @awsify/database prisma:generate
+RUN pnpm install --frozen-lockfile --filter @awsify/worker... --prod \
+ && pnpm --filter @awsify/database prisma:generate \
+ && npm install -g tsx
 WORKDIR /repo/apps/worker
-CMD ["pnpm", "exec", "tsx", "src/main.ts"]
+CMD ["tsx", "src/main.ts"]
