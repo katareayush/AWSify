@@ -26,7 +26,10 @@ COPY packages/pulumi-templates packages/pulumi-templates
 COPY packages/templates packages/templates
 COPY apps/worker apps/worker
 RUN pnpm --filter @awsify/database prisma:generate \
- && pnpm exec turbo run build --filter=@awsify/worker...
+ && pnpm exec turbo run build --filter=@awsify/worker^... \
+ && pnpm --filter @awsify/worker build \
+ && test -f /repo/apps/worker/dist/main.js \
+    || (echo "ERROR: worker dist/main.js not produced" && ls -R /repo/apps/worker && exit 1)
 
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production
