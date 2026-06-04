@@ -1,0 +1,17 @@
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/coverage
+**/tmp
+**/pulumi.work
+**/.env
+**/.env.local
+.git
+.gitignore
+.DS_Store
+*.pem
+docs
+README.md
+deploy/.env
+deploy/data

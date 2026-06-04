@@ -1,13 +1,21 @@
 export function generateCloudFormationRoleTemplate(input: {
   awsifyAccountId: string;
-  externalId: string;
+  externalId?: string;
   roleName?: string;
 }): string {
   const roleName = input.roleName ?? "AWSifyDeploymentRole";
+  const externalIdRef = input.externalId ?? "!Ref ExternalId";
+  const parametersBlock = input.externalId
+    ? "Parameters: {}"
+    : `Parameters:
+  ExternalId:
+    Type: String
+    Description: Unique ID issued by AWS-ify. Do not modify.
+    NoEcho: true`;
 
   return `AWSTemplateFormatVersion: "2010-09-09"
 Description: AWS-ify deployment role - grants only the permissions needed for the ECS Fargate MVP.
-Parameters: {}
+${parametersBlock}
 Resources:
   AWSifyDeploymentRole:
     Type: AWS::IAM::Role
@@ -22,7 +30,7 @@ Resources:
             Action: sts:AssumeRole
             Condition:
               StringEquals:
-                sts:ExternalId: ${input.externalId}
+                sts:ExternalId: ${externalIdRef}
       Policies:
         - PolicyName: AWSifyEcsFargateDeployPolicy
           PolicyDocument:

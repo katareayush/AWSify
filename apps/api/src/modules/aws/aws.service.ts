@@ -13,14 +13,21 @@ export class AwsService {
     const awsifyAccountId = process.env.AWSIFY_AWS_ACCOUNT_ID;
 
     if (!awsifyAccountId) {
-      return { externalId, template: null, status: "missing_awsify_account_id" };
+      return { externalId, template: null, launchStackUrl: null, status: "missing_awsify_account_id" };
     }
 
     return {
       externalId,
       template: generateCloudFormationRoleTemplate({ awsifyAccountId, externalId }),
-      note: "Deploy this CloudFormation template in the target AWS account, then submit the output RoleArn."
+      launchStackUrl: buildLaunchStackUrl(externalId),
+      note: "Click Launch Stack to open AWS Console with the role template pre-filled, then paste the output RoleArn."
     };
+  }
+
+  getPublicTemplate(): string | null {
+    const awsifyAccountId = process.env.AWSIFY_AWS_ACCOUNT_ID;
+    if (!awsifyAccountId) return null;
+    return generateCloudFormationRoleTemplate({ awsifyAccountId });
   }
 
   async validateConnection(userId: string, input: { roleArn: string; externalId: string; region?: string }) {
@@ -58,25 +65,24 @@ export class AwsService {
     }
   }
 
-  async saveConnection(userId: string, input: { roleArn: string; externalId: string; accountId: string; region: string }) {
+  async saveConnection(userId: string, input: { roleArn: string; externalId: string; region?: string }) {
     if (!verifyExternalId(userId, input.externalId)) return { error: "invalid_external_id" };
-    const validation = await this.validateConnection(userId, input);
+    const region = input.region ?? "us-east-1";
+    const validation = await this.validateConnection(userId, { ...input, region });
     if (validation.status !== "valid") return { error: "aws_validation_failed", validation };
-    if (validation.accountId && validation.accountId !== input.accountId) {
-      return { error: `account_id_mismatch: expected ${validation.accountId}` };
-    }
+    if (!validation.accountId) return { error: "missing_account_id_from_sts" };
     const connection = await this.prisma.awsConnection.upsert({
       where: { id: input.externalId },
       create: {
         id: input.externalId,
-        accountId: input.accountId,
+        accountId: validation.accountId,
         roleArn: input.roleArn,
         externalId: input.externalId,
-        defaultRegion: input.region,
+        defaultRegion: region,
         status: "valid",
         userId
       },
-      update: { roleArn: input.roleArn, defaultRegion: input.region, status: "valid" }
+      update: { roleArn: input.roleArn, defaultRegion: region, status: "valid" }
     });
     return { connection };
   }
@@ -108,6 +114,19 @@ function verifyExternalId(userId: string, externalId: string): boolean {
   } catch {
     return false;
   }
+}
+
+function buildLaunchStackUrl(externalId: string): string | null {
+  const apiUrl = process.env.API_URL;
+  if (!apiUrl) return null;
+  const templateUrl = `${apiUrl.replace(/\/$/, "")}/aws/cloudformation-template/public`;
+  const region = process.env.AWS_REGION ?? "us-east-1";
+  const params = new URLSearchParams({
+    templateURL: templateUrl,
+    stackName: "awsify-deployment-role",
+    param_ExternalId: externalId
+  });
+  return `https://console.aws.amazon.com/cloudformation/home?region=${region}#/stacks/quickcreate?${params.toString()}`;
 }
 
 function signExternalId(payload: string): string {

@@ -78,7 +78,9 @@ export const api = {
   refreshRepositories: () => req<{ repositories: Repo[] }>("/github/repositories/refresh"),
 
   cfnTemplate: () =>
-    req<{ externalId: string; template: string | null }>("/aws/cloudformation-template"),
+    req<{ externalId: string; template: string | null; launchStackUrl: string | null }>(
+      "/aws/cloudformation-template"
+    ),
 
   validateConnection: (body: { roleArn: string; externalId: string; region: string }) =>
     req<{ status: string; reason?: string; accountId?: string; arn?: string }>("/aws/connections/validate", {
@@ -86,7 +88,7 @@ export const api = {
       body: JSON.stringify(body)
     }),
 
-  saveConnection: (body: { roleArn: string; externalId: string; accountId: string; region: string }) =>
+  saveConnection: (body: { roleArn: string; externalId: string; region?: string }) =>
     req<{ connection: AwsConnection }>("/aws/connections", {
       method: "POST",
       body: JSON.stringify(body)

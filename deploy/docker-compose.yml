@@ -1,0 +1,63 @@
+name: awsify
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    image: awsify-web:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    expose:
+      - "3000"
+    networks: [edge]
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    image: awsify-api:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: 4000
+    expose:
+      - "4000"
+    networks: [edge]
+
+  worker:
+    build:
+      context: ..
+      dockerfile: apps/worker/Dockerfile
+    image: awsify-worker:latest
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - pulumi-state:/root/.pulumi
+    networks: [edge]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file: .env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [web, api]
+    networks: [edge]
+
+networks:
+  edge:
+
+volumes:
+  caddy-data:
+  caddy-config:
+  pulumi-state:
