@@ -4,7 +4,8 @@ export function redisConnectionOptions() {
     host: redisUrl.hostname,
     port: Number(redisUrl.port || 6379),
     username: redisUrl.username || undefined,
-    password: redisUrl.password || undefined,
+    password: redisUrl.password ? decodeURIComponent(redisUrl.password) : undefined,
+    tls: redisUrl.protocol === "rediss:" ? {} : undefined,
     maxRetriesPerRequest: null
   };
 }
