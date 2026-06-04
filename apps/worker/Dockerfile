@@ -26,10 +26,7 @@ COPY packages/pulumi-templates packages/pulumi-templates
 COPY packages/templates packages/templates
 COPY apps/worker apps/worker
 RUN pnpm --filter @awsify/database prisma:generate \
- && pnpm exec turbo run build --filter=@awsify/worker^... \
- && pnpm --filter @awsify/worker build \
- && test -f /repo/apps/worker/dist/main.js \
-    || (echo "ERROR: worker dist/main.js not produced" && ls -R /repo/apps/worker && exit 1)
+ && pnpm exec turbo run build --filter=@awsify/worker^...
 
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production
@@ -43,7 +40,8 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /repo
 COPY --from=build /repo/pnpm-lock.yaml /repo/pnpm-workspace.yaml /repo/package.json /repo/turbo.json /repo/tsconfig.base.json ./
 COPY --from=build /repo/apps/worker/package.json apps/worker/
-COPY --from=build /repo/apps/worker/dist apps/worker/dist
+COPY --from=build /repo/apps/worker/src apps/worker/src
+COPY --from=build /repo/apps/worker/tsconfig.json apps/worker/tsconfig.json
 COPY --from=build /repo/packages/ai packages/ai
 COPY --from=build /repo/packages/config packages/config
 COPY --from=build /repo/packages/database packages/database
@@ -51,7 +49,7 @@ COPY --from=build /repo/packages/deployment-schemas packages/deployment-schemas
 COPY --from=build /repo/packages/repo-scanner packages/repo-scanner
 COPY --from=build /repo/packages/pulumi-templates packages/pulumi-templates
 COPY --from=build /repo/packages/templates packages/templates
-RUN pnpm install --frozen-lockfile --filter @awsify/worker... --prod \
+RUN pnpm install --frozen-lockfile --filter @awsify/worker... \
  && pnpm --filter @awsify/database prisma:generate
 WORKDIR /repo/apps/worker
-CMD ["node", "dist/main.js"]
+CMD ["pnpm", "exec", "tsx", "src/main.ts"]
