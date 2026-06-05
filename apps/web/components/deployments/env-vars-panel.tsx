@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { Eye, EyeOff, KeyRound, Loader2, Save, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Panel } from "../ui/panel";
+import { ConfirmDialog } from "../ui/confirm-dialog";
+import { useToast } from "../ui/toast";
 import { api } from "../../lib/api";
 
 interface DetectedVar {
@@ -27,11 +29,13 @@ interface EnvVarsPanelProps {
 }
 
 export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVarsPanelProps) {
+  const toast = useToast();
   const [values, setValues] = useState<Record<string, string>>({});
   const [visible, setVisible] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const savedByName = useMemo(() => new Map(saved.map((envVar) => [envVar.name, envVar])), [saved]);
 
@@ -68,18 +72,21 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
     setSaving(true);
     setError(null);
     try {
-      await api.saveDeploymentEnv(deploymentId, values);
+      const result = await api.saveDeploymentEnv(deploymentId, values);
       setValues({});
       setVisible({});
+      toast.success(`Saved ${result.saved.length} env var${result.saved.length === 1 ? "" : "s"}.`);
       await onChange();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save env vars.");
+      const msg = err instanceof Error ? err.message : "Failed to save env vars.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleDelete(name: string) {
+  async function performDelete(name: string) {
     setDeleting(name);
     setError(null);
     try {
@@ -89,11 +96,15 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
         delete next[name];
         return next;
       });
+      toast.success(`Removed ${name}.`);
       await onChange();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete env var.");
+      const msg = err instanceof Error ? err.message : "Failed to delete env var.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setDeleting(null);
+      setConfirmDelete(null);
     }
   }
 
@@ -125,7 +136,7 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
               isDeleting={deleting === envVar.name}
               onChangeValue={(v) => setValues((c) => ({ ...c, [envVar.name]: v }))}
               onToggleVisible={() => setVisible((c) => ({ ...c, [envVar.name]: !c[envVar.name] }))}
-              onDelete={envVar.saved ? () => handleDelete(envVar.name) : undefined}
+              onDelete={envVar.saved ? () => setConfirmDelete(envVar.name) : undefined}
             />
           ))}
         </Group>
@@ -142,7 +153,7 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
               isDeleting={deleting === envVar.name}
               onChangeValue={(v) => setValues((c) => ({ ...c, [envVar.name]: v }))}
               onToggleVisible={() => setVisible((c) => ({ ...c, [envVar.name]: !c[envVar.name] }))}
-              onDelete={envVar.saved ? () => handleDelete(envVar.name) : undefined}
+              onDelete={envVar.saved ? () => setConfirmDelete(envVar.name) : undefined}
             />
           ))}
         </Group>
@@ -166,6 +177,16 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
       <p className="mt-2 text-[11px] text-white/35">
         Leave a field blank to keep its saved value. Use the trash icon to remove a saved var.
       </p>
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title={`Remove ${confirmDelete ?? ""}?`}
+        description="The saved value will be deleted. The next deploy will fail until you re-save the variable."
+        confirmLabel="Remove"
+        tone="danger"
+        onConfirm={() => (confirmDelete ? performDelete(confirmDelete) : Promise.resolve())}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </Panel>
   );
 }

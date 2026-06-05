@@ -8,7 +8,9 @@ import { ProductShell } from "../../components/product-shell";
 import { Button } from "../../components/ui/button";
 import { Panel } from "../../components/ui/panel";
 import { Pagination } from "../../components/ui/pagination";
+import { PageSkeleton } from "../../components/ui/skeleton";
 import { useAuth } from "../../lib/use-auth";
+import { useToast } from "../../components/ui/toast";
 import { api, type Deployment } from "../../lib/api";
 
 const PAGE_SIZE = 10;
@@ -22,20 +24,29 @@ function statusColor(s: string) {
 
 export default function DeploymentsPage() {
   const { me, loading } = useAuth();
+  const toast = useToast();
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [page, setPage] = useState(0);
 
   useEffect(() => {
     if (!me?.authenticated) return;
-    api.listDeployments().then(r => setDeployments(r.deployments)).catch(() => {});
-  }, [me?.authenticated]);
+    api.listDeployments().then(r => setDeployments(r.deployments)).catch((err) => {
+      toast.error(err instanceof Error ? err.message : "Could not load deployments.");
+    });
+  }, [me?.authenticated, toast]);
 
   const paginated = useMemo(
     () => deployments.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
     [deployments, page]
   );
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <ProductShell active="Templates">
+        <PageSkeleton variant="list" />
+      </ProductShell>
+    );
+  }
 
   return (
     <ProductShell active="Templates">

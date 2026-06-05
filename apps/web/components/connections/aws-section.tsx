@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { ExternalLink, KeyRound, Loader2 } from "lucide-react";
 import { Button } from "../ui/button";
+import { useToast } from "../ui/toast";
 import { api, type AwsConnection } from "../../lib/api";
 import { Field, Input, Section } from "./section";
 
 export function AwsSection() {
+  const toast = useToast();
   const [connections, setConnections] = useState<AwsConnection[]>([]);
   const [externalId, setExternalId] = useState("");
   const [template, setTemplate] = useState<string | null>(null);
@@ -17,13 +19,17 @@ export function AwsSection() {
   const [showManual, setShowManual] = useState(false);
 
   useEffect(() => {
-    api.listConnections().then((r) => setConnections(r.connections)).catch(() => {});
+    api.listConnections().then((r) => setConnections(r.connections)).catch((err) => {
+      toast.error(err instanceof Error ? err.message : "Could not load AWS connections.");
+    });
     api.cfnTemplate().then((r) => {
       setExternalId(r.externalId);
       setTemplate(r.template);
       setLaunchStackUrl(r.launchStackUrl);
-    }).catch(() => {});
-  }, []);
+    }).catch((err) => {
+      toast.error(err instanceof Error ? err.message : "Could not load AWS template.");
+    });
+  }, [toast]);
 
   async function handleConnect() {
     if (!roleArn.trim() || !externalId) return;

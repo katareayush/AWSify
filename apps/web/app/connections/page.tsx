@@ -1,6 +1,7 @@
 "use client";
 
 import { ProductShell } from "../../components/product-shell";
+import { PageSkeleton } from "../../components/ui/skeleton";
 import { useAuth } from "../../lib/use-auth";
 import { GithubSection } from "../../components/connections/github-section";
 import { AwsSection } from "../../components/connections/aws-section";
@@ -8,7 +9,13 @@ import { AwsSection } from "../../components/connections/aws-section";
 export default function ConnectionsPage() {
   const { me, loading } = useAuth();
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <ProductShell active="Connections">
+        <PageSkeleton />
+      </ProductShell>
+    );
+  }
 
   return (
     <ProductShell active="Connections">

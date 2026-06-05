@@ -2,13 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { CheckCircle2, ChevronDown, ChevronUp, Cloud, ExternalLink, GitPullRequest, HeartPulse, Loader2, Play, RotateCw, Save, ServerCrash, TerminalSquare } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Cloud, ExternalLink, GitPullRequest, HeartPulse, Loader2, Play, RotateCw, Save, TerminalSquare } from "lucide-react";
 import { PageHeading } from "../../../components/page-heading";
 import { InfraDiagram } from "../../../components/infra-diagram";
 import { ProductShell } from "../../../components/product-shell";
 import { Button } from "../../../components/ui/button";
 import { Panel } from "../../../components/ui/panel";
 import { EnvVarsPanel } from "../../../components/deployments/env-vars-panel";
+import { FailurePanel } from "../../../components/deployments/failure-panel";
+import { PageSkeleton } from "../../../components/ui/skeleton";
+import { useToast } from "../../../components/ui/toast";
 import { useAuth } from "../../../lib/use-auth";
 import { api, type CommitArtifactsResponse, type DeploymentDetail } from "../../../lib/api";
 
@@ -23,6 +26,7 @@ function statusColor(s: string) {
 
 export default function DeploymentDetailPage() {
   const { me, loading } = useAuth();
+  const toast = useToast();
   const { id } = useParams<{ id: string }>();
   const [detail, setDetail] = useState<DeploymentDetail | null>(null);
   const [fetching, setFetching] = useState(true);
@@ -88,10 +92,7 @@ export default function DeploymentDetailPage() {
   if (loading || fetching) {
     return (
       <ProductShell active="Templates">
-        <div className="flex items-center justify-center py-24 gap-2 text-white/40">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-[13px]">Loading deployment...</span>
-        </div>
+        <PageSkeleton variant="detail" />
       </ProductShell>
     );
   }
@@ -126,8 +127,11 @@ export default function DeploymentDetailPage() {
         healthPath: runtimeValues.healthPath || "/"
       });
       await fetchDetail();
+      toast.success("Runtime settings saved.");
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setActionError(msg);
+      toast.error(msg);
     } finally {
       setSavingRuntime(false);
     }
@@ -139,8 +143,11 @@ export default function DeploymentDetailPage() {
     try {
       await api.approveDeployment(id);
       await fetchDetail();
+      toast.success("Plan approved — deployment starting.");
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setActionError(msg);
+      toast.error(msg);
     } finally {
       setApproving(false);
     }
@@ -151,8 +158,11 @@ export default function DeploymentDetailPage() {
     setActionError(null);
     try {
       setCiToken(await api.rotateDeploymentCiToken(id));
+      toast.success("CI token rotated.");
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setActionError(msg);
+      toast.error(msg);
     } finally {
       setRotatingToken(false);
     }
@@ -162,9 +172,13 @@ export default function DeploymentDetailPage() {
     setCommittingArtifacts(true);
     setActionError(null);
     try {
-      setCommitResult(await api.commitDeploymentArtifacts(id));
+      const result = await api.commitDeploymentArtifacts(id);
+      setCommitResult(result);
+      toast.success(`Pushed to ${result.branch} (PR #${result.prNumber}).`);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setActionError(msg);
+      toast.error(msg);
     } finally {
       setCommittingArtifacts(false);
     }
@@ -204,15 +218,7 @@ export default function DeploymentDetailPage() {
         )}
 
         {isFailed && detail.failureReason && (
-          <Panel className="border-red-500/20 p-4">
-            <div className="flex items-start gap-3">
-              <ServerCrash className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-              <div>
-                <p className="text-[13px] font-medium text-red-400">Deployment failed</p>
-                <p className="mt-1 font-mono text-[12px] text-red-400/70">{detail.failureReason}</p>
-              </div>
-            </div>
-          </Panel>
+          <FailurePanel reason={detail.failureReason} />
         )}
 
         {isAwaitingApproval && (

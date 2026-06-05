@@ -9,7 +9,9 @@ import { ProductShell } from "../../components/product-shell";
 import { Button } from "../../components/ui/button";
 import { Panel } from "../../components/ui/panel";
 import { Pagination } from "../../components/ui/pagination";
+import { PageSkeleton } from "../../components/ui/skeleton";
 import { useAuth } from "../../lib/use-auth";
+import { useToast } from "../../components/ui/toast";
 import { api, type Repo, type AwsConnection } from "../../lib/api";
 
 const PAGE_SIZE = 10;
@@ -17,6 +19,7 @@ const PAGE_SIZE = 10;
 export default function RepositoriesPage() {
   const { me, loading } = useAuth();
   const router = useRouter();
+  const toast = useToast();
   const [repos, setRepos] = useState<Repo[]>([]);
   const [connections, setConnections] = useState<AwsConnection[]>([]);
   const [query, setQuery] = useState("");
@@ -28,10 +31,14 @@ export default function RepositoriesPage() {
   useEffect(() => {
     if (!me?.authenticated) return;
     Promise.all([
-      api.repositories().then(r => setRepos(r.repositories)),
-      api.listConnections().then(r => setConnections(r.connections))
+      api.repositories().then(r => setRepos(r.repositories)).catch((err) => {
+        toast.error(err instanceof Error ? err.message : "Could not load repositories.");
+      }),
+      api.listConnections().then(r => setConnections(r.connections)).catch((err) => {
+        toast.error(err instanceof Error ? err.message : "Could not load AWS connections.");
+      })
     ]).finally(() => setReposLoading(false));
-  }, [me?.authenticated]);
+  }, [me?.authenticated, toast]);
 
   useEffect(() => { setPage(0); }, [query]);
 
@@ -39,7 +46,9 @@ export default function RepositoriesPage() {
     try {
       const { url } = await api.appInstallUrl();
       window.location.href = url;
-    } catch { /* ignore */ }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not start GitHub App installation.");
+    }
   }
 
   async function handleRefreshRepos() {
@@ -47,8 +56,10 @@ export default function RepositoriesPage() {
     try {
       const result = await api.refreshRepositories();
       setRepos(result.repositories);
-    } catch { /* ignore */ }
-    finally {
+      toast.success(`Repository list refreshed (${result.repositories.length} repos).`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Refresh failed.");
+    } finally {
       setRefreshing(false);
     }
   }
@@ -66,9 +77,10 @@ export default function RepositoriesPage() {
         branch: repo.defaultBranch,
         awsConnectionId: connection.id
       });
+      toast.success(`Deployment started for ${repo.fullName}.`);
       router.push(`/deployments/${deploymentId}`);
     } catch (err) {
-      alert(`Failed to trigger deployment: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(err instanceof Error ? err.message : "Could not start deployment.");
       setDeploying(null);
     }
   }
@@ -82,7 +94,13 @@ export default function RepositoriesPage() {
     [filtered, page]
   );
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <ProductShell active="Repositories">
+        <PageSkeleton variant="list" />
+      </ProductShell>
+    );
+  }
 
   const hasAws = connections.length > 0;
 

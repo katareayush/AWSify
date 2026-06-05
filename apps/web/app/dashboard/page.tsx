@@ -9,29 +9,42 @@ import { SetupBanner } from "../../components/dashboard/setup-banner";
 import { StatStrip, type StatItem } from "../../components/dashboard/stat-strip";
 import { Button } from "../../components/ui/button";
 import { Pagination } from "../../components/ui/pagination";
+import { PageSkeleton } from "../../components/ui/skeleton";
 import { useAuth } from "../../lib/use-auth";
+import { useToast } from "../../components/ui/toast";
 import { api, type Deployment, type AwsConnection } from "../../lib/api";
 
 const PAGE_SIZE = 6;
 
 export default function DashboardPage() {
   const { me, loading } = useAuth();
+  const toast = useToast();
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [connections, setConnections] = useState<AwsConnection[]>([]);
   const [page, setPage] = useState(0);
 
   useEffect(() => {
     if (!me?.authenticated) return;
-    api.listDeployments().then((r) => setDeployments(r.deployments)).catch(() => {});
-    api.listConnections().then((r) => setConnections(r.connections)).catch(() => {});
-  }, [me?.authenticated]);
+    api.listDeployments().then((r) => setDeployments(r.deployments)).catch((err) => {
+      toast.error(err instanceof Error ? err.message : "Could not load deployments.");
+    });
+    api.listConnections().then((r) => setConnections(r.connections)).catch((err) => {
+      toast.error(err instanceof Error ? err.message : "Could not load AWS connections.");
+    });
+  }, [me?.authenticated, toast]);
 
   const paginated = useMemo(
     () => deployments.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
     [deployments, page]
   );
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <ProductShell active="Deployments">
+        <PageSkeleton />
+      </ProductShell>
+    );
+  }
 
   const liveCount = deployments.filter((d) => d.status === "deployed").length;
   const pendingCount = deployments.filter((d) => ["queued", "scanning", "deploying"].includes(d.status)).length;
