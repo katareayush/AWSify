@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowRight, Github, KeyRound, Loader2, ScanLine, ShieldCheck, X } from "lucide-react";
@@ -33,6 +33,14 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default function OnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingPageInner />
+    </Suspense>
+  );
+}
+
+function OnboardingPageInner() {
   const router = useRouter();
   const params = useSearchParams();
   const authError = params.get("error");
