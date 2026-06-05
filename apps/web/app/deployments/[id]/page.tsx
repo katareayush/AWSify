@@ -4,7 +4,6 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { CheckCircle2, ChevronDown, ChevronUp, Cloud, ExternalLink, GitPullRequest, HeartPulse, Loader2, Play, RotateCw, Save } from "lucide-react";
 import { PageHeading } from "../../../components/page-heading";
-import { InfraDiagram } from "../../../components/infra-diagram";
 import { ProductShell } from "../../../components/product-shell";
 import { Button } from "../../../components/ui/button";
 import { Panel } from "../../../components/ui/panel";
@@ -205,17 +204,17 @@ function DeploymentDetailPageInner() {
 
         {isLive && detail.liveUrl && (
           <Panel className="p-4">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-              <p className="text-[13px] text-white/70">Deployment is live at</p>
+              <p className="shrink-0 text-[13px] text-white/70">Live at</p>
               <a
                 href={detail.liveUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-[13px] text-violet-soft hover:underline"
+                className="flex min-w-0 items-center gap-1 text-[13px] text-violet-soft hover:underline"
               >
-                {detail.liveUrl}
-                <ExternalLink className="h-3 w-3" />
+                <span className="truncate">{detail.liveUrl}</span>
+                <ExternalLink className="h-3 w-3 shrink-0" />
               </a>
             </div>
           </Panel>
@@ -251,36 +250,27 @@ function DeploymentDetailPageInner() {
           </Panel>
         )}
 
-        <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
-          <LogsPanel logs={detail.logs} isRunning={isRunning} />
+        <div className="grid gap-5 min-w-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 space-y-5">
+            <LogsPanel logs={detail.logs} isRunning={isRunning} />
+          </div>
 
-          <div className="space-y-5">
+          <div className="min-w-0 space-y-4">
             <Panel className="p-5">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <p className="text-[14px] font-medium tracking-tight text-white">Infrastructure path</p>
-                <span className="font-mono text-[10.5px] uppercase tracking-wider text-white/35">ECS Fargate MVP</span>
-              </div>
-              <InfraDiagram />
-            </Panel>
-
-            <Panel className="p-5">
-              <p className="text-[14px] font-medium tracking-tight text-white">Timeline</p>
+              <p className="text-[13px] font-medium tracking-tight text-white">Timeline</p>
               <div className="mt-4 space-y-3">
                 {buildTimeline(detail.logs, detail.status).map((item) => (
                   <div key={item.label} className="flex items-start gap-3">
-                    <span className={`mt-1 h-2.5 w-2.5 rounded-full ${item.state === "done" ? "bg-emerald-400" : item.state === "active" ? "bg-violet-soft" : item.state === "failed" ? "bg-red-400" : "bg-white/20"}`} />
-                    <div>
+                    <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${item.state === "done" ? "bg-emerald-400" : item.state === "active" ? "bg-violet-soft" : item.state === "failed" ? "bg-red-400" : "bg-white/20"}`} />
+                    <div className="min-w-0">
                       <p className="text-[12.5px] font-medium text-white/75">{item.label}</p>
-                      <p className="mt-0.5 text-[11.5px] text-white/35">{item.detail}</p>
+                      <p className="mt-0.5 text-[11.5px] leading-[1.5] text-white/35">{item.detail}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </Panel>
-          </div>
 
-          {/* Plan summary */}
-          <div className="space-y-4">
             {suggestion && (
               <Panel className="p-5">
                 <div className="mb-4 flex items-center gap-2">
@@ -474,11 +464,11 @@ function DeploymentDetailPageInner() {
               <Panel key={artifact.kind} className="overflow-hidden">
                 <button
                   onClick={() => setExpandedArtifact(expandedArtifact === artifact.kind ? null : artifact.kind)}
-                  className="flex w-full items-center justify-between p-4 text-left"
+                  className="flex w-full items-center justify-between gap-3 p-4 text-left"
                 >
-                  <div>
-                    <p className="font-mono text-[13px] text-white">{artifact.path}</p>
-                    <p className="mt-0.5 text-[12px] text-white/40">{artifact.summary}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-mono text-[13px] text-white">{artifact.path}</p>
+                    <p className="mt-0.5 truncate text-[12px] text-white/40">{artifact.summary}</p>
                   </div>
                   {expandedArtifact === artifact.kind
                     ? <ChevronUp className="h-4 w-4 shrink-0 text-white/40" />
@@ -512,9 +502,9 @@ function DeploymentDetailPageInner() {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <dt className="text-white/40">{label}</dt>
-      <dd className="font-mono text-white/70 text-right">{value}</dd>
+    <div className="flex min-w-0 items-center justify-between gap-3">
+      <dt className="shrink-0 text-white/40">{label}</dt>
+      <dd className="min-w-0 truncate font-mono text-right text-white/70" title={value}>{value}</dd>
     </div>
   );
 }

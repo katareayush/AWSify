@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { PanelLeftClose } from "lucide-react";
 import { Mark } from "../landing/primitives/mark";
 import { navItems } from "./nav-data";
 import { useSidebar } from "./sidebar-context";
+import { SidebarRail } from "./sidebar-rail";
 
 interface SidebarProps {
   active: string;
@@ -11,17 +13,9 @@ interface SidebarProps {
 
 export function Sidebar({ active }: SidebarProps) {
   const { collapsed } = useSidebar();
+  if (collapsed) return <SidebarRail active={active} />;
   return (
-    <aside
-      aria-hidden={collapsed}
-      data-collapsed={collapsed}
-      inert={collapsed}
-      className={`group/sidebar z-30 hidden w-[260px] border-r bg-[#0a0a0d]/95 backdrop-blur-xl transition-[transform,opacity,border-color] duration-200 ease-out lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col ${
-        collapsed
-          ? "lg:-translate-x-full lg:border-transparent lg:opacity-0"
-          : "lg:translate-x-0 lg:border-white/[0.06] lg:opacity-100"
-      }`}
-    >
+    <aside className="z-30 hidden w-[260px] border-r border-white/[0.06] bg-[#0a0a0d]/95 backdrop-blur-xl lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col">
       <SidebarBrand />
       <SidebarNav active={active} />
       <SidebarFooter />
@@ -30,8 +24,9 @@ export function Sidebar({ active }: SidebarProps) {
 }
 
 function SidebarBrand() {
+  const { setCollapsed } = useSidebar();
   return (
-    <div className="flex h-16 items-center border-b border-white/[0.06] px-5">
+    <div className="flex h-16 items-center justify-between gap-2 border-b border-white/[0.06] pl-5 pr-3">
       <Link href="/" className="flex min-w-0 items-center gap-2.5" title="AWS-ify">
         <Mark />
         <div className="min-w-0 leading-tight">
@@ -39,6 +34,15 @@ function SidebarBrand() {
           <p className="truncate text-[11px] text-white/40">Personal workspace</p>
         </div>
       </Link>
+      <button
+        type="button"
+        onClick={() => setCollapsed(true)}
+        aria-label="Collapse sidebar"
+        title="Collapse sidebar (⌘\\)"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white"
+      >
+        <PanelLeftClose className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

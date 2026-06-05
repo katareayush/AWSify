@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Eye, EyeOff, KeyRound, Loader2, Save, Trash2 } from "lucide-react";
+import { Check, Eye, EyeOff, KeyRound, Loader2, Save, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Panel } from "../ui/panel";
 import { ConfirmDialog } from "../ui/confirm-dialog";
@@ -115,14 +115,16 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
       <div className="mb-4 flex items-center gap-2">
         <KeyRound className="h-4 w-4 text-violet-soft" />
         <p className="text-[13px] font-medium text-white">Environment variables</p>
-        <span className="ml-auto font-mono text-[11px] text-white/35">
-          {saved.length}/{allVars.length} saved
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 font-mono text-[10.5px] text-white/55">
+            {saved.length}/{allVars.length} saved
+          </span>
           {missingRequiredCount > 0 && (
-            <span className="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-300/90">
-              {missingRequiredCount} required missing
+            <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10.5px] font-medium text-amber-300">
+              {missingRequiredCount} missing
             </span>
           )}
-        </span>
+        </div>
       </div>
 
       {required.length > 0 && (
@@ -165,18 +167,19 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
         </div>
       )}
 
-      <Button
-        className="mt-4 w-full"
-        variant="secondary"
-        onClick={handleSave}
-        disabled={saving || !hasPendingChanges}
-      >
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-        {saving ? "Saving…" : "Save changes"}
-      </Button>
-      <p className="mt-2 text-[11px] text-white/35">
-        Leave a field blank to keep its saved value. Use the trash icon to remove a saved var.
-      </p>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className="text-[11px] text-white/35">
+          Blank fields keep their saved value.
+        </p>
+        <Button
+          variant="secondary"
+          onClick={handleSave}
+          disabled={saving || !hasPendingChanges}
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          {saving ? "Saving…" : "Save changes"}
+        </Button>
+      </div>
 
       <ConfirmDialog
         open={confirmDelete !== null}
@@ -214,32 +217,49 @@ interface EnvRowProps {
 
 function EnvRow({ envVar, value, isVisible, isDeleting, onChangeValue, onToggleVisible, onDelete }: EnvRowProps) {
   const saved = envVar.saved;
+  const hint = saved?.valuePreview ? lastChars(saved.valuePreview) : null;
+  const inputPaddingRight = onDelete ? "pr-[68px]" : "pr-10";
+
   return (
-    <label className="block">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <span className="font-mono text-[12px] text-white/75">{envVar.name}</span>
+    <label className="block rounded-lg border border-white/[0.06] bg-white/[0.015] p-3 transition-colors focus-within:border-white/[0.12]">
+      <div className="flex items-center justify-between gap-3">
+        <span className="truncate font-mono text-[12.5px] text-white">{envVar.name}</span>
         {saved ? (
-          <span className="font-mono text-[11px] text-emerald-400/80">saved {saved.valuePreview ?? ""}</span>
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10.5px] font-medium text-emerald-300">
+            <Check className="h-3 w-3" />
+            Saved
+          </span>
         ) : envVar.required ? (
-          <span className="text-[11px] text-amber-400/80">required</span>
+          <span className="shrink-0 rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10.5px] font-medium text-amber-300">
+            Required
+          </span>
         ) : (
-          <span className="text-[11px] text-white/40">optional</span>
+          <span className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.02] px-2 py-0.5 text-[10.5px] text-white/45">
+            Optional
+          </span>
         )}
       </div>
-      <div className="relative flex items-center gap-1.5">
+
+      {hint && (
+        <p className="mt-1 font-mono text-[10.5px] text-white/35">
+          Current value ends in <span className="text-white/55">{hint}</span>
+        </p>
+      )}
+
+      <div className="relative mt-2 flex items-center">
         <input
           value={value}
           onChange={(event) => onChangeValue(event.target.value)}
           type={isVisible ? "text" : "password"}
           autoComplete="off"
           spellCheck={false}
-          placeholder={saved ? "Leave blank to keep current value" : "Paste value"}
-          className="h-9 w-full rounded-lg border border-white/[0.08] bg-white/[0.03] pl-3 pr-10 font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40"
+          placeholder={saved ? "Update value…" : "Paste value"}
+          className={`h-9 w-full rounded-md border border-white/[0.08] bg-white/[0.03] pl-3 ${inputPaddingRight} font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40`}
         />
         <button
           type="button"
           onClick={onToggleVisible}
-          className="absolute right-12 flex h-7 w-7 items-center justify-center rounded text-white/40 hover:bg-white/[0.05] hover:text-white/80"
+          className={`absolute ${onDelete ? "right-10" : "right-1.5"} flex h-7 w-7 items-center justify-center rounded text-white/40 hover:bg-white/[0.05] hover:text-white/80`}
           aria-label={isVisible ? "Hide value" : "Show value"}
           tabIndex={-1}
         >
@@ -250,7 +270,7 @@ function EnvRow({ envVar, value, isVisible, isDeleting, onChangeValue, onToggleV
             type="button"
             onClick={onDelete}
             disabled={isDeleting}
-            className="absolute right-2 flex h-7 w-7 items-center justify-center rounded text-white/40 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
+            className="absolute right-1.5 flex h-7 w-7 items-center justify-center rounded text-white/40 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
             aria-label={`Delete ${envVar.name}`}
             tabIndex={-1}
           >
@@ -258,9 +278,15 @@ function EnvRow({ envVar, value, isVisible, isDeleting, onChangeValue, onToggleV
           </button>
         )}
       </div>
+
       {envVar.description && (
-        <p className="mt-1.5 text-[11px] leading-[1.5] text-white/40">{envVar.description}</p>
+        <p className="mt-2 text-[11px] leading-[1.5] text-white/40">{envVar.description}</p>
       )}
     </label>
   );
+}
+
+function lastChars(preview: string): string | null {
+  const match = preview.match(/[^*•·\s]+$/);
+  return match ? match[0] : null;
 }
