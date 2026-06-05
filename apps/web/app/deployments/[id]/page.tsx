@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { CheckCircle2, ChevronDown, ChevronUp, Cloud, ExternalLink, GitPullRequest, HeartPulse, KeyRound, Loader2, Play, RotateCw, Save, ServerCrash, TerminalSquare } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Cloud, ExternalLink, GitPullRequest, HeartPulse, Loader2, Play, RotateCw, Save, ServerCrash, TerminalSquare } from "lucide-react";
 import { PageHeading } from "../../../components/page-heading";
 import { InfraDiagram } from "../../../components/infra-diagram";
 import { ProductShell } from "../../../components/product-shell";
 import { Button } from "../../../components/ui/button";
 import { Panel } from "../../../components/ui/panel";
+import { EnvVarsPanel } from "../../../components/deployments/env-vars-panel";
 import { useAuth } from "../../../lib/use-auth";
 import { api, type CommitArtifactsResponse, type DeploymentDetail } from "../../../lib/api";
 
@@ -26,9 +27,7 @@ export default function DeploymentDetailPage() {
   const [detail, setDetail] = useState<DeploymentDetail | null>(null);
   const [fetching, setFetching] = useState(true);
   const [expandedArtifact, setExpandedArtifact] = useState<string | null>(null);
-  const [envValues, setEnvValues] = useState<Record<string, string>>({});
   const [runtimeValues, setRuntimeValues] = useState<{ port: string; healthPath: string }>({ port: "", healthPath: "/" });
-  const [savingEnv, setSavingEnv] = useState(false);
   const [savingRuntime, setSavingRuntime] = useState(false);
   const [approving, setApproving] = useState(false);
   const [rotatingToken, setRotatingToken] = useState(false);
@@ -117,20 +116,6 @@ export default function DeploymentDetailPage() {
     : [];
   const savedEnvNames = new Set((detail.projectEnvVars ?? []).map((envVar) => envVar.name));
   const missingRequiredEnv = envVars.filter((envVar) => envVar.required !== false && !savedEnvNames.has(envVar.name));
-
-  async function saveEnvVars() {
-    setSavingEnv(true);
-    setActionError(null);
-    try {
-      await api.saveDeploymentEnv(id, envValues);
-      setEnvValues({});
-      await fetchDetail();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSavingEnv(false);
-    }
-  }
 
   async function saveRuntimeSettings() {
     setSavingRuntime(true);
@@ -354,55 +339,13 @@ export default function DeploymentDetailPage() {
               </Panel>
             )}
 
-            {envVars.length > 0 && (
-              <Panel className="p-5">
-                <div className="mb-4 flex items-center gap-2">
-                  <KeyRound className="h-4 w-4 text-violet-soft" />
-                  <p className="text-[13px] font-medium text-white">Environment</p>
-                  <span className="ml-auto font-mono text-[11px] text-white/35">
-                    {savedEnvNames.size}/{envVars.length}
-                  </span>
-                </div>
-                <div className="space-y-3">
-                  {envVars.map((envVar) => {
-                    const saved = detail.projectEnvVars?.find((item) => item.name === envVar.name);
-                    return (
-                      <label key={envVar.name} className="block">
-                        <div className="mb-1 flex items-center justify-between gap-2">
-                          <span className="font-mono text-[12px] text-white/70">{envVar.name}</span>
-                          <span className={saved ? "text-[11px] text-emerald-400/80" : "text-[11px] text-amber-400/80"}>
-                            {saved ? `saved ${saved.valuePreview ?? ""}` : envVar.required === false ? "optional" : "required"}
-                          </span>
-                        </div>
-                        <input
-                          value={envValues[envVar.name] ?? ""}
-                          onChange={(event) => setEnvValues((current) => ({ ...current, [envVar.name]: event.target.value }))}
-                          type="password"
-                          autoComplete="off"
-                          placeholder={saved ? "Leave blank to keep saved value" : "Enter value"}
-                          disabled={!isAwaitingApproval}
-                          className="h-9 w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40"
-                        />
-                        {envVar.description && (
-                          <p className="mt-1 text-[11px] text-white/35">{envVar.description}</p>
-                        )}
-                      </label>
-                    );
-                  })}
-                </div>
-                {isAwaitingApproval && (
-                  <Button
-                    className="mt-4 w-full"
-                    variant="secondary"
-                    onClick={saveEnvVars}
-                    disabled={savingEnv || Object.values(envValues).every((value) => value.length === 0)}
-                  >
-                    {savingEnv ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    Save env vars
-                  </Button>
-                )}
-              </Panel>
-            )}
+            <EnvVarsPanel
+              deploymentId={id}
+              detected={envVars}
+              saved={detail.projectEnvVars ?? []}
+              onChange={async () => { await fetchDetail(); }}
+            />
+
 
             {detail.plan?.artifacts && detail.plan.artifacts.length > 0 && (
               <Panel className="p-5">

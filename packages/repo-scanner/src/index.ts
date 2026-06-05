@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { ComputeTarget, DeploymentSuggestion } from "@awsify/deployment-schemas";
+import { detectEnvVars } from "./env-vars.js";
 
 export interface KeyFile {
   path: string;
@@ -105,7 +106,7 @@ function scanNode(root: string, hasDockerfile: boolean, signals: string[]): Repo
   if (isNext) signals.push("Next.js detected");
   if (isExpress) signals.push("Express detected");
 
-  const envVars = findEnvVars(root, ["ts", "tsx", "js", "jsx", "mjs"]);
+  const envVars = detectEnvVars(root, ["ts", "tsx", "js", "jsx", "mjs"]);
   const { databaseRequired, databaseEngine } = detectDatabase(deps, envVars);
   const cacheRequired = detectRedis(deps);
 
@@ -245,28 +246,6 @@ function detectPort(root: string, extensions: string[]): number | undefined {
     if (Number.isInteger(port) && port > 0 && port < 65536) return port;
   }
   return undefined;
-}
-
-function findEnvVars(root: string, extensions: string[]): DeploymentSuggestion["envVars"] {
-  const names = new Set<string>();
-  const patterns = [
-    /process\.env\.([A-Z_][A-Z0-9_]*)/g,
-    /os\.environ\.get\(['"]([A-Z_][A-Z0-9_]*)['"]/g,
-    /os\.environ\[['"]([A-Z_][A-Z0-9_]*)['"]\]/g,
-    /os\.Getenv\(['"]([A-Z_][A-Z0-9_]*)['"]\)/g
-  ];
-
-  for (const file of collectSourceFiles(root, extensions)) {
-    const content = readFileSafe(file);
-    for (const pattern of patterns) {
-      for (const match of content.matchAll(pattern)) names.add(match[1]);
-    }
-  }
-
-  return [...names].sort().map(name => ({
-    name,
-    required: name !== "NODE_ENV" && name !== "PORT"
-  }));
 }
 
 function collectSourceFiles(root: string, extensions: string[], depth = 0): string[] {

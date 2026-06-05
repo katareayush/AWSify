@@ -123,6 +123,11 @@ export const api = {
       body: JSON.stringify({ env })
     }),
 
+  deleteDeploymentEnv: (id: string, name: string) =>
+    req<{ deleted: string }>(`/deployments/${id}/env/${encodeURIComponent(name)}`, {
+      method: "DELETE"
+    }),
+
   saveDeploymentRuntime: (id: string, body: { port: number; healthPath: string }) =>
     req<{ suggestion: Record<string, unknown> }>(`/deployments/${id}/runtime`, {
       method: "POST",

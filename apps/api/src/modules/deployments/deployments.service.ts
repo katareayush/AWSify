@@ -151,7 +151,6 @@ export class DeploymentsService {
       include: { plan: true }
     });
     if (!deployment) return { error: "not_found" };
-    if (deployment.plan.status !== "awaiting_approval") return { error: "plan_not_awaiting_approval" };
 
     const suggestion = deploymentSuggestionSchema.safeParse(deployment.plan.suggestion);
     if (!suggestion.success) return { error: "plan_not_ready" };
@@ -183,6 +182,22 @@ export class DeploymentsService {
     );
 
     return { saved: entries.map(([name]) => name) };
+  }
+
+  async deleteEnvVar(deploymentId: string, sessionToken: string | undefined, name: string) {
+    const userId = this.getUserId(sessionToken);
+    if (!userId) return { error: "not_authenticated" };
+    if (!/^[A-Z_][A-Z0-9_]*$/.test(name)) return { error: "invalid_env_var_name" };
+
+    const deployment = await this.prisma.deployment.findFirst({
+      where: { id: deploymentId, actorUserId: userId }
+    });
+    if (!deployment) return { error: "not_found" };
+
+    await this.prisma.projectEnvVar.deleteMany({
+      where: { projectId: deployment.projectId, name }
+    });
+    return { deleted: name };
   }
 
   async saveRuntimeSettings(

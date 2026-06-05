@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Headers, Param, Post, Req } from "@nestjs/common";
 import type { Request } from "express";
 import { SESSION_COOKIE } from "../github/session-cookie";
 import { DeploymentsService } from "./deployments.service";
@@ -42,6 +42,12 @@ export class DeploymentsController {
   ) {
     const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
     return this.deployments.saveEnvVars(id, token, body);
+  }
+
+  @Delete(":id/env/:name")
+  deleteEnvVar(@Req() req: Request, @Param("id") id: string, @Param("name") name: string) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    return this.deployments.deleteEnvVar(id, token, name);
   }
 
   @Post(":id/runtime")
