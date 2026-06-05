@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useUrlNumber } from "../../lib/use-url-state";
 import { ArrowRight, FileCode2 } from "lucide-react";
 import { PageHeading } from "../../components/page-heading";
 import { ProductShell } from "../../components/product-shell";
@@ -9,6 +10,7 @@ import { Button } from "../../components/ui/button";
 import { Panel } from "../../components/ui/panel";
 import { Pagination } from "../../components/ui/pagination";
 import { PageSkeleton } from "../../components/ui/skeleton";
+import { EmptyState } from "../../components/ui/empty-state";
 import { useAuth } from "../../lib/use-auth";
 import { useToast } from "../../components/ui/toast";
 import { api, type Deployment } from "../../lib/api";
@@ -23,10 +25,18 @@ function statusColor(s: string) {
 }
 
 export default function DeploymentsPage() {
+  return (
+    <Suspense fallback={null}>
+      <DeploymentsPageInner />
+    </Suspense>
+  );
+}
+
+function DeploymentsPageInner() {
   const { me, loading } = useAuth();
   const toast = useToast();
   const [deployments, setDeployments] = useState<Deployment[]>([]);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useUrlNumber("page", 0);
 
   useEffect(() => {
     if (!me?.authenticated) return;
@@ -42,14 +52,14 @@ export default function DeploymentsPage() {
 
   if (loading) {
     return (
-      <ProductShell active="Templates">
+      <ProductShell active="Deployments">
         <PageSkeleton variant="list" />
       </ProductShell>
     );
   }
 
   return (
-    <ProductShell active="Templates">
+    <ProductShell active="Deployments">
       <div className="space-y-5">
         <PageHeading
           eyebrow="Deployment plans"
@@ -59,21 +69,19 @@ export default function DeploymentsPage() {
 
         <Panel className="p-5">
           {deployments.length === 0 ? (
-            <div className="py-14 text-center">
-              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03]">
-                <FileCode2 className="h-5 w-5 text-violet-soft" />
-              </div>
-              <p className="mt-5 text-[14px] font-medium text-white">No deployment plans yet</p>
-              <p className="mx-auto mt-2 max-w-md text-[13px] leading-[1.6] text-white/55">
-                Select a connected repository and deploy it. AWS-ify generates a plan before creating any AWS resources.
-              </p>
-              <Button asChild variant="secondary" className="mt-5">
-                <Link href="/repositories">
-                  Choose repository
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
+            <EmptyState
+              icon={FileCode2}
+              title="No deployment plans yet"
+              description="Select a connected repository and deploy it. AWS-ify generates a plan before creating any AWS resources."
+              action={
+                <Button asChild variant="secondary">
+                  <Link href="/repositories">
+                    Choose repository
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              }
+            />
           ) : (
             <>
               <div className="divide-y divide-white/[0.05]">

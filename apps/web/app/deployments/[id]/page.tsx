@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { CheckCircle2, ChevronDown, ChevronUp, Cloud, ExternalLink, GitPullRequest, HeartPulse, Loader2, Play, RotateCw, Save, TerminalSquare } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Cloud, ExternalLink, GitPullRequest, HeartPulse, Loader2, Play, RotateCw, Save } from "lucide-react";
 import { PageHeading } from "../../../components/page-heading";
 import { InfraDiagram } from "../../../components/infra-diagram";
 import { ProductShell } from "../../../components/product-shell";
@@ -10,6 +10,7 @@ import { Button } from "../../../components/ui/button";
 import { Panel } from "../../../components/ui/panel";
 import { EnvVarsPanel } from "../../../components/deployments/env-vars-panel";
 import { FailurePanel } from "../../../components/deployments/failure-panel";
+import { LogsPanel } from "../../../components/deployments/logs-panel";
 import { PageSkeleton } from "../../../components/ui/skeleton";
 import { useToast } from "../../../components/ui/toast";
 import { useAuth } from "../../../lib/use-auth";
@@ -25,6 +26,14 @@ function statusColor(s: string) {
 }
 
 export default function DeploymentDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <DeploymentDetailPageInner />
+    </Suspense>
+  );
+}
+
+function DeploymentDetailPageInner() {
   const { me, loading } = useAuth();
   const toast = useToast();
   const { id } = useParams<{ id: string }>();
@@ -39,7 +48,6 @@ export default function DeploymentDetailPage() {
   const [committingArtifacts, setCommittingArtifacts] = useState(false);
   const [commitResult, setCommitResult] = useState<CommitArtifactsResponse | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const logsEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function fetchDetail() {
@@ -77,10 +85,6 @@ export default function DeploymentDetailPage() {
   }, [me?.authenticated, id]);
 
   useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [detail?.logs.length]);
-
-  useEffect(() => {
     const suggestion = detail?.plan?.suggestion as Record<string, unknown> | undefined;
     if (!suggestion) return;
     setRuntimeValues({
@@ -91,7 +95,7 @@ export default function DeploymentDetailPage() {
 
   if (loading || fetching) {
     return (
-      <ProductShell active="Templates">
+      <ProductShell active="Deployments">
         <PageSkeleton variant="detail" />
       </ProductShell>
     );
@@ -99,7 +103,7 @@ export default function DeploymentDetailPage() {
 
   if (!detail) {
     return (
-      <ProductShell active="Templates">
+      <ProductShell active="Deployments">
         <div className="py-24 text-center">
           <p className="text-[14px] font-medium text-white">Deployment not found</p>
         </div>
@@ -185,7 +189,7 @@ export default function DeploymentDetailPage() {
   }
 
   return (
-    <ProductShell active="Templates">
+    <ProductShell active="Deployments">
       <div className="space-y-5">
         <PageHeading
           eyebrow={detail.project.repoFullName}
@@ -248,33 +252,7 @@ export default function DeploymentDetailPage() {
         )}
 
         <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
-          {/* Logs */}
-          <Panel className="p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <TerminalSquare className="h-4 w-4 text-violet-soft" />
-              <p className="text-[14px] font-medium tracking-tight text-white">Deployment logs</p>
-              {isRunning && <Loader2 className="h-3.5 w-3.5 animate-spin text-white/40 ml-auto" />}
-            </div>
-            <div className="h-[360px] overflow-y-auto rounded-lg border border-white/[0.06] bg-black/40 p-4 font-mono text-[12px] leading-[1.7]">
-              {detail.logs.length === 0 ? (
-                <span className="text-white/30">Waiting for logs...</span>
-              ) : (
-                detail.logs.map((log, i) => (
-                  <div key={i} className="flex gap-3">
-                    <span className="shrink-0 text-white/25">{new Date(log.at).toLocaleTimeString()}</span>
-                    <span className={
-                      log.status === "failed" ? "text-red-400" :
-                      log.status === "deployed" ? "text-emerald-400" :
-                      "text-white/70"
-                    }>
-                      {log.message}
-                    </span>
-                  </div>
-                ))
-              )}
-              <div ref={logsEndRef} />
-            </div>
-          </Panel>
+          <LogsPanel logs={detail.logs} isRunning={isRunning} />
 
           <div className="space-y-5">
             <Panel className="p-5">

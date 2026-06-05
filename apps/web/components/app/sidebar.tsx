@@ -88,7 +88,11 @@ function SidebarNavItem({
 
 function SidebarFooter() {
   return (
-    <div className="border-t border-white/[0.06] p-4">
+    <div className="space-y-2 border-t border-white/[0.06] p-4">
+      <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[12px] text-white/55">
+        <span>Command palette</span>
+        <kbd className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-white/60">⌘ K</kbd>
+      </div>
       <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
         <p className="font-mono text-[10px] uppercase tracking-wider text-white/35">
           status

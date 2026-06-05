@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useUrlNumber, useUrlState } from "../../lib/use-url-state";
 import { AlertTriangle, ArrowRight, Github, KeyRound, Loader2, Lock, RefreshCw, Search } from "lucide-react";
 import { PageHeading } from "../../components/page-heading";
 import { ProductShell } from "../../components/product-shell";
@@ -10,6 +11,7 @@ import { Button } from "../../components/ui/button";
 import { Panel } from "../../components/ui/panel";
 import { Pagination } from "../../components/ui/pagination";
 import { PageSkeleton } from "../../components/ui/skeleton";
+import { EmptyState } from "../../components/ui/empty-state";
 import { useAuth } from "../../lib/use-auth";
 import { useToast } from "../../components/ui/toast";
 import { api, type Repo, type AwsConnection } from "../../lib/api";
@@ -17,13 +19,21 @@ import { api, type Repo, type AwsConnection } from "../../lib/api";
 const PAGE_SIZE = 10;
 
 export default function RepositoriesPage() {
+  return (
+    <Suspense fallback={null}>
+      <RepositoriesPageInner />
+    </Suspense>
+  );
+}
+
+function RepositoriesPageInner() {
   const { me, loading } = useAuth();
   const router = useRouter();
   const toast = useToast();
   const [repos, setRepos] = useState<Repo[]>([]);
   const [connections, setConnections] = useState<AwsConnection[]>([]);
-  const [query, setQuery] = useState("");
-  const [page, setPage] = useState(0);
+  const [query, setQuery] = useUrlState("q", "");
+  const [page, setPage] = useUrlNumber("page", 0);
   const [deploying, setDeploying] = useState<string | null>(null);
   const [reposLoading, setReposLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -167,22 +177,25 @@ export default function RepositoriesPage() {
                 <span className="text-[13px]">Loading repositories…</span>
               </div>
             ) : filtered.length === 0 ? (
-              <div className="py-14 text-center">
-                <p className="text-[14px] font-medium text-white">
-                  {repos.length === 0 ? "No repositories connected" : "No results"}
-                </p>
-                <p className="mx-auto mt-2 max-w-md text-[13px] leading-[1.6] text-white/55">
-                  {repos.length === 0
-                    ? "Install the GitHub App to list repositories here."
-                    : "Try a different search term."}
-                </p>
-                {repos.length === 0 && (
-                  <Button className="mt-5" variant="secondary" onClick={handleInstallApp}>
-                    <Github className="h-4 w-4" />
-                    Install GitHub App
-                  </Button>
-                )}
-              </div>
+              repos.length === 0 ? (
+                <EmptyState
+                  icon={Github}
+                  title="No repositories connected"
+                  description="Install the GitHub App to list repositories here."
+                  action={
+                    <Button variant="secondary" onClick={handleInstallApp}>
+                      <Github className="h-4 w-4" />
+                      Install GitHub App
+                    </Button>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  icon={Search}
+                  title="No results"
+                  description="Try a different search term."
+                />
+              )
             ) : (
               paginated.map(repo => (
                 <div

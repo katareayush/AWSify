@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, Cloud, KeyRound, TerminalSquare } from "lucide-react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useUrlNumber } from "../../lib/use-url-state";
+import { ArrowRight, CheckCircle2, Cloud, KeyRound, Rocket, TerminalSquare } from "lucide-react";
 import { ProductShell } from "../../components/product-shell";
 import { DeploymentRow } from "../../components/dashboard/deployment-row";
 import { SetupBanner } from "../../components/dashboard/setup-banner";
 import { StatStrip, type StatItem } from "../../components/dashboard/stat-strip";
 import { Button } from "../../components/ui/button";
+import { EmptyState } from "../../components/ui/empty-state";
 import { Pagination } from "../../components/ui/pagination";
 import { PageSkeleton } from "../../components/ui/skeleton";
 import { useAuth } from "../../lib/use-auth";
@@ -17,11 +19,19 @@ import { api, type Deployment, type AwsConnection } from "../../lib/api";
 const PAGE_SIZE = 6;
 
 export default function DashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardPageInner />
+    </Suspense>
+  );
+}
+
+function DashboardPageInner() {
   const { me, loading } = useAuth();
   const toast = useToast();
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [connections, setConnections] = useState<AwsConnection[]>([]);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useUrlNumber("page", 0);
 
   useEffect(() => {
     if (!me?.authenticated) return;
@@ -40,7 +50,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <ProductShell active="Deployments">
+      <ProductShell active="Overview">
         <PageSkeleton />
       </ProductShell>
     );
@@ -60,7 +70,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <ProductShell active="Deployments">
+    <ProductShell active="Overview">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-[22px] font-medium tracking-tight text-white">Deployments</h1>
@@ -90,7 +100,19 @@ export default function DashboardPage() {
           </div>
 
           {deployments.length === 0 ? (
-            <EmptyState canDeploy={canDeploy} />
+            <EmptyState
+              icon={Rocket}
+              title="No deployments yet"
+              description={canDeploy ? "Select a repository to create your first deployment." : "Connect AWS and install the GitHub App to deploy your first repository."}
+              action={canDeploy ? (
+                <Button asChild variant="secondary">
+                  <Link href="/repositories">
+                    Select repository
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              ) : undefined}
+            />
           ) : (
             <>
               <div className="divide-y divide-white/[0.04]">
@@ -115,19 +137,3 @@ export default function DashboardPage() {
   );
 }
 
-function EmptyState({ canDeploy }: { canDeploy: boolean }) {
-  return (
-    <div className="px-5 py-12 text-center">
-      <p className="text-[13px] text-white/55">No deployments yet</p>
-      {canDeploy && (
-        <Link
-          href="/repositories"
-          className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] text-white/70 transition-colors hover:text-white"
-        >
-          Select repository
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
-      )}
-    </div>
-  );
-}

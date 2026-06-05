@@ -56,7 +56,15 @@ export function TopBar() {
         >
           <Search className="h-3.5 w-3.5" />
           Search AWS-ify
-          <kbd className="ml-3 hidden rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-white/45 md:inline-block">⌘ K</kbd>
+          <kbd className="ml-3 rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-white/45">⌘ K</kbd>
+        </button>
+        <button
+          type="button"
+          onClick={openPalette}
+          aria-label="Open command palette"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.02] text-white/45 transition-colors hover:border-white/[0.14] hover:text-white/70 sm:hidden"
+        >
+          <Search className="h-3.5 w-3.5" />
         </button>
       </div>
 
