@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Mark } from "./primitives/mark";
 import { Wordmark } from "./primitives/wordmark";
 import { footerColumns } from "./data";
 
@@ -21,9 +20,8 @@ export function Footer() {
 function Brand() {
   return (
     <div>
-      <Link href="/" className="flex items-center gap-2.5">
-        <Mark />
-        <Wordmark size={16} />
+      <Link href="/" className="flex items-center">
+        <Wordmark size={18} />
       </Link>
       <p className="mt-5 max-w-sm text-[13.5px] leading-[1.6] text-white/45">
         A control plane between your repository and AWS. Reviewed templates.

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowRight, Github, KeyRound, Loader2, ScanLine, ShieldCheck, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AppRoot } from "../../components/app";
-import { Mark } from "../../components/landing/primitives/mark";
+import { Wordmark } from "../../components/landing/primitives/wordmark";
 import { Button } from "../../components/ui/button";
 import { api } from "../../lib/api";
 
@@ -150,9 +150,8 @@ function AuthErrorMessage({ message, onDismiss }: { message: string; onDismiss: 
 function TopNav() {
   return (
     <header className="flex h-14 items-center border-b border-white/[0.05] px-5">
-      <Link href="/" className="flex items-center gap-2.5">
-        <Mark />
-        <span className="text-[14px] font-medium tracking-tight text-white">AWS-ify</span>
+      <Link href="/" className="flex items-center">
+        <Wordmark size={16} />
       </Link>
     </header>
   );

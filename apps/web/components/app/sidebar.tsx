@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { PanelLeftClose } from "lucide-react";
-import { Mark } from "../landing/primitives/mark";
 import { Wordmark } from "../landing/primitives/wordmark";
 import { navItems } from "./nav-data";
 import { useSidebar } from "./sidebar-context";
@@ -28,10 +27,9 @@ function SidebarBrand() {
   const { setCollapsed } = useSidebar();
   return (
     <div className="flex h-16 items-center justify-between gap-2 border-b border-white/[0.06] pl-5 pr-3">
-      <Link href="/" className="flex min-w-0 items-center gap-2.5" title="AWS-ify">
-        <Mark />
+      <Link href="/" className="flex min-w-0 items-center" title="AWS-ify">
         <div className="min-w-0 leading-tight">
-          <Wordmark size={15} />
+          <Wordmark size={17} />
           <p className="mt-1 truncate text-[11px] text-white/40">Personal workspace</p>
         </div>
       </Link>

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { Mark } from "./primitives/mark";
 import { Wordmark } from "./primitives/wordmark";
 import { navLinks } from "./data";
 
@@ -52,9 +51,8 @@ function NavRing() {
 
 function Brand() {
   return (
-    <Link href="/" className="relative z-10 flex shrink-0 items-center gap-2.5">
-      <Mark />
-      <Wordmark size={16} />
+    <Link href="/" className="relative z-10 flex shrink-0 items-center">
+      <Wordmark size={18} />
     </Link>
   );
 }

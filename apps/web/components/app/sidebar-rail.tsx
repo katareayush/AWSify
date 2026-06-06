@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { Mark } from "../landing/primitives/mark";
 import { navItems } from "./nav-data";
 import { useSidebar } from "./sidebar-context";
 
@@ -14,11 +13,7 @@ export function SidebarRail({ active }: SidebarRailProps) {
   const { setCollapsed } = useSidebar();
   return (
     <aside className="z-30 hidden w-14 border-r border-white/[0.06] bg-[#0a0a0d]/95 backdrop-blur-xl lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col">
-      <div className="flex h-16 items-center justify-center border-b border-white/[0.06]">
-        <Link href="/" title="AWS-ify">
-          <Mark />
-        </Link>
-      </div>
+      <div className="h-16 border-b border-white/[0.06]" />
       <nav className="flex-1 space-y-1 px-2 py-4">
         {navItems.map((item) => {
           const isActive = item.label === active;

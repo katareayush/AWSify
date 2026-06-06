@@ -4,10 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import { Button } from "../ui/button";
-import { Mark } from "../landing/primitives/mark";
+import { Wordmark } from "../landing/primitives/wordmark";
 import { api, type Me } from "../../lib/api";
 import { CommandPalette } from "./command-palette";
-import { SidebarToggle } from "./sidebar-toggle";
 
 export function TopBar() {
   const [me, setMe] = useState<Me | null>(null);
@@ -44,11 +43,8 @@ export function TopBar() {
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-white/[0.06] bg-black/40 px-4 backdrop-blur-xl sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
         <Link href="/" className="lg:hidden">
-          <Mark />
+          <Wordmark size={16} />
         </Link>
-        <div className="hidden lg:flex">
-          <SidebarToggle />
-        </div>
         <button
           type="button"
           onClick={openPalette}
