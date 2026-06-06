@@ -118,7 +118,7 @@ export const api = {
   getDeployment: (id: string) => req<{ deployment: DeploymentDetail }>(`/deployments/${id}`),
 
   saveDeploymentEnv: (id: string, env: Record<string, string>) =>
-    req<{ saved: string[] }>(`/deployments/${id}/env`, {
+    req<{ saved: string[]; added: string[] }>(`/deployments/${id}/env`, {
       method: "POST",
       body: JSON.stringify({ env })
     }),

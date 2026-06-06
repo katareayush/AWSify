@@ -155,14 +155,22 @@ export class DeploymentsService {
     const suggestion = deploymentSuggestionSchema.safeParse(deployment.plan.suggestion);
     if (!suggestion.success) return { error: "plan_not_ready" };
 
-    const allowed = new Map(suggestion.data.envVars.map((envVar) => [envVar.name, envVar]));
+    const NAME_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
     const entries = Object.entries(input.env ?? {}).filter(([, value]) => value.length > 0);
-    const unsupported = entries.map(([name]) => name).filter((name) => !allowed.has(name));
-    if (unsupported.length > 0) return { error: `unsupported_env_vars: ${unsupported.join(", ")}` };
+    const invalid = entries.map(([name]) => name).filter((name) => !NAME_PATTERN.test(name));
+    if (invalid.length > 0) return { error: `invalid_env_var_names: ${invalid.join(", ")}` };
+
+    // Vars in the suggestion keep their detected metadata. User-added vars
+    // are treated as optional + category "custom" so the UI can flag them.
+    const detected = new Map(suggestion.data.envVars.map((envVar) => [envVar.name, envVar]));
+    const userAdded: typeof suggestion.data.envVars = [];
 
     await this.prisma.$transaction(
       entries.map(([name, value]) => {
-        const requirement = allowed.get(name);
+        const det = detected.get(name);
+        if (!det) {
+          userAdded.push({ name, required: false, category: "custom" });
+        }
         return this.prisma.projectEnvVar.upsert({
           where: { projectId_name: { projectId: deployment.projectId, name } },
           create: {
@@ -170,18 +178,31 @@ export class DeploymentsService {
             name,
             encryptedValue: encryptSecret(value),
             valuePreview: previewSecret(value),
-            required: requirement?.required ?? true
+            required: det?.required ?? false
           },
           update: {
             encryptedValue: encryptSecret(value),
             valuePreview: previewSecret(value),
-            required: requirement?.required ?? true
+            required: det?.required ?? false
           }
         });
       })
     );
 
-    return { saved: entries.map(([name]) => name) };
+    // Persist user-added vars onto the plan's suggestion so the panel keeps
+    // showing them on reload, and so future re-scans don't drop them.
+    if (userAdded.length > 0 && deployment.plan.status === "awaiting_approval") {
+      const nextSuggestion = {
+        ...suggestion.data,
+        envVars: [...suggestion.data.envVars, ...userAdded]
+      };
+      await this.prisma.deploymentPlan.update({
+        where: { id: deployment.planId },
+        data: { suggestion: nextSuggestion as object }
+      });
+    }
+
+    return { saved: entries.map(([name]) => name), added: userAdded.map((envVar) => envVar.name) };
   }
 
   async deleteEnvVar(deploymentId: string, sessionToken: string | undefined, name: string) {
@@ -333,15 +354,19 @@ export class DeploymentsService {
     const hasArtifacts = deployment.plan.artifacts.length > 0;
     if (!hasSuggestion || !hasResources || !hasArtifacts) return { error: "plan_not_ready" };
 
+    // We *warn* about missing required env vars but no longer block approval.
+    // Required-detection is heuristic; sometimes it's wrong, and the user
+    // is the final arbiter. The deploy may still fail at runtime if the app
+    // really needs them — surfaced in logs.
     const requiredEnvNames = suggestion.data.envVars.filter((envVar) => envVar.required).map((envVar) => envVar.name);
+    let missingRequired: string[] = [];
     if (requiredEnvNames.length > 0) {
       const stored = await this.prisma.projectEnvVar.findMany({
         where: { projectId: deployment.projectId, name: { in: requiredEnvNames } },
         select: { name: true }
       });
       const storedNames = new Set(stored.map((envVar) => envVar.name));
-      const missing = requiredEnvNames.filter((name) => !storedNames.has(name));
-      if (missing.length > 0) return { error: `missing_env_vars: ${missing.join(", ")}` };
+      missingRequired = requiredEnvNames.filter((name) => !storedNames.has(name));
     }
 
     await this.prisma.deploymentPlan.update({
@@ -349,11 +374,15 @@ export class DeploymentsService {
       data: { status: "approved", approvedAt: new Date() }
     });
 
+    const approvalLog = missingRequired.length > 0
+      ? `Plan approved with ${missingRequired.length} unset required var${missingRequired.length === 1 ? "" : "s"} (${missingRequired.join(", ")}); deployment queued — may fail at runtime if app needs them.`
+      : "Plan approved; deployment queued.";
+
     await this.updateStatus(deployment.id, {
       status: "queued",
       appendLog: {
         status: "queued",
-        message: "Plan approved; deployment queued.",
+        message: approvalLog,
         at: new Date().toISOString()
       }
     });
@@ -368,7 +397,11 @@ export class DeploymentsService {
       deploymentId: deployment.id
     });
 
-    return { deploymentId: deployment.id, status: "queued" };
+    return {
+      deploymentId: deployment.id,
+      status: "queued",
+      ...(missingRequired.length > 0 ? { warning: { missingRequired } } : {})
+    };
   }
 
   async updateStatus(

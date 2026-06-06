@@ -97,7 +97,7 @@ function DeploymentDetailPageInner() {
   const isAwaitingApproval = detail.status === "awaiting_approval";
   const suggestion = (detail.plan?.suggestion as Record<string, unknown> | null) ?? null;
   const envVars = Array.isArray(suggestion?.envVars)
-    ? (suggestion.envVars as Array<{ name: string; required?: boolean; description?: string }>)
+    ? (suggestion.envVars as Array<{ name: string; required?: boolean; description?: string; example?: string; category?: string }>)
     : [];
   const savedEnvNames = new Set((detail.projectEnvVars ?? []).map((envVar) => envVar.name));
   const missingRequiredEnv = envVars.filter((envVar) => envVar.required !== false && !savedEnvNames.has(envVar.name));
@@ -159,14 +159,14 @@ function DeploymentDetailPageInner() {
                 </p>
                 {missingRequiredEnv.length > 0 && (
                   <p className="mt-2 text-[12px] text-amber-300/85">
-                    {missingRequiredEnv.length} required env var{missingRequiredEnv.length === 1 ? "" : "s"} missing — add them below before approving.
+                    Heads up: {missingRequiredEnv.length} variable{missingRequiredEnv.length === 1 ? "" : "s"} marked required ({missingRequiredEnv.slice(0, 3).map((envVar) => envVar.name).join(", ")}{missingRequiredEnv.length > 3 ? "…" : ""}) {missingRequiredEnv.length === 1 ? "is" : "are"} unset. You can approve anyway — the deploy may fail at runtime if the app needs them.
                   </p>
                 )}
                 {actionError && <p className="mt-3 font-mono text-[12px] text-red-400">{actionError}</p>}
               </div>
               <Button
                 onClick={approveDeployment}
-                disabled={approving || missingRequiredEnv.length > 0}
+                disabled={approving}
                 className="shrink-0"
               >
                 {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
@@ -185,7 +185,7 @@ function DeploymentDetailPageInner() {
           <div className="min-w-0 space-y-4">
             <TimelinePanel logs={detail.logs} status={detail.status} />
 
-            {envVars.length + (detail.projectEnvVars?.length ?? 0) > 0 && (
+            {(isAwaitingApproval || envVars.length + (detail.projectEnvVars?.length ?? 0) > 0) && (
               <EnvVarsPanel
                 deploymentId={id}
                 detected={envVars}

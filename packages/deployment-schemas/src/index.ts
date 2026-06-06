@@ -1,6 +1,16 @@
 import { z } from "zod";
 
-export const supportedAppTypeSchema = z.enum(["node-backend", "nextjs-app"]);
+export const supportedAppTypeSchema = z.enum([
+  "node-backend",
+  "nextjs-app",
+  "static-spa",
+  "python-backend",
+  "go-backend",
+  "ruby-backend",
+  "java-backend",
+  "rust-backend",
+  "php-backend"
+]);
 
 export const computeTargetSchema = z.enum(["ecs-fargate"]);
 
@@ -21,10 +31,26 @@ export const healthPathSchema = z
   })
   .default("/");
 
+export const envVarCategorySchema = z.enum([
+  "secret",
+  "config",
+  "feature-flag",
+  "build-time",
+  "integration",
+  "custom"
+]);
+
+export type EnvVarCategory = z.infer<typeof envVarCategorySchema>;
+
 export const envVarSchema = z.object({
   name: z.string().regex(/^[A-Z_][A-Z0-9_]*$/),
-  required: z.boolean().default(true),
+  // Default to optional. `required: true` should be set only when the
+  // app demonstrably cannot start without the variable (no default in
+  // .env.example AND used unguarded in source).
+  required: z.boolean().default(false),
   description: z.string().max(300).optional(),
+  example: z.string().max(200).optional(),
+  category: envVarCategorySchema.optional(),
   valuePreview: z.string().max(120).optional()
 });
 

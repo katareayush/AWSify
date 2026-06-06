@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Mark } from "./primitives/mark";
+import { Wordmark } from "./primitives/wordmark";
 import { navLinks } from "./data";
 
 export function Nav() {
@@ -53,7 +54,7 @@ function Brand() {
   return (
     <Link href="/" className="relative z-10 flex shrink-0 items-center gap-2.5">
       <Mark />
-      <span className="text-[15px] font-medium tracking-tight text-white">AWS-ify</span>
+      <Wordmark size={16} />
     </Link>
   );
 }

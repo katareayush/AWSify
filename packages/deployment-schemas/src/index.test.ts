@@ -74,6 +74,50 @@ describe("deploymentSuggestionSchema", () => {
     expect(isValidHealthPath("/health space")).toBe(false);
   });
 
+  it("accepts the new env-var category + example fields", () => {
+    const result = deploymentSuggestionSchema.parse({
+      appType: "node-backend",
+      services: ["backend"],
+      packageManager: "npm",
+      buildCommand: "npm run build",
+      startCommand: "npm start",
+      installCommand: "npm ci",
+      port: 3000,
+      hasDockerfile: false,
+      envVars: [
+        { name: "DATABASE_URL", required: true, description: "Primary Postgres connection.", example: "postgres://u:p@h/db", category: "integration" },
+        { name: "FEATURE_NEW_UI", required: false, category: "feature-flag" },
+        { name: "CUSTOM_THING", required: false, category: "custom" }
+      ],
+      database: { required: false },
+      confidence: 0.8,
+      notes: []
+    });
+
+    expect(result.envVars[0].example).toBe("postgres://u:p@h/db");
+    expect(result.envVars[0].category).toBe("integration");
+    expect(result.envVars[1].category).toBe("feature-flag");
+    expect(result.envVars[2].category).toBe("custom");
+  });
+
+  it("rejects unknown env-var category values", () => {
+    const result = deploymentSuggestionSchema.safeParse({
+      appType: "node-backend",
+      services: ["backend"],
+      packageManager: "npm",
+      buildCommand: "npm run build",
+      startCommand: "npm start",
+      installCommand: "npm ci",
+      port: 3000,
+      hasDockerfile: false,
+      envVars: [{ name: "WAT", required: false, category: "nonsense" }],
+      database: { required: false },
+      confidence: 0.5,
+      notes: []
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("rejects unsupported AWS resources disguised as services", () => {
     const result = deploymentSuggestionSchema.safeParse({
       appType: "node-backend",
