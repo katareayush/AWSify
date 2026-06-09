@@ -9,16 +9,17 @@ import { SidebarRail } from "./sidebar-rail";
 
 interface SidebarProps {
   active: string;
+  onOpenCommandPalette: () => void;
 }
 
-export function Sidebar({ active }: SidebarProps) {
+export function Sidebar({ active, onOpenCommandPalette }: SidebarProps) {
   const { collapsed } = useSidebar();
-  if (collapsed) return <SidebarRail active={active} />;
+  if (collapsed) return <SidebarRail active={active} onOpenCommandPalette={onOpenCommandPalette} />;
   return (
     <aside className="z-30 hidden w-[260px] border-r border-white/[0.06] bg-[#0a0a0d]/95 backdrop-blur-xl lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col">
       <SidebarBrand />
       <SidebarNav active={active} />
-      <SidebarFooter />
+      <SidebarFooter onOpenCommandPalette={onOpenCommandPalette} />
     </aside>
   );
 }
@@ -30,7 +31,6 @@ function SidebarBrand() {
       <Link href="/" className="flex min-w-0 items-center" title="AWS-ify">
         <div className="min-w-0 leading-tight">
           <Wordmark size={17} />
-          <p className="mt-1 truncate text-[11px] text-white/40">Personal workspace</p>
         </div>
       </Link>
       <button
@@ -89,13 +89,17 @@ function SidebarNavItem({
   );
 }
 
-function SidebarFooter() {
+function SidebarFooter({ onOpenCommandPalette }: { onOpenCommandPalette: () => void }) {
   return (
     <div className="space-y-2 border-t border-white/[0.06] p-4">
-      <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[12px] text-white/55">
+      <button
+        type="button"
+        onClick={onOpenCommandPalette}
+        className="flex w-full items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-left text-[12px] text-white/55 transition-colors hover:border-white/[0.12] hover:bg-white/[0.04] hover:text-white"
+      >
         <span>Command palette</span>
         <kbd className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-white/60">⌘ K</kbd>
-      </div>
+      </button>
       <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
         <p className="font-mono text-[10px] uppercase tracking-wider text-white/35">
           status

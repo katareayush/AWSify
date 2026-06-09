@@ -1,38 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import { Button } from "../ui/button";
 import { Wordmark } from "../landing/primitives/wordmark";
 import { api, type Me } from "../../lib/api";
-import { CommandPalette } from "./command-palette";
 import { navItems } from "./nav-data";
 
 interface TopBarProps {
   active?: string;
+  onOpenCommandPalette: () => void;
 }
 
-export function TopBar({ active }: TopBarProps) {
+export function TopBar({ active, onOpenCommandPalette }: TopBarProps) {
   const [me, setMe] = useState<Me | null>(null);
-  const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
     api.me().then(setMe).catch(() => {});
-  }, []);
-
-  const openPalette = useCallback(() => setPaletteOpen(true), []);
-  const closePalette = useCallback(() => setPaletteOpen(false), []);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setPaletteOpen((v) => !v);
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   async function handleConnect() {
@@ -54,7 +39,7 @@ export function TopBar({ active }: TopBarProps) {
             </Link>
             <button
               type="button"
-              onClick={openPalette}
+              onClick={onOpenCommandPalette}
               className="hidden h-9 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 text-[13px] text-white/45 transition-colors hover:border-white/[0.14] hover:text-white/70 sm:flex"
             >
               <Search className="h-3.5 w-3.5" />
@@ -63,7 +48,7 @@ export function TopBar({ active }: TopBarProps) {
             </button>
             <button
               type="button"
-              onClick={openPalette}
+              onClick={onOpenCommandPalette}
               aria-label="Open command palette"
               className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.02] text-white/45 transition-colors hover:border-white/[0.14] hover:text-white/70 sm:hidden"
             >
@@ -116,7 +101,6 @@ export function TopBar({ active }: TopBarProps) {
           })}
         </nav>
       </header>
-      <CommandPalette open={paletteOpen} onClose={closePalette} />
     </>
   );
 }

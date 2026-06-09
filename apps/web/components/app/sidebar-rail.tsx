@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 import { navItems } from "./nav-data";
 import { useSidebar } from "./sidebar-context";
 
 interface SidebarRailProps {
   active: string;
+  onOpenCommandPalette: () => void;
 }
 
-export function SidebarRail({ active }: SidebarRailProps) {
+export function SidebarRail({ active, onOpenCommandPalette }: SidebarRailProps) {
   const { setCollapsed } = useSidebar();
   return (
     <aside className="z-30 hidden w-14 border-r border-white/[0.06] bg-[#0a0a0d]/95 backdrop-blur-xl lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col">
@@ -41,6 +42,17 @@ export function SidebarRail({ active }: SidebarRailProps) {
           );
         })}
       </nav>
+      <div className="border-t border-white/[0.06] px-2 py-3">
+        <button
+          type="button"
+          onClick={onOpenCommandPalette}
+          aria-label="Open command palette"
+          title="Command palette (⌘ K)"
+          className="flex h-9 w-full items-center justify-center rounded-lg text-white/55 transition-colors hover:bg-white/[0.04] hover:text-white"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+      </div>
       <button
         type="button"
         onClick={() => setCollapsed(false)}
