@@ -68,39 +68,51 @@ function StepMarker({ state, isLast }: { state: StepState; isLast: boolean }) {
 export function buildTimeline(logs: DeploymentDetail["logs"], status: string): Array<{ label: string; detail: string; state: StepState }> {
   const messages = logs.map((log) => log.message.toLowerCase());
   const has = (needle: string) => messages.some((message) => message.includes(needle));
+  const hasAny = (needles: string[]) => needles.some(has);
   const failed = status === "failed";
   const deployed = status === "deployed";
+  const deploying = status === "deploying";
 
   return [
     {
-      label: "Queued",
-      detail: "Deployment job created.",
-      state: logs.length > 0 ? "done" : "pending"
+      label: "Scan",
+      detail: "Clone repository, detect framework, commands, env vars, port, and health path.",
+      state: hasAny(["scan complete", "plan and preview", "ai recommendation"]) || deployed ? "done" : status === "scanning" ? "active" : logs.length > 0 ? "done" : "pending"
     },
     {
-      label: "Repository scan",
-      detail: "Detect runtime, env vars, port, and health path.",
-      state: has("scan complete") || has("plan and preview") || deployed ? "done" : status === "scanning" ? "active" : "pending"
+      label: "Review",
+      detail: "Confirm resources, cost impact, IAM scope, runtime, and env vars.",
+      state: status === "awaiting_approval" ? "active" : has("approved plan loaded") || deployed || deploying ? "done" : "pending"
     },
     {
-      label: "Approval",
-      detail: "Review generated artifacts and approve infra.",
-      state: status === "awaiting_approval" ? "active" : has("approved plan loaded") || deployed ? "done" : "pending"
+      label: "Build image",
+      detail: "Build the Docker image from the repository or approved AWSify template.",
+      state: has("image pushed") || deployed ? "done" : deploying && hasAny(["creating ecr", "dockerfile source"]) ? "active" : "pending"
     },
     {
-      label: "Image build",
-      detail: "Build Docker image and push to ECR.",
-      state: has("image pushed") || deployed ? "done" : status === "deploying" && has("creating ecr") ? "active" : "pending"
+      label: "Push ECR",
+      detail: "Create or reuse the ECR repository and push the tagged image.",
+      state: has("image pushed") || deployed ? "done" : deploying && has("creating ecr") ? "active" : "pending"
     },
     {
-      label: "AWS apply",
-      detail: "Run the approved Pulumi ECS Fargate template.",
-      state: has("health check") || deployed ? "done" : status === "deploying" && has("running pulumi") ? "active" : "pending"
+      label: "Pulumi update",
+      detail: "Apply the approved ECS Fargate, ALB, IAM, logging, and security group resources.",
+      state: has("checking service health") || deployed ? "done" : deploying && hasAny(["running pulumi", "pulumi"]) ? "active" : "pending"
+    },
+    {
+      label: "ECS rollout",
+      detail: "Wait for the ECS service and load balancer target group to settle.",
+      state: has("checking service health") || deployed ? "done" : deploying && hasAny(["ecs", "target group", "service"]) ? "active" : "pending"
     },
     {
       label: "Health check",
-      detail: "Poll the public ALB URL.",
+      detail: "Poll the live URL and health path before marking the deployment live.",
       state: failed ? "failed" : deployed ? "done" : status === "deploying" && has("checking service health") ? "active" : "pending"
+    },
+    {
+      label: "Live URL",
+      detail: "Expose the final public endpoint when the rollout is healthy.",
+      state: failed ? "failed" : deployed || has("live at") ? "done" : "pending"
     }
   ];
 }

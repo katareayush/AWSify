@@ -41,6 +41,26 @@ interface GitHubRepositoriesResponse {
   repositories?: GitHubRepositoryResponse[];
 }
 
+interface GitHubBranchResponse {
+  name: string;
+  commit?: { sha?: string };
+}
+
+interface GitHubCommitResponse {
+  sha: string;
+  html_url?: string;
+  commit: {
+    message: string;
+    author?: {
+      name?: string | null;
+      date?: string | null;
+    } | null;
+  };
+  author?: {
+    login?: string | null;
+  } | null;
+}
+
 interface SessionPayload {
   userId: string;
   githubLogin: string;
@@ -146,6 +166,62 @@ export class GithubService {
           private: repo.private
         }))
       )
+    };
+  }
+
+  async repositoryRefs(sessionToken: string | undefined, repoId: string, selectedBranch: string | undefined) {
+    const session = sessionToken ? this.verifySession(sessionToken) : null;
+    if (!session) return { error: "not_authenticated" };
+
+    const repo = await this.prisma.repository.findFirst({
+      where: { id: repoId, installation: { userId: session.userId } },
+      include: { installation: true }
+    });
+    if (!repo) return { error: "repo_not_found" };
+
+    const [owner, repoName] = repo.fullName.split("/");
+    if (!owner || !repoName) return { error: "invalid_repo_fullname" };
+
+    let token: string;
+    try {
+      token = await createInstallationToken(repo.installation.installationId);
+    } catch (err) {
+      return { error: "installation_token_failed", detail: errorMessage(err) };
+    }
+
+    const branchesRes = await fetch(`https://api.github.com/repos/${owner}/${repoName}/branches?per_page=50`, {
+      headers: githubHeaders(token)
+    });
+    if (!branchesRes.ok) return { error: "branches_lookup_failed", detail: `HTTP ${branchesRes.status}` };
+    const branchData = (await branchesRes.json()) as GitHubBranchResponse[];
+    const branches = branchData.map((branch) => ({
+      name: branch.name,
+      sha: branch.commit?.sha ?? "",
+      isDefault: branch.name === repo.defaultBranch
+    }));
+
+    const branch = selectedBranch && branches.some((item) => item.name === selectedBranch)
+      ? selectedBranch
+      : repo.defaultBranch;
+
+    const commitsRes = await fetch(
+      `https://api.github.com/repos/${owner}/${repoName}/commits?sha=${encodeURIComponent(branch)}&per_page=5`,
+      { headers: githubHeaders(token) }
+    );
+    if (!commitsRes.ok) return { error: "commits_lookup_failed", detail: `HTTP ${commitsRes.status}` };
+    const commitData = (await commitsRes.json()) as GitHubCommitResponse[];
+
+    return {
+      branch,
+      branches,
+      commits: commitData.map((commit) => ({
+        sha: commit.sha,
+        shortSha: commit.sha.slice(0, 7),
+        message: commit.commit.message.split("\n")[0] ?? "Commit",
+        author: commit.author?.login ?? commit.commit.author?.name ?? "unknown",
+        committedAt: commit.commit.author?.date ?? null,
+        url: commit.html_url ?? null
+      }))
     };
   }
 
@@ -348,6 +424,10 @@ function githubHeaders(token: string) {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28"
   };
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 function parseNextLink(linkHeader: string | null): string {

@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Eye, EyeOff, KeyRound, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { Check, Eye, EyeOff, Filter, KeyRound, Loader2, Plus, Save, Trash2, Upload } from "lucide-react";
 import { Button } from "../ui/button";
 import { Panel } from "../ui/panel";
 import { ConfirmDialog } from "../ui/confirm-dialog";
 import { useToast } from "../ui/toast";
 import { api } from "../../lib/api";
+import { parseEnvFile } from "../../lib/env-file";
 
 type EnvCategory = "secret" | "config" | "feature-flag" | "build-time" | "integration" | "custom";
 
@@ -55,6 +56,9 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
   const [customDraft, setCustomDraft] = useState<string>("");
   const [customRows, setCustomRows] = useState<string[]>([]);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [bulkText, setBulkText] = useState("");
+  const [showBulk, setShowBulk] = useState(false);
+  const [missingOnly, setMissingOnly] = useState(false);
 
   const savedByName = useMemo(() => new Map(saved.map((envVar) => [envVar.name, envVar])), [saved]);
   const detectedByName = useMemo(() => new Map(detected.map((envVar) => [envVar.name, envVar])), [detected]);
@@ -87,6 +91,9 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
 
   const required = allVars.filter((envVar) => envVar.required);
   const optional = allVars.filter((envVar) => !envVar.required);
+  const visibleRequired = missingOnly ? required.filter((envVar) => !savedByName.has(envVar.name)) : required;
+  const visibleOptional = missingOnly ? [] : optional;
+  const parsedBulk = useMemo(() => parseEnvFile(bulkText), [bulkText]);
 
   const hasPendingChanges = Object.values(values).some((value) => value.length > 0);
   const missingRequiredCount = required.filter(
@@ -108,6 +115,23 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
     setCustomRows((rows) => [...rows, name]);
     setCustomDraft("");
     setVisible((current) => ({ ...current, [name]: false }));
+  }
+
+  function applyBulkImport() {
+    if (parsedBulk.invalid.length > 0 || parsedBulk.entries.length === 0) return;
+    const nextValues = Object.fromEntries(parsedBulk.entries.map((entry) => [entry.name, entry.value]));
+    setValues((current) => ({ ...current, ...nextValues }));
+    const known = new Set(allNames);
+    setCustomRows((rows) => {
+      const next = new Set(rows);
+      for (const entry of parsedBulk.entries) {
+        if (!known.has(entry.name)) next.add(entry.name);
+      }
+      return Array.from(next);
+    });
+    setBulkText("");
+    setShowBulk(false);
+    toast.success(`Prepared ${parsedBulk.entries.length} env var${parsedBulk.entries.length === 1 ? "" : "s"} for save.`);
   }
 
   async function handleSave() {
@@ -161,6 +185,14 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
         <KeyRound className="h-4 w-4 text-violet-soft" />
         <p className="text-[13px] font-medium text-white">Environment variables</p>
         <div className="ml-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setMissingOnly((value) => !value)}
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] ${missingOnly ? "border-amber-500/25 bg-amber-500/10 text-amber-300" : "border-white/[0.08] bg-white/[0.03] text-white/55"}`}
+          >
+            <Filter className="h-3 w-3" />
+            Missing
+          </button>
           <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 font-mono text-[10.5px] text-white/55">
             {saved.length}/{allVars.length} saved
           </span>
@@ -172,9 +204,68 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
         </div>
       </div>
 
-      {required.length > 0 && (
+      <div className="mb-4 rounded-lg border border-dashed border-white/10 bg-white/[0.015] p-3">
+        <button
+          type="button"
+          onClick={() => setShowBulk((value) => !value)}
+          className="flex w-full items-center justify-between gap-3 text-left"
+        >
+          <span>
+            <span className="flex items-center gap-2 text-[12.5px] font-medium text-white/80">
+              <Upload className="h-3.5 w-3.5 text-white/50" />
+              Bulk paste .env
+            </span>
+            <span className="mt-1 block text-[11px] text-white/35">
+              Supports comments, blank lines, KEY=value, export KEY=value, and quoted values.
+            </span>
+          </span>
+          <span className="text-[11px] text-white/40">{showBulk ? "Hide" : "Open"}</span>
+        </button>
+        {showBulk && (
+          <div className="mt-3 space-y-3">
+            <textarea
+              value={bulkText}
+              onChange={(event) => setBulkText(event.target.value)}
+              placeholder={"DATABASE_URL=postgres://...\nNEXT_PUBLIC_API_URL=\"https://api.example.com\""}
+              spellCheck={false}
+              className="min-h-28 w-full resize-y rounded-md border border-white/[0.08] bg-black/25 p-3 font-mono text-[12px] leading-[1.5] text-white outline-none placeholder:text-white/25 focus:border-violet/40"
+            />
+            {(parsedBulk.entries.length > 0 || parsedBulk.invalid.length > 0) && (
+              <div className="rounded-md border border-white/[0.06] bg-black/20 p-3">
+                <p className="text-[11px] text-white/45">
+                  Preview: {parsedBulk.entries.length} valid, {parsedBulk.invalid.length} invalid
+                </p>
+                {parsedBulk.entries.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {parsedBulk.entries.slice(0, 8).map((entry) => (
+                      <span key={`${entry.line}-${entry.name}`} className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10.5px] text-emerald-300">
+                        {entry.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {parsedBulk.invalid.map((line) => (
+                  <p key={line.line} className="mt-1 font-mono text-[10.5px] text-red-300">
+                    Line {line.line}: {line.reason}
+                  </p>
+                ))}
+              </div>
+            )}
+            <Button
+              variant="secondary"
+              onClick={applyBulkImport}
+              disabled={parsedBulk.entries.length === 0 || parsedBulk.invalid.length > 0}
+            >
+              <Upload className="h-4 w-4" />
+              Add to form
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {visibleRequired.length > 0 && (
         <Group title="Required" tone="required">
-          {required.map((envVar) => (
+          {visibleRequired.map((envVar) => (
             <EnvRow
               key={envVar.name}
               envVar={envVar}
@@ -202,9 +293,9 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
         </Group>
       )}
 
-      {optional.length > 0 && (
+      {visibleOptional.length > 0 && (
         <Group title="Optional" tone="optional">
-          {optional.map((envVar) => (
+          {visibleOptional.map((envVar) => (
             <EnvRow
               key={envVar.name}
               envVar={envVar}
@@ -230,6 +321,12 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
             />
           ))}
         </Group>
+      )}
+
+      {missingOnly && visibleRequired.length === 0 && (
+        <p className="rounded-lg border border-dashed border-white/10 px-4 py-6 text-center text-[12px] text-white/40">
+          No missing required variables.
+        </p>
       )}
 
       {allVars.length === 0 && (
@@ -240,7 +337,7 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
 
       <div className="mt-4 rounded-lg border border-dashed border-white/10 bg-white/[0.015] p-3">
         <p className="mb-2 font-mono text-[10.5px] uppercase tracking-wider text-white/35">Add custom variable</p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
             value={customDraft}
             onChange={(event) => { setCustomDraft(event.target.value); setNameError(null); }}
@@ -248,13 +345,13 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
             placeholder="VARIABLE_NAME"
             spellCheck={false}
             autoComplete="off"
-            className="h-9 flex-1 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] uppercase text-white outline-none placeholder:text-white/25 focus:border-violet/40"
+            className="h-9 min-w-0 flex-1 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] uppercase text-white outline-none placeholder:text-white/25 focus:border-violet/40"
           />
           <button
             type="button"
             onClick={handleAddCustom}
             disabled={!customDraft.trim()}
-            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.04] px-3 text-[12px] text-white/80 hover:bg-white/[0.07] disabled:opacity-40"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.04] px-3 text-[12px] text-white/80 hover:bg-white/[0.07] disabled:opacity-40"
           >
             <Plus className="h-3.5 w-3.5" /> Add
           </button>
@@ -268,9 +365,9 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
         </div>
       )}
 
-      <div className="mt-4 flex items-center justify-between gap-3">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-[11px] text-white/35">
-          Blank fields keep their saved value.
+          Blank fields keep their saved value. Pending changes: {Object.keys(values).filter((name) => values[name].length > 0).length}.
         </p>
         <Button
           variant="secondary"
@@ -330,9 +427,9 @@ function EnvRow({ envVar, value, isVisible, isDeleting, onChangeValue, onToggleV
 
   return (
     <label className="block rounded-lg border border-white/[0.06] bg-white/[0.015] p-3 transition-colors focus-within:border-white/[0.12]">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <span className="truncate font-mono text-[12.5px] text-white">{envVar.name}</span>
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           {categoryStyle && (
             <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-medium ${categoryStyle.className}`}>
               {categoryStyle.label}

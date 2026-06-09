@@ -26,7 +26,7 @@ export function useUrlState(key: string, defaultValue = ""): [string, (next: str
 export function useUrlNumber(key: string, defaultValue = 0): [number, (next: number) => void] {
   const [raw, setRaw] = useUrlState(key, String(defaultValue));
   const parsed = Number.parseInt(raw, 10);
-  const value = Number.isFinite(parsed) ? parsed : defaultValue;
-  const setValue = useCallback((next: number) => setRaw(String(next)), [setRaw]);
+  const value = Number.isFinite(parsed) && parsed >= 0 ? parsed : defaultValue;
+  const setValue = useCallback((next: number) => setRaw(String(Math.max(defaultValue, next))), [defaultValue, setRaw]);
   return [value, setValue];
 }

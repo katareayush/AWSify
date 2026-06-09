@@ -11,13 +11,13 @@ interface SectionProps {
 export function Section({ icon, title, status, statusTone, children }: SectionProps) {
   return (
     <div className="rounded-xl border border-white/[0.06]">
-      <div className="flex items-center justify-between border-b border-white/[0.05] px-5 py-3">
+      <div className="flex items-center justify-between gap-3 border-b border-white/[0.05] px-5 py-3">
         <div className="flex items-center gap-2.5">
           {icon}
           <p className="text-[13px] font-medium text-white">{title}</p>
         </div>
         <span
-          className={`text-[11.5px] ${
+          className={`shrink-0 text-[11.5px] ${
             statusTone === "ok" ? "text-emerald-300" : "text-white/40"
           }`}
         >

@@ -9,7 +9,7 @@ import { decryptSecret } from "@awsify/config";
 import { PrismaClient, createPrismaAdapter } from "@awsify/database";
 import type { DeploymentJob, DeploymentPlan, DeploymentSuggestion, GeneratedArtifact } from "@awsify/deployment-schemas";
 import { collectKeyFiles, scanRepository, type RepoScanResult } from "@awsify/repo-scanner";
-import { createDeploymentPlan, generateDockerfile } from "@awsify/templates";
+import { generateDockerfile } from "@awsify/templates";
 import { createStack } from "@awsify/pulumi-templates";
 import { ECRClient, CreateRepositoryCommand, DescribeRepositoriesCommand, GetAuthorizationTokenCommand } from "@aws-sdk/client-ecr";
 import { STSClient, AssumeRoleCommand } from "@aws-sdk/client-sts";
@@ -82,34 +82,16 @@ export class DeploymentOrchestrator {
       const { suggestion } = aiResult;
       await emit("scanning", `AI recommendation: ${suggestion.appType} on ${suggestion.computeTarget} (confidence ${suggestion.confidence.toFixed(2)})`);
 
-      const plan = createDeploymentPlan({
-        projectId: job.projectId,
-        appName: sanitizeAppName(job.repoFullName),
-        region,
-        awsifyAccountId,
-        externalId: `awsify-${job.projectId}`,
-        suggestion
-      });
-
       await this.prisma.deploymentPlan.update({
         where: { id: job.approvedPlanId },
         data: {
           suggestion: suggestion as object,
-          resources: plan.resources as object[],
-          estimatedCost: plan.estimatedMonthlyCostUsd as object,
-          status: "awaiting_approval",
-          artifacts: {
-            deleteMany: {},
-            create: plan.artifacts.map((artifact) => ({
-              kind: toDbArtifactKind(artifact.kind),
-              path: artifact.path,
-              content: artifact.content,
-              summary: artifact.summary
-            }))
-          }
+          resources: [],
+          estimatedCost: { low: 0, high: 0, notes: [] },
+          status: "draft"
         }
       });
-      await emit("awaiting_approval", "Plan and preview artifacts are ready. Deployment is paused until user approval.");
+      await emit("awaiting_approval", "Scan review is ready. Confirm or correct the detected settings before AWSify creates the plan.");
       return { status: "awaiting_approval", events };
     }
 
@@ -400,13 +382,6 @@ function hydratePlan(planRecord: {
     requiresApproval: true,
     status: "approved"
   };
-}
-
-function toDbArtifactKind(kind: GeneratedArtifact["kind"]) {
-  if (kind === "github-action") return "github_action";
-  if (kind === "pulumi-preview") return "pulumi_preview";
-  if (kind === "cloudformation-role") return "cloudformation_role";
-  return kind;
 }
 
 function fromDbArtifactKind(kind: string): GeneratedArtifact["kind"] {

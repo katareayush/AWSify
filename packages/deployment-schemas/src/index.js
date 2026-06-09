@@ -1,10 +1,20 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.awsConnectionSchema = exports.deploymentJobSchema = exports.deploymentPlanSchema = exports.generatedArtifactSchema = exports.deploymentSuggestionSchema = exports.envVarSchema = exports.healthPathSchema = exports.supportedServiceSchema = exports.computeTargetSchema = exports.supportedAppTypeSchema = void 0;
+exports.awsConnectionSchema = exports.deploymentJobSchema = exports.deploymentPlanSchema = exports.generatedArtifactSchema = exports.deploymentSuggestionSchema = exports.envVarSchema = exports.envVarCategorySchema = exports.healthPathSchema = exports.supportedServiceSchema = exports.computeTargetSchema = exports.supportedAppTypeSchema = void 0;
 exports.isValidHealthPath = isValidHealthPath;
 exports.parseDeploymentSuggestion = parseDeploymentSuggestion;
 const zod_1 = require("zod");
-exports.supportedAppTypeSchema = zod_1.z.enum(["node-backend", "nextjs-app"]);
+exports.supportedAppTypeSchema = zod_1.z.enum([
+    "node-backend",
+    "nextjs-app",
+    "static-spa",
+    "python-backend",
+    "go-backend",
+    "ruby-backend",
+    "java-backend",
+    "rust-backend",
+    "php-backend"
+]);
 exports.computeTargetSchema = zod_1.z.enum(["ecs-fargate"]);
 exports.supportedServiceSchema = zod_1.z.enum(["frontend", "backend", "database", "worker", "cache"]);
 const HEALTH_PATH_PATTERN = /^\/[A-Za-z0-9/_\-.]*$/;
@@ -20,10 +30,20 @@ exports.healthPathSchema = zod_1.z
     message: "must start with / and contain only safe URL path characters (no '..' segments)"
 })
     .default("/");
+exports.envVarCategorySchema = zod_1.z.enum([
+    "secret",
+    "config",
+    "feature-flag",
+    "build-time",
+    "integration",
+    "custom"
+]);
 exports.envVarSchema = zod_1.z.object({
     name: zod_1.z.string().regex(/^[A-Z_][A-Z0-9_]*$/),
-    required: zod_1.z.boolean().default(true),
+    required: zod_1.z.boolean().default(false),
     description: zod_1.z.string().max(300).optional(),
+    example: zod_1.z.string().max(200).optional(),
+    category: exports.envVarCategorySchema.optional(),
     valuePreview: zod_1.z.string().max(120).optional()
 });
 exports.deploymentSuggestionSchema = zod_1.z.object({

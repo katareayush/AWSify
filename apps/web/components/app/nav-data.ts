@@ -3,6 +3,7 @@ import {
   Github,
   KeyRound,
   LayoutDashboard,
+  Settings,
   type LucideIcon
 } from "lucide-react";
 
@@ -16,5 +17,6 @@ export const navItems: NavItem[] = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { label: "Deployments", href: "/deployments", icon: FileCode2 },
   { label: "Repositories", href: "/repositories", icon: Github },
-  { label: "Connections", href: "/connections", icon: KeyRound }
+  { label: "Connections", href: "/connections", icon: KeyRound },
+  { label: "Settings", href: "/settings", icon: Settings }
 ];

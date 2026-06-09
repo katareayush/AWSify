@@ -36,10 +36,15 @@ export function RuntimePanel({
   }, [planSignature]);
 
   async function save() {
+    const parsedPort = Number(port);
+    if (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65535 || !healthPath.startsWith("/")) {
+      toast.error("Enter a port from 1 to 65535 and a health path starting with /.");
+      return;
+    }
     setSaving(true);
     try {
       await api.saveDeploymentRuntime(deploymentId, {
-        port: Number(port),
+        port: parsedPort,
         healthPath: healthPath || "/"
       });
       await onSaved();
@@ -51,7 +56,10 @@ export function RuntimePanel({
     }
   }
 
-  const canSave = editable && !!port && healthPath.startsWith("/");
+  const parsedPort = Number(port);
+  const portValid = Number.isInteger(parsedPort) && parsedPort >= 1 && parsedPort <= 65535;
+  const healthPathValid = healthPath.startsWith("/");
+  const canSave = editable && portValid && healthPathValid;
 
   return (
     <Panel className="p-5">
@@ -70,6 +78,7 @@ export function RuntimePanel({
             value={port}
             onChange={(e) => setPort(e.target.value)}
             inputMode="numeric"
+            pattern="[0-9]*"
             disabled={!editable}
             placeholder="3000"
             className="h-9 w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40 disabled:opacity-60"
@@ -85,6 +94,11 @@ export function RuntimePanel({
           />
         </Field>
       </div>
+      {editable && (!portValid || !healthPathValid) && (
+        <p className="mt-2 text-[11px] leading-[1.5] text-amber-300/80">
+          Port must be 1-65535 and health path must start with /.
+        </p>
+      )}
       {editable && (
         <Button
           className="mt-3 w-full"

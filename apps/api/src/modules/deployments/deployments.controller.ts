@@ -10,7 +10,7 @@ export class DeploymentsController {
   @Post("trigger")
   trigger(
     @Req() req: Request,
-    @Body() body: { repoId: string; branch: string; awsConnectionId: string }
+    @Body() body: { repoId: string; branch: string; awsConnectionId: string; deploymentProfile?: string }
   ) {
     const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
     return this.deployments.trigger(token, body);
@@ -32,6 +32,12 @@ export class DeploymentsController {
   approve(@Req() req: Request, @Param("id") id: string) {
     const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
     return this.deployments.approve(id, token);
+  }
+
+  @Post(":id/redeploy")
+  redeployLatest(@Req() req: Request, @Param("id") id: string) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    return this.deployments.redeployLatest(id, token);
   }
 
   @Post(":id/env")
@@ -58,6 +64,36 @@ export class DeploymentsController {
   ) {
     const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
     return this.deployments.saveRuntimeSettings(id, token, body);
+  }
+
+  @Post(":id/scan-review")
+  saveScanReview(
+    @Req() req: Request,
+    @Param("id") id: string,
+    @Body() body: {
+      appType?: string;
+      packageManager?: string;
+      buildCommand?: string;
+      startCommand?: string;
+      installCommand?: string;
+      port?: number;
+      healthPath?: string;
+    }
+  ) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    return this.deployments.saveScanReview(id, token, body);
+  }
+
+  @Get(":id/diagnosis")
+  diagnosis(@Req() req: Request, @Param("id") id: string) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    return this.deployments.getDiagnosis(id, token);
+  }
+
+  @Get(":id/artifact-diff")
+  artifactDiff(@Req() req: Request, @Param("id") id: string) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    return this.deployments.getArtifactDiff(id, token);
   }
 
   @Post(":id/ci-token")

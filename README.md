@@ -11,10 +11,11 @@ The safety rule is the product boundary:
 - GitHub sign-in for identity.
 - GitHub App installation for repository access.
 - AWS account connection through a generated CloudFormation IAM role.
-- Repo scanner for Node.js backend and Next.js apps.
+- Repo scanner for Node.js backends, Next.js apps, static SPAs, Python, Go, Ruby, Java, Rust, and PHP services.
 - Bounded AI recommendation schema.
 - Generated Dockerfile, GitHub Actions workflow, and infra plan preview.
 - Worker-driven deployment to ECR, ECS Fargate, ALB, and CloudWatch through Pulumi Automation API.
+- Database and Redis dependencies are detected and shown in the plan, but RDS and ElastiCache provisioning are not part of the current MVP template.
 - GitHub Actions redeploy for already-approved infrastructure.
 
 ## Local Setup

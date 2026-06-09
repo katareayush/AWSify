@@ -1,11 +1,18 @@
 import { Injectable } from "@nestjs/common";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { encryptSecret, previewSecret } from "@awsify/config";
-import { deploymentSuggestionSchema, isValidHealthPath } from "@awsify/deployment-schemas";
+import {
+  deploymentSuggestionSchema,
+  isValidHealthPath,
+  type DeploymentSuggestion,
+  type GeneratedArtifact
+} from "@awsify/deployment-schemas";
+import { createDeploymentPlan } from "@awsify/templates";
 import { PrismaService } from "../prisma.service";
 import { QueueService } from "../queue/queue.service";
 import { GithubCommitService } from "../github/github-commit.service";
 import { GithubService } from "../github/github.service";
+import { diagnoseDeploymentFailure } from "./diagnosis";
 
 function sanitizeAppName(repoFullName: string): string {
   const name = repoFullName.split("/").pop() ?? "awsify-app";
@@ -30,12 +37,29 @@ export class DeploymentsService {
   async commitArtifactsToRepo(deploymentId: string, sessionToken: string | undefined) {
     const userId = this.getUserId(sessionToken);
     if (!userId) return { error: "not_authenticated" };
-    return this.githubCommit.commitDeploymentArtifacts(deploymentId, userId);
+    const result = await this.githubCommit.commitDeploymentArtifacts(deploymentId, userId);
+    const deployment = await this.prisma.deployment.findFirst({
+      where: { id: deploymentId, actorUserId: userId },
+      select: { projectId: true }
+    });
+    if (deployment) {
+      await this.recordAudit({
+        userId,
+        projectId: deployment.projectId,
+        deploymentId,
+        type: "artifact_pr",
+        message: "Generated deployment artifact PR action completed.",
+        metadata: "error" in result
+          ? { ok: false, error: result.error, detail: result.detail }
+          : { ok: true, branch: result.branch, prNumber: result.prNumber, committed: result.committed }
+      });
+    }
+    return result;
   }
 
   async trigger(
     sessionToken: string | undefined,
-    input: { repoId: string; branch: string; awsConnectionId: string }
+    input: { repoId: string; branch: string; awsConnectionId: string; deploymentProfile?: string }
   ) {
     const userId = this.getUserId(sessionToken);
     if (!userId) return { error: "not_authenticated" };
@@ -71,8 +95,19 @@ export class DeploymentsService {
       }
     });
 
+    const profileLabel = deploymentProfileLabel(input.deploymentProfile);
     const deployment = await this.prisma.deployment.create({
-      data: { projectId: project.id, planId: plan.id, actorUserId: userId, status: "queued", logs: [] }
+      data: {
+        projectId: project.id,
+        planId: plan.id,
+        actorUserId: userId,
+        status: "queued",
+        logs: profileLabel ? [{
+          status: "queued",
+          message: `Deployment profile selected: ${profileLabel}.`,
+          at: new Date().toISOString()
+        }] : []
+      }
     });
 
     await this.queue.enqueueDeployment({
@@ -86,6 +121,61 @@ export class DeploymentsService {
     });
 
     return { deploymentId: deployment.id };
+  }
+
+  async redeployLatest(deploymentId: string, sessionToken: string | undefined) {
+    const userId = this.getUserId(sessionToken);
+    if (!userId) return { error: "not_authenticated" };
+
+    const source = await this.prisma.deployment.findFirst({
+      where: { id: deploymentId, actorUserId: userId },
+      include: { project: { include: { repository: true } }, plan: true }
+    });
+    if (!source) return { error: "not_found" };
+    if (!source.project.awsConnectionId) return { error: "missing_aws_connection" };
+
+    const approvedPlan = source.plan.status === "approved"
+      ? source.plan
+      : await this.prisma.deploymentPlan.findFirst({
+          where: { projectId: source.projectId, status: "approved" },
+          orderBy: { approvedAt: "desc" }
+        });
+    if (!approvedPlan) return { error: "no_approved_plan" };
+
+    const deployment = await this.prisma.deployment.create({
+      data: {
+        projectId: source.projectId,
+        planId: approvedPlan.id,
+        actorUserId: userId,
+        status: "queued",
+        logs: [{
+          status: "queued",
+          message: `Redeploy queued for latest commit on ${source.project.branch}.`,
+          at: new Date().toISOString()
+        }]
+      }
+    });
+
+    await this.queue.enqueueDeployment({
+      projectId: source.projectId,
+      repoFullName: source.project.repository.fullName,
+      branch: source.project.branch,
+      awsConnectionId: source.project.awsConnectionId,
+      approvedPlanId: approvedPlan.id,
+      actorUserId: userId,
+      deploymentId: deployment.id
+    });
+
+    await this.recordAudit({
+      userId,
+      projectId: source.projectId,
+      deploymentId: deployment.id,
+      type: "manual_redeploy",
+      message: "Queued redeploy for latest commit.",
+      metadata: { branch: source.project.branch }
+    });
+
+    return { deploymentId: deployment.id, status: "queued" };
   }
 
   async list(sessionToken: string | undefined) {
@@ -102,6 +192,7 @@ export class DeploymentsService {
     return {
       deployments: deployments.map(d => ({
         id: d.id,
+        projectId: d.projectId,
         status: d.status,
         liveUrl: d.liveUrl,
         failureReason: d.failureReason,
@@ -136,6 +227,56 @@ export class DeploymentsService {
         }))
       }
     };
+  }
+
+  async getDiagnosis(deploymentId: string, sessionToken: string | undefined) {
+    const userId = this.getUserId(sessionToken);
+    if (!userId) return { error: "not_authenticated" };
+
+    const deployment = await this.prisma.deployment.findFirst({
+      where: { id: deploymentId, actorUserId: userId },
+      select: { id: true, projectId: true, failureReason: true, logs: true, status: true }
+    });
+    if (!deployment) return { error: "not_found" };
+    if (!deployment.failureReason) return { error: "no_failure_reason" };
+
+    const logs = Array.isArray(deployment.logs)
+      ? deployment.logs.filter((log): log is { status?: string; message?: string } => Boolean(log && typeof log === "object"))
+      : [];
+    const diagnosis = diagnoseDeploymentFailure(deployment.failureReason, logs);
+
+    await this.recordAudit({
+      userId,
+      projectId: deployment.projectId,
+      deploymentId,
+      type: "failure_diagnosis",
+      message: `Viewed deployment failure diagnosis: ${diagnosis.category}.`,
+      metadata: { category: diagnosis.category, status: deployment.status }
+    });
+
+    return { diagnosis };
+  }
+
+  async getArtifactDiff(deploymentId: string, sessionToken: string | undefined) {
+    const userId = this.getUserId(sessionToken);
+    if (!userId) return { error: "not_authenticated" };
+
+    const deployment = await this.prisma.deployment.findFirst({
+      where: { id: deploymentId, actorUserId: userId },
+      select: { id: true, projectId: true }
+    });
+    if (!deployment) return { error: "not_found" };
+
+    const diff = await this.githubCommit.getDeploymentArtifactDiff(deploymentId, userId);
+    await this.recordAudit({
+      userId,
+      projectId: deployment.projectId,
+      deploymentId,
+      type: "artifact_diff",
+      message: "Viewed generated artifact diff.",
+      metadata: "error" in diff ? { ok: false, error: diff.error } : { ok: true, files: diff.files.length }
+    });
+    return diff;
   }
 
   async saveEnvVars(
@@ -202,6 +343,15 @@ export class DeploymentsService {
       });
     }
 
+    await this.recordAudit({
+      userId,
+      projectId: deployment.projectId,
+      deploymentId,
+      type: entries.length > 1 ? "env_bulk_save" : "env_save",
+      message: `Saved ${entries.length} environment variable${entries.length === 1 ? "" : "s"}.`,
+      metadata: { names: entries.map(([name]) => name), added: userAdded.map((envVar) => envVar.name) }
+    });
+
     return { saved: entries.map(([name]) => name), added: userAdded.map((envVar) => envVar.name) };
   }
 
@@ -217,6 +367,14 @@ export class DeploymentsService {
 
     await this.prisma.projectEnvVar.deleteMany({
       where: { projectId: deployment.projectId, name }
+    });
+    await this.recordAudit({
+      userId,
+      projectId: deployment.projectId,
+      deploymentId,
+      type: "env_delete",
+      message: `Removed environment variable ${name}.`,
+      metadata: { name }
     });
     return { deleted: name };
   }
@@ -234,7 +392,8 @@ export class DeploymentsService {
       include: { plan: true }
     });
     if (!deployment) return { error: "not_found" };
-    if (deployment.plan.status !== "awaiting_approval") return { error: "plan_not_awaiting_approval" };
+    const originalPlanStatus = String(deployment.plan.status);
+    if (!["draft", "awaiting_approval"].includes(originalPlanStatus)) return { error: "plan_not_awaiting_approval" };
 
     const suggestion = deploymentSuggestionSchema.safeParse(deployment.plan.suggestion);
     if (!suggestion.success) return { error: "plan_not_ready" };
@@ -255,7 +414,119 @@ export class DeploymentsService {
       data: { suggestion: nextSuggestion as object }
     });
 
+    await this.recordAudit({
+      userId,
+      projectId: deployment.projectId,
+      deploymentId,
+      type: "runtime_settings_update",
+      message: "Updated deployment runtime settings.",
+      metadata: { port, healthPath }
+    });
+
     return { suggestion: nextSuggestion };
+  }
+
+  async saveScanReview(
+    deploymentId: string,
+    sessionToken: string | undefined,
+    input: {
+      appType?: string;
+      packageManager?: string;
+      buildCommand?: string;
+      startCommand?: string;
+      installCommand?: string;
+      port?: number;
+      healthPath?: string;
+    }
+  ) {
+    const userId = this.getUserId(sessionToken);
+    if (!userId) return { error: "not_authenticated" };
+
+    const deployment = await this.prisma.deployment.findFirst({
+      where: { id: deploymentId, actorUserId: userId },
+      include: { plan: true }
+    });
+    if (!deployment) return { error: "not_found" };
+    const originalPlanStatus = String(deployment.plan.status);
+    if (!["draft", "awaiting_approval"].includes(originalPlanStatus)) return { error: "plan_not_awaiting_approval" };
+
+    const suggestion = deploymentSuggestionSchema.safeParse(deployment.plan.suggestion);
+    if (!suggestion.success) return { error: "plan_not_ready" };
+
+    const nextSuggestion: DeploymentSuggestion = {
+      ...suggestion.data,
+      ...(input.appType ? { appType: input.appType as DeploymentSuggestion["appType"] } : {}),
+      ...(input.packageManager ? { packageManager: input.packageManager as DeploymentSuggestion["packageManager"] } : {}),
+      ...(input.buildCommand ? { buildCommand: input.buildCommand.trim() } : {}),
+      ...(input.startCommand ? { startCommand: input.startCommand.trim() } : {}),
+      ...(input.installCommand ? { installCommand: input.installCommand.trim() } : {}),
+      ...(input.port !== undefined ? { port: input.port } : {}),
+      ...(input.healthPath !== undefined ? { healthPath: input.healthPath.trim() || "/" } : {})
+    };
+
+    const parsed = deploymentSuggestionSchema.safeParse(nextSuggestion);
+    if (!parsed.success) {
+      return { error: "invalid_scan_review", validation: { reason: parsed.error.issues[0]?.message } };
+    }
+
+    const region = process.env.AWS_REGION;
+    const awsifyAccountId = process.env.AWSIFY_AWS_ACCOUNT_ID;
+    if (!region || !awsifyAccountId) return { error: "AWS_REGION and AWSIFY_AWS_ACCOUNT_ID must be configured." };
+
+    const plan = createDeploymentPlan({
+      projectId: deployment.projectId,
+      appName: deployment.plan.appName,
+      region,
+      awsifyAccountId,
+      externalId: `awsify-${deployment.projectId}`,
+      suggestion: parsed.data
+    });
+
+    await this.prisma.deploymentPlan.update({
+      where: { id: deployment.planId },
+      data: {
+        suggestion: parsed.data as object,
+        resources: plan.resources as object[],
+        estimatedCost: plan.estimatedMonthlyCostUsd as object,
+        status: "awaiting_approval",
+        artifacts: {
+          deleteMany: {},
+          create: plan.artifacts.map((artifact) => ({
+            kind: toDbArtifactKind(artifact.kind),
+            path: artifact.path,
+            content: artifact.content,
+            summary: artifact.summary
+          }))
+        }
+      }
+    });
+
+    if (originalPlanStatus === "draft") {
+      await this.updateStatus(deploymentId, {
+        status: "awaiting_approval",
+        appendLog: {
+          status: "awaiting_approval",
+          message: "Scan review confirmed; plan and preview artifacts are ready for approval.",
+          at: new Date().toISOString()
+        }
+      });
+    }
+
+    await this.recordAudit({
+      userId,
+      projectId: deployment.projectId,
+      deploymentId,
+      type: "scan_review_update",
+      message: "Updated scan review settings and regenerated deployment artifacts.",
+      metadata: {
+        appType: parsed.data.appType,
+        packageManager: parsed.data.packageManager,
+        port: parsed.data.port,
+        healthPath: parsed.data.healthPath
+      }
+    });
+
+    return { suggestion: parsed.data };
   }
 
   async rotateCiToken(deploymentId: string, sessionToken: string | undefined) {
@@ -272,6 +543,15 @@ export class DeploymentsService {
     await this.prisma.project.update({
       where: { id: deployment.projectId },
       data: { deployTokenHash: hashDeployToken(token) }
+    });
+
+    await this.recordAudit({
+      userId,
+      projectId: deployment.projectId,
+      deploymentId,
+      type: "ci_token_rotate",
+      message: "Rotated CI redeploy token.",
+      metadata: { secretName: "AWSIFY_API_TOKEN", variableName: "AWSIFY_API_URL" }
     });
 
     return {
@@ -397,6 +677,15 @@ export class DeploymentsService {
       deploymentId: deployment.id
     });
 
+    await this.recordAudit({
+      userId,
+      projectId: deployment.projectId,
+      deploymentId: deployment.id,
+      type: "deployment_approve",
+      message: "Approved deployment plan and queued deployment.",
+      metadata: { missingRequired }
+    });
+
     return {
       deploymentId: deployment.id,
       status: "queued",
@@ -421,6 +710,37 @@ export class DeploymentsService {
 
     await this.prisma.deployment.update({ where: { id: deploymentId }, data });
   }
+
+  private async recordAudit(input: {
+    userId: string;
+    projectId?: string | null;
+    deploymentId?: string | null;
+    type: string;
+    message: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    await (this.prisma as PrismaService & {
+      auditEvent: { create: (args: { data: Record<string, unknown> }) => Promise<unknown> };
+    }).auditEvent.create({
+      data: {
+        userId: input.userId,
+        projectId: input.projectId ?? undefined,
+        deploymentId: input.deploymentId ?? undefined,
+        type: input.type,
+        message: input.message,
+        metadata: input.metadata ?? {}
+      }
+    }).catch(() => {
+      // Audit must never block a deployment workflow.
+    });
+  }
+}
+
+function toDbArtifactKind(kind: GeneratedArtifact["kind"]) {
+  if (kind === "github-action") return "github_action";
+  if (kind === "pulumi-preview") return "pulumi_preview";
+  if (kind === "cloudformation-role") return "cloudformation_role";
+  return kind;
 }
 
 function hashDeployToken(token: string): string {
@@ -437,4 +757,11 @@ function verifyDeployToken(token: string, expectedHash: string): boolean {
 function parseBearerToken(authorization: string | undefined): string | null {
   const match = authorization?.match(/^Bearer\s+(.+)$/i);
   return match?.[1] ?? null;
+}
+
+function deploymentProfileLabel(profile: string | undefined): string | null {
+  if (profile === "growth") return "Growth traffic";
+  if (profile === "high-scale") return "Large user base";
+  if (profile === "lean") return "Lean launch";
+  return null;
 }

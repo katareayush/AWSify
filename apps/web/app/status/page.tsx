@@ -11,7 +11,7 @@ interface PublicStatus {
   state: string;
   checkedAt: string;
   services: Array<{ name: string; state: string }>;
-  recent: { active: number; deployed: number; failed: number };
+  recent: { active: number; deployed: number; failed: number; total: number; failureRate: number };
 }
 
 export default function StatusPage() {
@@ -25,7 +25,7 @@ export default function StatusPage() {
         state: "degraded",
         checkedAt: new Date().toISOString(),
         services: [{ name: "API", state: "unreachable" }],
-        recent: { active: 0, deployed: 0, failed: 0 }
+        recent: { active: 0, deployed: 0, failed: 0, total: 0, failureRate: 0 }
       }));
   }, []);
 
@@ -75,10 +75,12 @@ export default function StatusPage() {
         </div>
 
         {status && (
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="mt-6 grid gap-3 sm:grid-cols-5">
             <Metric label="Active deploys" value={status.recent.active} />
             <Metric label="Recent live" value={status.recent.deployed} />
             <Metric label="Recent failed" value={status.recent.failed} />
+            <Metric label="Recent total" value={status.recent.total} />
+            <Metric label="Failure rate" value={`${status.recent.failureRate}%`} />
           </div>
         )}
       </section>
@@ -86,7 +88,7 @@ export default function StatusPage() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-4">
       <p className="font-mono text-2xl text-white">{value}</p>

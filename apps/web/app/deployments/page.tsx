@@ -45,9 +45,16 @@ function DeploymentsPageInner() {
     });
   }, [me?.authenticated, toast]);
 
+  const totalPages = Math.max(1, Math.ceil(deployments.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages - 1);
+
+  useEffect(() => {
+    if (page !== currentPage) setPage(currentPage);
+  }, [currentPage, page, setPage]);
+
   const paginated = useMemo(
-    () => deployments.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
-    [deployments, page]
+    () => deployments.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE),
+    [deployments, currentPage]
   );
 
   if (loading) {
@@ -114,7 +121,7 @@ function DeploymentsPageInner() {
                 ))}
               </div>
               <Pagination
-                page={page}
+                page={currentPage}
                 pageSize={PAGE_SIZE}
                 total={deployments.length}
                 onPageChange={setPage}

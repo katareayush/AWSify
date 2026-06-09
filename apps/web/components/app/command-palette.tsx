@@ -50,7 +50,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       key: `repo:${r.id}`,
       label: r.fullName,
       hint: r.defaultBranch,
-      href: `/repositories?focus=${encodeURIComponent(r.fullName)}`,
+      href: `/repositories?q=${encodeURIComponent(r.fullName)}`,
       icon: <span className="text-[10px] font-mono text-white/45">repo</span>
     }));
     const all = [...navResults, ...repoResults];

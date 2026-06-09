@@ -2,7 +2,8 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { CheckCircle2, Cloud, DollarSign, Loader2, Play, Server } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, Cloud, DollarSign, Loader2, Play, Server, Settings } from "lucide-react";
 import { ProductShell } from "../../../components/product-shell";
 import { Button } from "../../../components/ui/button";
 import { Panel } from "../../../components/ui/panel";
@@ -16,9 +17,11 @@ import { DeployActionsPanel } from "../../../components/deployments/deploy-actio
 import { DeploymentHeader } from "../../../components/deployments/deployment-header";
 import { EnvVarsPanel } from "../../../components/deployments/env-vars-panel";
 import { FailurePanel } from "../../../components/deployments/failure-panel";
+import { InfrastructureGraph } from "../../../components/deployments/infrastructure-graph";
 import { LogsPanel } from "../../../components/deployments/logs-panel";
 import { PlanInfoPanel } from "../../../components/deployments/plan-info-panel";
-import { RuntimePanel } from "../../../components/deployments/runtime-panel";
+import { SafetyReviewPanel } from "../../../components/deployments/safety-review-panel";
+import { ScanReviewPanel } from "../../../components/deployments/scan-review-panel";
 import { TimelinePanel } from "../../../components/deployments/timeline-panel";
 
 const POLLING_STATUSES = new Set(["queued", "scanning", "deploying"]);
@@ -95,6 +98,8 @@ function DeploymentDetailPageInner() {
   const isFailed = detail.status === "failed";
   const isRunning = POLLING_STATUSES.has(detail.status);
   const isAwaitingApproval = detail.status === "awaiting_approval";
+  const isPlanReady = detail.plan?.status === "awaiting_approval";
+  const isScanReviewReady = isAwaitingApproval && detail.plan?.status === "draft";
   const suggestion = (detail.plan?.suggestion as Record<string, unknown> | null) ?? null;
   const envVars = Array.isArray(suggestion?.envVars)
     ? (suggestion.envVars as Array<{ name: string; required?: boolean; description?: string; example?: string; category?: string }>)
@@ -144,9 +149,30 @@ function DeploymentDetailPageInner() {
           chips={headerChips}
         />
 
-        {isFailed && detail.failureReason && <FailurePanel reason={detail.failureReason} />}
+        {detail.projectId && (
+          <div className="flex justify-end">
+            <Button asChild variant="secondary">
+              <Link href={`/projects/${detail.projectId}/settings`}>
+                <Settings className="h-4 w-4" />
+                Project settings
+              </Link>
+            </Button>
+          </div>
+        )}
 
-        {isAwaitingApproval && (
+        {isFailed && detail.failureReason && (
+          <FailurePanel deploymentId={id} reason={detail.failureReason} logs={detail.logs} />
+        )}
+
+        {isAwaitingApproval && isPlanReady && (
+          <SafetyReviewPanel
+            resources={detail.plan?.resources}
+            estimatedCost={detail.plan?.estimatedCost ?? null}
+            region={detail.plan?.region}
+          />
+        )}
+
+        {isAwaitingApproval && isPlanReady && (
           <Panel className="border-amber-500/20 bg-amber-500/[0.03] p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
@@ -176,8 +202,24 @@ function DeploymentDetailPageInner() {
           </Panel>
         )}
 
+        {isScanReviewReady && (
+          <Panel className="border-violet/20 bg-violet/[0.035] p-5">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-violet-soft" />
+              <p className="text-[14px] font-medium text-white">Scan ready for review</p>
+            </div>
+            <p className="mt-2 max-w-2xl text-[13px] leading-[1.6] text-white/55">
+              Confirm the detected framework, commands, port, health path, and variables. AWSify will create the plan preview after you save this review.
+            </p>
+          </Panel>
+        )}
+
         <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="min-w-0 space-y-5">
+            <InfrastructureGraph
+              resources={detail.plan?.resources}
+              suggestion={suggestion}
+            />
             <LogsPanel logs={detail.logs} isRunning={isRunning} />
             {detail.plan?.artifacts && <ArtifactsList artifacts={detail.plan.artifacts} />}
           </div>
@@ -185,23 +227,24 @@ function DeploymentDetailPageInner() {
           <div className="min-w-0 space-y-4">
             <TimelinePanel logs={detail.logs} status={detail.status} />
 
+            {suggestion && (
+              <ScanReviewPanel
+                deploymentId={id}
+                suggestion={suggestion}
+                editable={isAwaitingApproval}
+                planReady={isPlanReady}
+                envVarCount={envVars.length}
+                planSignature={`${detail.plan?.id ?? ""}:${detail.plan?.updatedAt ?? ""}`}
+                onSaved={async () => { await fetchDetail(); }}
+              />
+            )}
+
             {(isAwaitingApproval || envVars.length + (detail.projectEnvVars?.length ?? 0) > 0) && (
               <EnvVarsPanel
                 deploymentId={id}
                 detected={envVars}
                 saved={detail.projectEnvVars ?? []}
                 onChange={async () => { await fetchDetail(); }}
-              />
-            )}
-
-            {suggestion && (
-              <RuntimePanel
-                deploymentId={id}
-                initialPort={String(suggestion.port ?? "")}
-                initialHealthPath={String(suggestion.healthPath ?? "/")}
-                editable={isAwaitingApproval}
-                planSignature={`${detail.plan?.id ?? ""}:${detail.plan?.updatedAt ?? ""}`}
-                onSaved={async () => { await fetchDetail(); }}
               />
             )}
 

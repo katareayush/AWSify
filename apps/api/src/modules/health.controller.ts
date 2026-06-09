@@ -7,7 +7,7 @@ interface PublicStatusResponse {
   state: "operational" | "degraded";
   checkedAt: string;
   services: Array<{ name: string; state: ServiceState }>;
-  recent: { active: number; deployed: number; failed: number };
+  recent: { active: number; deployed: number; failed: number; total: number; failureRate: number };
 }
 
 @Controller("health")
@@ -30,8 +30,10 @@ export class HealthController {
       const active = recent.filter((deployment) => ["queued", "scanning", "deploying"].includes(deployment.status)).length;
       const failedRecent = recent.filter((deployment) => deployment.status === "failed").length;
       const deployedRecent = recent.filter((deployment) => deployment.status === "deployed").length;
+      const finished = failedRecent + deployedRecent;
+      const failureRate = finished > 0 ? Math.round((failedRecent / finished) * 100) : 0;
       const state: PublicStatusResponse["state"] =
-        failedRecent > deployedRecent && failedRecent > 0 ? "degraded" : "operational";
+        failureRate >= 50 && failedRecent > 0 ? "degraded" : "operational";
 
       return {
         state,
@@ -44,7 +46,9 @@ export class HealthController {
         recent: {
           active,
           deployed: deployedRecent,
-          failed: failedRecent
+          failed: failedRecent,
+          total: recent.length,
+          failureRate
         }
       };
     } catch {
@@ -56,7 +60,7 @@ export class HealthController {
           { name: "Database", state: "degraded" },
           { name: "Deployment worker", state: "unknown" }
         ],
-        recent: { active: 0, deployed: 0, failed: 0 }
+        recent: { active: 0, deployed: 0, failed: 0, total: 0, failureRate: 0 }
       };
     }
   }

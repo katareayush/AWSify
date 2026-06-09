@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Req, Res } from "@nestjs/common";
+import { Controller, Get, Param, Query, Req, Res } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { GithubService } from "./github.service";
 import {
@@ -75,6 +75,16 @@ export class GithubController {
     const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
     if (!token) return { error: "not_authenticated" };
     return this.github.listRepositories(token);
+  }
+
+  @Get("repositories/:id/refs")
+  async repositoryRefs(
+    @Req() req: Request,
+    @Param("id") id: string,
+    @Query("branch") branch: string | undefined
+  ) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    return this.github.repositoryRefs(token, id, branch);
   }
 
   @Get("repositories/refresh")

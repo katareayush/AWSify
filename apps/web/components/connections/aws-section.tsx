@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ExternalLink, KeyRound, Loader2 } from "lucide-react";
+import { Check, Copy, ExternalLink, KeyRound, Loader2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { useToast } from "../ui/toast";
 import { api, type AwsConnection } from "../../lib/api";
@@ -17,6 +17,7 @@ export function AwsSection() {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showManual, setShowManual] = useState(false);
+  const [externalIdCopied, setExternalIdCopied] = useState(false);
 
   useEffect(() => {
     api.listConnections().then((r) => setConnections(r.connections)).catch((err) => {
@@ -58,6 +59,17 @@ export function AwsSection() {
     URL.revokeObjectURL(url);
   }
 
+  async function copyExternalId() {
+    if (!externalId) return;
+    try {
+      await navigator.clipboard.writeText(externalId);
+      setExternalIdCopied(true);
+      setTimeout(() => setExternalIdCopied(false), 1500);
+    } catch {
+      toast.error("Could not copy external ID.");
+    }
+  }
+
   return (
     <Section
       icon={<KeyRound className="h-4 w-4 text-white/55" />}
@@ -68,9 +80,9 @@ export function AwsSection() {
       {connections.length > 0 && (
         <div className="mb-4 divide-y divide-white/[0.04] rounded-lg border border-white/[0.05]">
           {connections.map((c) => (
-            <div key={c.id} className="flex items-center justify-between px-4 py-3 text-[12.5px]">
-              <span className="font-mono text-white/75">{c.accountId}</span>
-              <span className="text-white/40">{c.defaultRegion} · {c.status}</span>
+            <div key={c.id} className="flex flex-col gap-1 px-4 py-3 text-[12.5px] sm:flex-row sm:items-center sm:justify-between">
+              <span className="min-w-0 truncate font-mono text-white/75" title={c.accountId}>{c.accountId}</span>
+              <span className="shrink-0 text-white/40">{c.defaultRegion} · {c.status}</span>
             </div>
           ))}
         </div>
@@ -119,15 +131,15 @@ export function AwsSection() {
         </div>
       )}
 
-      <div className="mt-4 flex items-center justify-between gap-2">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <button
           type="button"
           onClick={() => setShowManual((v) => !v)}
-          className="text-[11.5px] text-white/40 underline-offset-2 hover:text-white/70 hover:underline"
+          className="self-start text-[11.5px] text-white/40 underline-offset-2 hover:text-white/70 hover:underline"
         >
           {showManual ? "Hide manual setup" : "Use manual setup instead"}
         </button>
-        <Button onClick={handleConnect} disabled={!roleArn.trim() || connecting}>
+        <Button onClick={handleConnect} disabled={!roleArn.trim() || connecting} className="sm:shrink-0">
           {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Connect AWS"}
         </Button>
       </div>
@@ -143,10 +155,12 @@ export function AwsSection() {
               <span className="truncate font-mono">{externalId || "Loading…"}</span>
               <button
                 type="button"
-                onClick={() => externalId && navigator.clipboard.writeText(externalId)}
-                className="ml-2 shrink-0 text-white/40 transition-colors hover:text-white/80"
+                onClick={copyExternalId}
+                disabled={!externalId}
+                className="ml-2 inline-flex shrink-0 items-center gap-1 text-white/40 transition-colors hover:text-white/80 disabled:opacity-40"
               >
-                Copy
+                {externalIdCopied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                {externalIdCopied ? "Copied" : "Copy"}
               </button>
             </div>
           </Field>

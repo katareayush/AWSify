@@ -150,10 +150,10 @@ export function scanToSuggestion(scan: RepoScanResult): DeploymentSuggestion {
     hasDockerfile: scan.hasDockerfile,
     envVars: scan.envVars,
     database: scan.databaseRequired
-      ? { required: true, engine: scan.databaseEngine, note: "Detected database dependency. RDS will be provisioned." }
+      ? { required: true, engine: scan.databaseEngine, note: "Detected database dependency. RDS provisioning is planned, but not part of the current ECS Fargate MVP template." }
       : { required: false },
     cache: scan.cacheRequired
-      ? { required: true, note: "Detected Redis dependency. ElastiCache will be provisioned." }
+      ? { required: true, note: "Detected Redis dependency. ElastiCache provisioning is planned, but not part of the current ECS Fargate MVP template." }
       : { required: false },
     confidence: scan.signals.length >= 2 ? 0.82 : 0.55,
     notes: scan.signals

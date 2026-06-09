@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUrlNumber, useUrlState } from "../../lib/use-url-state";
-import { AlertTriangle, ArrowRight, Github, KeyRound, Loader2, Lock, RefreshCw, Search } from "lucide-react";
+import { AlertTriangle, ArrowRight, GitBranch, GitCommitHorizontal, Github, KeyRound, Loader2, Lock, RefreshCw, Search, Users } from "lucide-react";
 import { PageHeading } from "../../components/page-heading";
 import { ProductShell } from "../../components/product-shell";
 import { Button } from "../../components/ui/button";
@@ -14,9 +14,27 @@ import { PageSkeleton } from "../../components/ui/skeleton";
 import { EmptyState } from "../../components/ui/empty-state";
 import { useAuth } from "../../lib/use-auth";
 import { useToast } from "../../components/ui/toast";
-import { api, type Repo, type AwsConnection } from "../../lib/api";
+import { api, type Repo, type AwsConnection, type RepoRefSummary } from "../../lib/api";
 
 const PAGE_SIZE = 10;
+
+const DEPLOYMENT_PROFILES = [
+  {
+    key: "lean",
+    label: "Lean launch",
+    description: "Small team, early traffic, lowest baseline spend."
+  },
+  {
+    key: "growth",
+    label: "Growth traffic",
+    description: "Production launch with room for regular usage spikes."
+  },
+  {
+    key: "high-scale",
+    label: "Large user base",
+    description: "Higher availability expectations and heavier traffic."
+  }
+];
 
 export default function RepositoriesPage() {
   return (
@@ -37,6 +55,9 @@ function RepositoriesPageInner() {
   const [deploying, setDeploying] = useState<string | null>(null);
   const [reposLoading, setReposLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [deploymentProfile, setDeploymentProfile] = useState("lean");
+  const [repoRefs, setRepoRefs] = useState<Record<string, RepoRefSummary>>({});
+  const [refsLoading, setRefsLoading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!me?.authenticated) return;
@@ -50,7 +71,7 @@ function RepositoriesPageInner() {
     ]).finally(() => setReposLoading(false));
   }, [me?.authenticated, toast]);
 
-  useEffect(() => { setPage(0); }, [query]);
+  useEffect(() => { setPage(0); }, [query, setPage]);
 
   async function handleInstallApp() {
     try {
@@ -84,8 +105,9 @@ function RepositoriesPageInner() {
     try {
       const { deploymentId } = await api.triggerDeploy({
         repoId: repo.id,
-        branch: repo.defaultBranch,
-        awsConnectionId: connection.id
+        branch: repoRefs[repo.id]?.branch ?? repo.defaultBranch,
+        awsConnectionId: connection.id,
+        deploymentProfile
       });
       toast.success(`Deployment started for ${repo.fullName}.`);
       router.push(`/deployments/${deploymentId}`);
@@ -99,10 +121,38 @@ function RepositoriesPageInner() {
     () => repos.filter(r => r.fullName.toLowerCase().includes(query.toLowerCase())),
     [repos, query]
   );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages - 1);
+
+  useEffect(() => {
+    if (page !== currentPage) setPage(currentPage);
+  }, [currentPage, page, setPage]);
+
   const paginated = useMemo(
-    () => filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
-    [filtered, page]
+    () => filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE),
+    [filtered, currentPage]
   );
+
+  useEffect(() => {
+    if (!me?.authenticated || reposLoading) return;
+    for (const repo of paginated) {
+      if (repoRefs[repo.id] || refsLoading[repo.id]) continue;
+      void loadRefs(repo.id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.authenticated, paginated, reposLoading]);
+
+  async function loadRefs(repoId: string, branch?: string) {
+    setRefsLoading((current) => ({ ...current, [repoId]: true }));
+    try {
+      const refs = await api.repositoryRefs(repoId, branch);
+      setRepoRefs((current) => ({ ...current, [repoId]: refs }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not load repository branches.");
+    } finally {
+      setRefsLoading((current) => ({ ...current, [repoId]: false }));
+    }
+  }
 
   if (loading) {
     return (
@@ -160,6 +210,33 @@ function RepositoriesPageInner() {
         )}
 
         <Panel className="p-6">
+          <div className="mb-5 rounded-lg border border-white/[0.06] bg-white/[0.015] p-3">
+            <div className="mb-3 flex items-center gap-2">
+              <Users className="h-4 w-4 text-violet-soft" />
+              <p className="text-[12.5px] font-medium text-white/85">Expected traffic</p>
+            </div>
+            <div className="grid gap-2 lg:grid-cols-3">
+              {DEPLOYMENT_PROFILES.map((profile) => {
+                const selected = deploymentProfile === profile.key;
+                return (
+                  <button
+                    key={profile.key}
+                    type="button"
+                    onClick={() => setDeploymentProfile(profile.key)}
+                    className={`rounded-md border px-3 py-2 text-left transition-colors ${
+                      selected
+                        ? "border-violet/35 bg-violet/10 text-white"
+                        : "border-white/[0.07] bg-white/[0.02] text-white/65 hover:border-white/[0.14] hover:text-white"
+                    }`}
+                  >
+                    <span className="block text-[12.5px] font-medium">{profile.label}</span>
+                    <span className="mt-1 block text-[11px] leading-[1.45] text-white/40">{profile.description}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="flex h-10 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 text-[13px] text-white/45">
             <Search className="h-3.5 w-3.5 shrink-0" />
             <input
@@ -200,7 +277,7 @@ function RepositoriesPageInner() {
               paginated.map(repo => (
                 <div
                   key={repo.id}
-                  className="grid gap-3 py-4 text-[13.5px] md:grid-cols-[1fr_200px]"
+                  className="grid gap-3 py-4 text-[13.5px] lg:grid-cols-[minmax(0,1fr)_minmax(220px,300px)_160px]"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -216,7 +293,13 @@ function RepositoriesPageInner() {
                       default branch · {repo.defaultBranch}
                     </p>
                   </div>
-                  <div className="flex md:justify-end">
+                  <RepoBranchControl
+                    repo={repo}
+                    refs={repoRefs[repo.id]}
+                    loading={!!refsLoading[repo.id]}
+                    onBranchChange={(branch) => loadRefs(repo.id, branch)}
+                  />
+                  <div className="flex lg:justify-end">
                     {hasAws ? (
                       <Button
                         variant="secondary"
@@ -244,7 +327,7 @@ function RepositoriesPageInner() {
           </div>
 
           <Pagination
-            page={page}
+            page={currentPage}
             pageSize={PAGE_SIZE}
             total={filtered.length}
             onPageChange={setPage}
@@ -253,5 +336,66 @@ function RepositoriesPageInner() {
         </Panel>
       </div>
     </ProductShell>
+  );
+}
+
+function RepoBranchControl({
+  repo,
+  refs,
+  loading,
+  onBranchChange
+}: {
+  repo: Repo;
+  refs?: RepoRefSummary;
+  loading: boolean;
+  onBranchChange: (branch: string) => void;
+}) {
+  const commits = refs?.commits ?? [];
+  const branch = refs?.branch ?? repo.defaultBranch;
+
+  return (
+    <div className="min-w-0 rounded-md border border-white/[0.06] bg-white/[0.015] p-2.5">
+      <label className="flex items-center gap-2">
+        <GitBranch className="h-3.5 w-3.5 shrink-0 text-white/40" />
+        <select
+          value={branch}
+          onChange={(event) => onBranchChange(event.target.value)}
+          disabled={loading || !refs}
+          className="min-w-0 flex-1 bg-transparent font-mono text-[11.5px] text-white/75 outline-none disabled:opacity-50"
+        >
+          {refs ? (
+            refs.branches.map((item) => (
+              <option key={item.name} value={item.name}>
+                {item.name}{item.isDefault ? " (default)" : ""}
+              </option>
+            ))
+          ) : (
+            <option value={repo.defaultBranch}>{loading ? "Loading branches..." : repo.defaultBranch}</option>
+          )}
+        </select>
+      </label>
+      <div className="mt-2 space-y-1">
+        {loading && commits.length === 0 ? (
+          <p className="flex items-center gap-1.5 text-[11px] text-white/35">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Loading recent commits
+          </p>
+        ) : commits.length > 0 ? (
+          commits.slice(0, 2).map((commit) => (
+            <div key={commit.sha} className="min-w-0 text-[11px] leading-[1.35]">
+              <p className="truncate text-white/65" title={commit.message}>
+                <GitCommitHorizontal className="mr-1 inline h-3 w-3 text-white/35" />
+                {commit.message}
+              </p>
+              <p className="mt-0.5 font-mono text-white/35">
+                {commit.shortSha} · {commit.author}
+              </p>
+            </div>
+          ))
+        ) : (
+          <p className="text-[11px] text-white/35">Recent commits unavailable.</p>
+        )}
+      </div>
+    </div>
   );
 }

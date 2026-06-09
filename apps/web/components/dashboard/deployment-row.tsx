@@ -18,7 +18,7 @@ export function DeploymentRow({ deployment }: { deployment: Deployment }) {
   return (
     <Link
       href={`/deployments/${deployment.id}`}
-      className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-white/[0.02]"
+      className="flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-white/[0.02] sm:items-center sm:gap-4"
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] text-white">{deployment.project.name}</p>
@@ -29,7 +29,7 @@ export function DeploymentRow({ deployment }: { deployment: Deployment }) {
       <span className="hidden text-[11.5px] text-white/40 sm:block">
         {new Date(deployment.updatedAt).toLocaleDateString()}
       </span>
-      <span className={`shrink-0 text-[11.5px] ${statusClass(deployment.status)}`}>
+      <span className={`shrink-0 rounded-full border border-white/[0.08] bg-white/[0.02] px-2 py-0.5 text-[11.5px] sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 ${statusClass(deployment.status)}`}>
         {deployment.status}
       </span>
     </Link>
