@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { PanelLeftClose } from "lucide-react";
+import { Activity, PanelLeftClose } from "lucide-react";
 import { Wordmark } from "../landing/primitives/wordmark";
 import { navItems } from "./nav-data";
 import { useSidebar } from "./sidebar-context";
@@ -100,18 +100,15 @@ function SidebarFooter({ onOpenCommandPalette }: { onOpenCommandPalette: () => v
         <span>Command palette</span>
         <kbd className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-white/60">⌘ K</kbd>
       </button>
-      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+      <Link href="/status" className="block rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 transition-colors hover:border-white/[0.12] hover:bg-white/[0.04]">
         <p className="font-mono text-[10px] uppercase tracking-wider text-white/35">
           status
         </p>
         <div className="mt-2 flex items-center gap-2 text-[12px] text-white/70">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          </span>
-          All systems operational
+          <Activity className="h-3.5 w-3.5 text-white/45" />
+          View system status
         </div>
-      </div>
+      </Link>
     </div>
   );
 }
