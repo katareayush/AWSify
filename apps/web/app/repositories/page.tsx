@@ -103,7 +103,7 @@ function RepositoriesPageInner() {
   }
 
   async function handleDeploy(repo: Repo) {
-    const connection = connections.find((c) => c.status === "valid") ?? connections[0];
+    const connection = connections.find((c) => c.status === "valid");
     if (!connection) {
       router.push("/connections");
       return;
@@ -169,7 +169,8 @@ function RepositoriesPageInner() {
     );
   }
 
-  const hasAws = connections.length > 0;
+  const hasAws = connections.some((connection) => connection.status === "valid");
+  const hasBrokenAws = !hasAws && connections.length > 0;
 
   return (
     <ProductShell active="Repositories">
@@ -201,15 +202,19 @@ function RepositoriesPageInner() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
               <div className="flex-1">
-                <p className="text-[13px] font-medium text-amber-200">AWS account not connected</p>
+                <p className="text-[13px] font-medium text-amber-200">
+                  {hasBrokenAws ? "AWS connection needs attention" : "AWS account not connected"}
+                </p>
                 <p className="mt-1 text-[12.5px] leading-[1.55] text-amber-200/75">
-                  Deploying requires an IAM role from your AWS account. Connect one to enable the Deploy button on each repository.
+                  {hasBrokenAws
+                    ? "Your AWS connection is invalid or still pending validation. Fix it to enable the Deploy button on each repository."
+                    : "Deploying requires an IAM role from your AWS account. Connect one to enable the Deploy button on each repository."}
                 </p>
               </div>
               <Button asChild variant="secondary" className="shrink-0">
                 <Link href="/connections">
                   <KeyRound className="h-4 w-4" />
-                  Connect AWS
+                  {hasBrokenAws ? "Fix AWS connection" : "Connect AWS"}
                 </Link>
               </Button>
             </div>

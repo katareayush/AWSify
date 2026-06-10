@@ -3,6 +3,16 @@ import { humanizeError } from "./error-messages";
 const BASE = process.env.NEXT_PUBLIC_API_URL;
 if (!BASE) throw new Error("NEXT_PUBLIC_API_URL is required.");
 
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
@@ -17,10 +27,10 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     const detail = typeof errObj.detail === "string" ? errObj.detail : "";
     const reason = typeof errObj.validation?.reason === "string" ? errObj.validation.reason : "";
     const composite = [code, detail, reason].filter(Boolean).join(": ");
-    throw new Error(humanizeError(composite));
+    throw new ApiError(humanizeError(composite), res.status);
   }
   if (!res.ok) {
-    throw new Error(humanizeError(`HTTP ${res.status}`));
+    throw new ApiError(humanizeError(`HTTP ${res.status}`), res.status);
   }
   return data as T;
 }

@@ -14,11 +14,25 @@ export function SidebarRail({ active, onOpenCommandPalette }: SidebarRailProps) 
   const { setCollapsed } = useSidebar();
   return (
     <aside className="z-30 hidden w-14 border-r border-white/[0.06] bg-[#0a0a0d]/95 backdrop-blur-xl lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col">
-      <div className="h-16 border-b border-white/[0.06]" />
+      <div className="flex h-16 items-center justify-center border-b border-white/[0.06]">
+        <Link
+          href="/"
+          title="AWS-ify"
+          aria-label="AWS-ify home"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-violet/25 bg-violet/10 text-[13px] font-semibold text-violet-soft transition-colors hover:border-violet/40 hover:text-white"
+        >
+          A
+        </Link>
+      </div>
       <nav className="flex-1 px-2 py-4">
         {navGroups.map((group, index) => (
-          <div key={group.label} className={index > 0 ? "mt-3 border-t border-white/[0.05] pt-3" : ""}>
-            <div className="space-y-1">
+          <div key={group.label} className={index > 0 ? "mt-6" : ""}>
+            {/* Same height as the expanded sidebar's group label so icons
+                don't jump vertically when collapsing/expanding. */}
+            <div className="flex h-[23px] items-center justify-center" aria-hidden>
+              <span className="h-px w-4 bg-white/[0.08]" />
+            </div>
+            <div className="space-y-0.5">
               {group.items.map((item) => {
                 const isActive = item.label === active;
                 return (

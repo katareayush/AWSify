@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import { Button } from "../ui/button";
 import { Wordmark } from "../landing/primitives/wordmark";
-import { api, type Me } from "../../lib/api";
+import { api } from "../../lib/api";
+import { useAuth } from "../../lib/use-auth";
 import { navItems } from "./nav-data";
 
 interface TopBarProps {
@@ -14,11 +14,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ active, onOpenCommandPalette }: TopBarProps) {
-  const [me, setMe] = useState<Me | null>(null);
-
-  useEffect(() => {
-    api.me().then(setMe).catch(() => {});
-  }, []);
+  const { me, loading } = useAuth({ redirect: false });
 
   async function handleConnect() {
     try {
@@ -57,7 +53,9 @@ export function TopBar({ active, onOpenCommandPalette }: TopBarProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            {me?.authenticated ? (
+            {loading ? (
+              <div className="h-8 w-8 animate-pulse rounded-full border border-white/[0.08] bg-white/[0.04]" />
+            ) : me?.authenticated ? (
               <>
                 <Button asChild variant="secondary" className="hidden sm:inline-flex">
                   <Link href="/repositories">

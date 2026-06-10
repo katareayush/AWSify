@@ -12,7 +12,7 @@ import { Panel } from "../../../components/ui/panel";
 import { PageSkeleton } from "../../../components/ui/skeleton";
 import { useToast } from "../../../components/ui/toast";
 import { useAuth } from "../../../lib/use-auth";
-import { api, type DeploymentDetail } from "../../../lib/api";
+import { api, ApiError, type DeploymentDetail } from "../../../lib/api";
 
 import { ArtifactsList } from "../../../components/deployments/artifacts-list";
 import { DeployActionsPanel } from "../../../components/deployments/deploy-actions-panel";
@@ -57,7 +57,9 @@ function DeploymentDetailPageInner() {
       const r = await api.getDeployment(id);
       setDetail(r.deployment);
       return r.deployment;
-    } catch {
+    } catch (err) {
+      // Deleted elsewhere — show "not found" instead of polling stale data.
+      if (err instanceof ApiError && err.status === 404) setDetail(null);
       return null;
     } finally {
       setFetching(false);
@@ -65,10 +67,18 @@ function DeploymentDetailPageInner() {
   }
 
   useEffect(() => {
+    if (detail?.project.name) document.title = `${detail.project.name} — AWS-ify`;
+  }, [detail?.project.name]);
+
+  useEffect(() => {
     if (!me?.authenticated) return;
 
     let cancelled = false;
     async function poll() {
+      if (document.hidden) {
+        pollRef.current = setTimeout(poll, 3500);
+        return;
+      }
       const d = await fetchDetail();
       if (cancelled) return;
       if (d && POLLING_STATUSES.has(d.status)) {
