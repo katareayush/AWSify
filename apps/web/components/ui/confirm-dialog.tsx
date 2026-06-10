@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import { Button } from "./button";
 
@@ -26,20 +26,44 @@ export function ConfirmDialog({
   onCancel
 }: ConfirmDialogProps) {
   const [busy, setBusy] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     setBusy(false);
     document.body.style.overflow = "hidden";
+    const previouslyFocused = document.activeElement as HTMLElement | null;
     return () => {
       document.body.style.overflow = "";
+      previouslyFocused?.focus?.();
     };
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onCancel();
+      if (event.key === "Escape") {
+        onCancel();
+        return;
+      }
+      // Trap Tab inside the dialog.
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusables = dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const current = document.activeElement;
+      if (event.shiftKey) {
+        if (current === first || !dialogRef.current.contains(current)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (current === last || !dialogRef.current.contains(current)) {
+        event.preventDefault();
+        first.focus();
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -70,6 +94,7 @@ export function ConfirmDialog({
       onClick={requestCancel}
     >
       <div
+        ref={dialogRef}
         className="animate-palette-in w-full max-w-md overflow-hidden rounded-xl border border-white/[0.1] bg-[#0d0c14] shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
