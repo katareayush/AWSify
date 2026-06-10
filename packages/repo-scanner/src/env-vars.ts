@@ -42,10 +42,13 @@ const INTERNAL_DENYLIST = new Set([
   "LC_ALL"
 ]);
 
+// import.meta.env builtins (Vite) — never user-supplied configuration.
+const VITE_BUILTINS = new Set(["MODE", "DEV", "PROD", "SSR", "BASE_URL"]);
+
 const INTERNAL_PREFIXES = ["npm_", "NPM_", "VERCEL_", "NEXT_RUNTIME", "TURBO_", "VSCODE_", "GITHUB_ACTIONS"];
 
 function isInternal(name: string): boolean {
-  if (INTERNAL_DENYLIST.has(name)) return true;
+  if (INTERNAL_DENYLIST.has(name) || VITE_BUILTINS.has(name)) return true;
   return INTERNAL_PREFIXES.some((prefix) => name.startsWith(prefix));
 }
 
@@ -64,24 +67,35 @@ function isInternal(name: string): boolean {
  */
 export function detectEnvVars(root: string, sourceExtensions: string[]): EnvVar[] {
   const fromSource = scanSource(root, sourceExtensions);
-  const fromDeclared = scanDeclared(root);
+  const { declared: fromDeclared, localNames } = scanDeclared(root);
 
   const merged = new Map<string, EnvVar>();
 
   const finalize = (name: string, declared: DeclaredVar | undefined, hit: SourceHit | undefined): EnvVar => {
     const declaredRequired = declared?.required ?? false;
     const sourceUnguarded = hit?.unguarded ?? false;
-    // Strong evidence: env.example marks it required AND source uses it unguarded.
-    // A `.env.example` entry without a default is the strongest single signal,
-    // so we honour it even if source isn't touched (declared-only vars).
-    const required = declaredRequired && (sourceUnguarded || !hit);
+    const category = categorize(name);
+
+    // Strong evidence paths to "required":
+    // 1. env.example marks it required AND source uses it unguarded
+    //    (or the var is declared-only — a no-default example entry is the
+    //    strongest single signal we have).
+    // 2. Not declared anywhere, but used unguarded in source AND it looks
+    //    like a secret/integration (DATABASE_URL, STRIPE_SECRET_KEY, …) —
+    //    apps don't survive without those.
+    // 3. Present in the developer's own .env file AND used unguarded —
+    //    if they needed it locally, production needs it too.
+    const required =
+      (declaredRequired && (sourceUnguarded || !hit)) ||
+      (!declared && sourceUnguarded && (category === "secret" || category === "integration")) ||
+      (localNames.has(name) && sourceUnguarded);
 
     return {
       name,
       required,
       ...(declared?.description ? { description: declared.description } : {}),
       ...(declared?.example ? { example: declared.example } : {}),
-      category: categorize(name)
+      category
     };
   };
 
@@ -93,6 +107,13 @@ export function detectEnvVars(root: string, sourceExtensions: string[]): EnvVar[
   for (const [name, declared] of fromDeclared) {
     if (merged.has(name) || isInternal(name)) continue;
     merged.set(name, finalize(name, declared, undefined));
+  }
+
+  // Names that only exist in a local .env: surface as optional config so the
+  // user sees them, but never leak the local value as an example.
+  for (const name of localNames) {
+    if (merged.has(name) || isInternal(name)) continue;
+    merged.set(name, { name, required: false, category: categorize(name) });
   }
 
   return [...merged.values()].sort((a, b) => {
@@ -113,10 +134,15 @@ function categorize(name: string): EnvVarCategory {
 // --- source-code scanning ----------------------------------------------------
 
 const SOURCE_PATTERNS: Array<{ regex: RegExp; group: number }> = [
-  // JS/TS: process.env.X — with optional fallback after it
-  { regex: /process\.env\.([A-Z_][A-Z0-9_]*)\s*(\|\|)?/g, group: 1 },
+  // JS/TS: process.env.X — with optional `||` / `??` fallback after it
+  { regex: /process\.env\.([A-Z_][A-Z0-9_]*)\s*(\|\||\?\?)?/g, group: 1 },
   // JS/TS: process.env["X"] / process.env['X']
-  { regex: /process\.env\[\s*['"]([A-Z_][A-Z0-9_]*)['"]\s*\]\s*(\|\|)?/g, group: 1 },
+  { regex: /process\.env\[\s*['"]([A-Z_][A-Z0-9_]*)['"]\s*\]\s*(\|\||\?\?)?/g, group: 1 },
+  // Vite: import.meta.env.VITE_X / import.meta.env["VITE_X"]
+  { regex: /import\.meta\.env\.([A-Z_][A-Z0-9_]*)\s*(\|\||\?\?)?/g, group: 1 },
+  { regex: /import\.meta\.env\[\s*['"]([A-Z_][A-Z0-9_]*)['"]\s*\]\s*(\|\||\?\?)?/g, group: 1 },
+  // Deno: Deno.env.get("X")
+  { regex: /Deno\.env\.get\(\s*['"]([A-Z_][A-Z0-9_]*)['"]\s*\)\s*(\|\||\?\?)?/g, group: 1 },
   // Python: os.environ.get("X", "default")  — second arg means optional
   { regex: /os\.environ\.get\(\s*['"]([A-Z_][A-Z0-9_]*)['"]\s*(,)?/g, group: 1 },
   // Python: os.environ["X"]
@@ -145,21 +171,38 @@ function scanSource(root: string, extensions: string[]): Map<string, SourceHit> 
   const exts = new Set([...extensions, "py", "go", "rb", "java", "kt", "rs", "php", "properties", "yml", "yaml"]);
   const hits = new Map<string, SourceHit>();
 
+  const record = (name: string, guarded: boolean, file: string) => {
+    const previous = hits.get(name);
+    hits.set(name, {
+      // unguarded only if EVERY reference seen so far is unguarded
+      unguarded: previous ? previous.unguarded && !guarded : !guarded,
+      files: previous ? Array.from(new Set([...previous.files, file])) : [file]
+    });
+  };
+
   for (const file of collectSourceFiles(root, exts)) {
     const content = readFileSafe(file);
+
+    // Destructuring: const { DATABASE_URL, API_KEY = "fallback" } = process.env
+    for (const match of content.matchAll(/(?:const|let|var)\s*\{([^}]+)\}\s*=\s*process\.env/g)) {
+      for (const part of match[1].split(",")) {
+        const entry = part.trim();
+        if (!entry) continue;
+        const nameMatch = /^([A-Z_][A-Z0-9_]*)/.exec(entry);
+        if (!nameMatch) continue;
+        // `X = fallback` or `X: alias = fallback` means there's a default.
+        record(nameMatch[1], entry.includes("="), file);
+      }
+    }
+
     for (const { regex, group } of SOURCE_PATTERNS) {
       for (const match of content.matchAll(regex)) {
         const name = match[group];
         if (!name) continue;
-        // group+1 is the "|| fallback" or "," (Python default) marker. Its
-        // presence demotes this *individual* reference to "guarded".
+        // group+1 is the "|| fallback" / "?? fallback" or "," (Python default)
+        // marker. Its presence demotes this *individual* reference to "guarded".
         const guarded = Boolean(match[group + 1]) || isGuardedContext(content, match.index ?? 0, name);
-        const previous = hits.get(name);
-        hits.set(name, {
-          // unguarded only if EVERY reference seen so far is unguarded
-          unguarded: previous ? previous.unguarded && !guarded : !guarded,
-          files: previous ? Array.from(new Set([...previous.files, file])) : [file]
-        });
+        record(name, guarded, file);
       }
     }
   }
@@ -183,18 +226,60 @@ function isGuardedContext(content: string, index: number, name: string): boolean
 
 // --- .env.example parsing ----------------------------------------------------
 
-const DECLARED_FILENAMES = [".env.example", ".env.sample", ".env.template", ".env.dist"];
+const DECLARED_FILENAMES = [".env.example", ".env.sample", ".env.template", ".env.dist", ".env.local.example", "example.env"];
 
-function scanDeclared(root: string): Map<string, DeclaredVar> {
+// Local env files: we read VARIABLE NAMES ONLY from these (never values —
+// they may hold real secrets). A var the developer set locally is a strong
+// hint production needs it too.
+const LOCAL_ENV_FILENAMES = [".env", ".env.local", ".env.development", ".env.production"];
+
+function scanDeclared(root: string): { declared: Map<string, DeclaredVar>; localNames: Set<string> } {
   const declared = new Map<string, DeclaredVar>();
+  const localNames = new Set<string>();
 
-  for (const filename of DECLARED_FILENAMES) {
-    const path = join(root, filename);
-    if (!existsSync(path)) continue;
-    parseEnvFile(readFileSafe(path), declared);
+  // Monorepos keep .env.example next to each app, not at the repo root.
+  for (const dir of collectEnvDirs(root)) {
+    for (const filename of DECLARED_FILENAMES) {
+      const path = join(dir, filename);
+      if (!existsSync(path)) continue;
+      parseEnvFile(readFileSafe(path), declared);
+    }
+    for (const filename of LOCAL_ENV_FILENAMES) {
+      const path = join(dir, filename);
+      if (!existsSync(path)) continue;
+      for (const line of readFileSafe(path).split(/\r?\n/)) {
+        const match = /^([A-Z_][A-Z0-9_]*)\s*=/.exec(line.trim());
+        if (match) localNames.add(match[1]);
+      }
+    }
   }
 
-  return declared;
+  return { declared, localNames };
+}
+
+function collectEnvDirs(root: string, depth = 0): string[] {
+  if (depth > 3) return [];
+  const ignored = new Set([
+    "node_modules", ".git", ".next", "dist", "build", "coverage",
+    "__pycache__", ".venv", "venv", "vendor", ".turbo", ".cache"
+  ]);
+  const dirs = [root];
+  let entries: string[];
+  try {
+    entries = readdirSync(root);
+  } catch {
+    return dirs;
+  }
+  for (const entry of entries) {
+    if (ignored.has(entry) || entry.startsWith(".")) continue;
+    const path = join(root, entry);
+    try {
+      if (statSync(path).isDirectory()) dirs.push(...collectEnvDirs(path, depth + 1));
+    } catch {
+      // unreadable entry — skip
+    }
+  }
+  return dirs;
 }
 
 function parseEnvFile(content: string, out: Map<string, DeclaredVar>): void {

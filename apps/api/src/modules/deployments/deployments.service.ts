@@ -110,15 +110,28 @@ export class DeploymentsService {
       }
     });
 
-    await this.queue.enqueueDeployment({
-      projectId: project.id,
-      repoFullName: repo.fullName,
-      branch: input.branch,
-      awsConnectionId: input.awsConnectionId,
-      approvedPlanId: plan.id,
-      actorUserId: userId,
-      deploymentId: deployment.id
-    });
+    try {
+      await this.queue.enqueueDeployment({
+        projectId: project.id,
+        repoFullName: repo.fullName,
+        branch: input.branch,
+        awsConnectionId: input.awsConnectionId,
+        approvedPlanId: plan.id,
+        actorUserId: userId,
+        deploymentId: deployment.id
+      });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      await this.prisma.deployment.update({
+        where: { id: deployment.id },
+        data: {
+          status: "failed",
+          failureReason: `Could not enqueue the deployment job: ${detail}`,
+          logs: [{ status: "failed", message: `Queue unavailable: ${detail}`, at: new Date().toISOString() }]
+        }
+      }).catch(() => undefined);
+      return { error: "queue_unavailable", detail };
+    }
 
     return { deploymentId: deployment.id };
   }

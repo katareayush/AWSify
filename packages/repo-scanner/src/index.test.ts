@@ -212,6 +212,67 @@ describe("repo scanner", () => {
     expect(byName.get("ANALYTICS_ID")?.required).toBe(false);
   });
 
+  it("detects destructured, nullish-coalesced, and import.meta env usage", () => {
+    const root = newRepo("env-patterns");
+    writeFileSync(
+      join(root, "package.json"),
+      JSON.stringify({
+        scripts: { start: "node server.js" },
+        dependencies: { express: "^4.18.0" }
+      })
+    );
+    writeFileSync(
+      join(root, "server.js"),
+      [
+        "const { DATABASE_URL, SMTP_HOST = 'localhost' } = process.env;",
+        "const key = process.env.STRIPE_SECRET_KEY ?? 'test';",
+        "app.listen(3000);"
+      ].join("\n")
+    );
+    writeFileSync(join(root, "client.ts"), "const api = import.meta.env.VITE_API_URL; const mode = import.meta.env.MODE;");
+
+    const suggestion = scanToSuggestion(scanRepository(root));
+    const byName = new Map(suggestion.envVars.map((envVar) => [envVar.name, envVar]));
+
+    // destructured without default + integration-looking -> required
+    expect(byName.get("DATABASE_URL")?.required).toBe(true);
+    // destructured WITH default -> optional
+    expect(byName.get("SMTP_HOST")?.required).toBe(false);
+    // ?? fallback counts as guarded -> optional
+    expect(byName.get("STRIPE_SECRET_KEY")?.required).toBe(false);
+    // import.meta.env custom var detected; Vite builtin excluded
+    expect(byName.has("VITE_API_URL")).toBe(true);
+    expect(byName.has("MODE")).toBe(false);
+  });
+
+  it("reads .env.example from subdirectories and promotes vars from local .env", () => {
+    const root = newRepo("env-monorepo");
+    writeFileSync(
+      join(root, "package.json"),
+      JSON.stringify({
+        scripts: { start: "node apps/api/server.js" },
+        dependencies: { express: "^4.18.0" }
+      })
+    );
+    mkdirSync(join(root, "apps", "api"), { recursive: true });
+    writeFileSync(join(root, "apps", "api", ".env.example"), "JWT_SECRET=\n");
+    // Local .env: names should surface, values must never leak.
+    writeFileSync(join(root, ".env"), "SESSION_KEY=super-secret-value\n");
+    writeFileSync(
+      join(root, "apps", "api", "server.js"),
+      "const jwt = process.env.JWT_SECRET; const session = process.env.SESSION_KEY; app.listen(3000);"
+    );
+
+    const suggestion = scanToSuggestion(scanRepository(root));
+    const byName = new Map(suggestion.envVars.map((envVar) => [envVar.name, envVar]));
+
+    // declared in nested .env.example without default + unguarded use -> required
+    expect(byName.get("JWT_SECRET")?.required).toBe(true);
+    // present in local .env + used unguarded -> required, but value never leaks
+    expect(byName.get("SESSION_KEY")?.required).toBe(true);
+    expect(byName.get("SESSION_KEY")?.example).toBeUndefined();
+  });
+
   it("throws a helpful error for unsupported repos", () => {
     const root = newRepo("empty");
     writeFileSync(join(root, "README.md"), "nothing useful here");
