@@ -1,13 +1,20 @@
 import type { Metadata } from "next";
-import { Inter, Instrument_Serif } from "next/font/google";
+import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import { ToastProvider } from "../components/ui/toast";
 import "./globals.css";
 
 const inter = Inter({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-app",
+  variable: "--font-sans",
   weight: ["400", "500", "600"]
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-mono",
+  weight: ["400", "500"]
 });
 
 const instrumentSerif = Instrument_Serif({
@@ -26,7 +33,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${instrumentSerif.variable}`}>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable}`}>
       <body className="font-sans">
         <ToastProvider>{children}</ToastProvider>
       </body>

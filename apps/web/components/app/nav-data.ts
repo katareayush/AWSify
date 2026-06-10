@@ -13,10 +13,27 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
-export const navItems: NavItem[] = [
-  { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Deployments", href: "/deployments", icon: FileCode2 },
-  { label: "Repositories", href: "/repositories", icon: Github },
-  { label: "Connections", href: "/connections", icon: KeyRound },
-  { label: "Settings", href: "/settings", icon: Settings }
+export interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+export const navGroups: NavGroup[] = [
+  {
+    label: "Platform",
+    items: [
+      { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Deployments", href: "/deployments", icon: FileCode2 },
+      { label: "Repositories", href: "/repositories", icon: Github }
+    ]
+  },
+  {
+    label: "Configure",
+    items: [
+      { label: "Connections", href: "/connections", icon: KeyRound },
+      { label: "Settings", href: "/settings", icon: Settings }
+    ]
+  }
 ];
+
+export const navItems: NavItem[] = navGroups.flatMap((group) => group.items);

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, PanelLeftClose } from "lucide-react";
+import { Activity, PanelLeftClose, Search } from "lucide-react";
 import { Wordmark } from "../landing/primitives/wordmark";
-import { navItems } from "./nav-data";
+import { navGroups, type NavItem } from "./nav-data";
 import { useSidebar } from "./sidebar-context";
 import { SidebarRail } from "./sidebar-rail";
 
@@ -48,40 +48,40 @@ function SidebarBrand() {
 
 function SidebarNav({ active }: { active: string }) {
   return (
-    <nav className="flex-1 space-y-0.5 px-3 py-4">
-      {navItems.map((item) => (
-        <SidebarNavItem
-          key={item.label}
-          item={item}
-          active={item.label === active}
-        />
+    <nav className="flex-1 overflow-y-auto px-3 py-4">
+      {navGroups.map((group, index) => (
+        <div key={group.label} className={index > 0 ? "mt-6" : ""}>
+          <p className="px-3 pb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/30">
+            {group.label}
+          </p>
+          <div className="space-y-0.5">
+            {group.items.map((item) => (
+              <SidebarNavItem key={item.label} item={item} active={item.label === active} />
+            ))}
+          </div>
+        </div>
       ))}
     </nav>
   );
 }
 
-function SidebarNavItem({
-  item,
-  active
-}: {
-  item: (typeof navItems)[number];
-  active: boolean;
-}) {
+function SidebarNavItem({ item, active }: { item: NavItem; active: boolean }) {
   return (
     <Link
       href={item.href}
-      className={`group relative flex h-9 items-center gap-2.5 rounded-lg px-3 text-[13.5px] transition-colors ${
+      aria-current={active ? "page" : undefined}
+      className={`group relative flex h-9 items-center gap-2.5 rounded-lg px-3 text-[13px] font-medium transition-colors ${
         active
-          ? "bg-white/[0.06] text-white"
-          : "text-white/55 hover:bg-white/[0.03] hover:text-white"
+          ? "bg-gradient-to-r from-violet/[0.14] to-white/[0.03] text-white"
+          : "text-white/55 hover:bg-white/[0.04] hover:text-white"
       }`}
     >
       {active ? (
-        <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-violet" />
+        <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-violet shadow-[0_0_8px_rgba(139,92,246,0.7)]" />
       ) : null}
       <item.icon
         className={`h-4 w-4 shrink-0 transition-colors ${
-          active ? "text-violet-soft" : "text-white/45 group-hover:text-white/75"
+          active ? "text-violet-soft" : "text-white/40 group-hover:text-white/75"
         }`}
       />
       <span className="truncate">{item.label}</span>
@@ -91,23 +91,26 @@ function SidebarNavItem({
 
 function SidebarFooter({ onOpenCommandPalette }: { onOpenCommandPalette: () => void }) {
   return (
-    <div className="space-y-2 border-t border-white/[0.06] p-4">
+    <div className="space-y-0.5 border-t border-white/[0.06] p-3">
       <button
         type="button"
         onClick={onOpenCommandPalette}
-        className="flex w-full items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-left text-[12px] text-white/55 transition-colors hover:border-white/[0.12] hover:bg-white/[0.04] hover:text-white"
+        className="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-left text-[13px] text-white/55 transition-colors hover:bg-white/[0.04] hover:text-white"
       >
-        <span>Command palette</span>
-        <kbd className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-white/60">⌘ K</kbd>
+        <Search className="h-4 w-4 shrink-0 text-white/40" />
+        <span className="flex-1">Search</span>
+        <kbd className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-white/50">⌘K</kbd>
       </button>
-      <Link href="/status" className="block rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 transition-colors hover:border-white/[0.12] hover:bg-white/[0.04]">
-        <p className="font-mono text-[10px] uppercase tracking-wider text-white/35">
-          status
-        </p>
-        <div className="mt-2 flex items-center gap-2 text-[12px] text-white/70">
-          <Activity className="h-3.5 w-3.5 text-white/45" />
-          View system status
-        </div>
+      <Link
+        href="/status"
+        className="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-[13px] text-white/55 transition-colors hover:bg-white/[0.04] hover:text-white"
+      >
+        <Activity className="h-4 w-4 shrink-0 text-white/40" />
+        <span className="flex-1">System status</span>
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+        </span>
       </Link>
     </div>
   );

@@ -80,7 +80,7 @@ html:has(.landing-root) {
 
 /* ── App (dashboard / connections / etc.) — dark theme tokens ─────────── */
 .app-root {
-  font-family: var(--font-app), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-feature-settings: normal;
   letter-spacing: -0.005em;
   --background: 240 8% 4%;
