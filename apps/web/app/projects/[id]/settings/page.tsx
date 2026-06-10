@@ -27,20 +27,26 @@ function ProjectSettingsPageInner() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [auditUnavailable, setAuditUnavailable] = useState(false);
   const [branch, setBranch] = useState("");
   const [port, setPort] = useState("");
   const [healthPath, setHealthPath] = useState("");
 
   async function load() {
-    const [settingsResult, eventResult] = await Promise.all([
-      api.getProjectSettings(id),
-      api.getProjectAuditEvents(id)
-    ]);
+    const settingsResult = await api.getProjectSettings(id);
     setSettings(settingsResult.settings);
-    setEvents(eventResult.events);
     setBranch(settingsResult.settings.branch);
     setPort(settingsResult.settings.plan?.port ? String(settingsResult.settings.plan.port) : "");
     setHealthPath(settingsResult.settings.plan?.healthPath ?? "/");
+
+    try {
+      const eventResult = await api.getProjectAuditEvents(id);
+      setEvents(eventResult.events);
+      setAuditUnavailable(Boolean(eventResult.unavailable));
+    } catch {
+      setEvents([]);
+      setAuditUnavailable(true);
+    }
   }
 
   useEffect(() => {
@@ -165,7 +171,11 @@ function ProjectSettingsPageInner() {
                 <p className="text-[13px] font-medium text-white">Audit trail</p>
               </div>
               <div className="divide-y divide-white/[0.05]">
-                {events.length === 0 ? (
+                {auditUnavailable ? (
+                  <p className="px-5 py-6 text-[12px] text-amber-300/75">
+                    Audit storage is not available yet. Settings remain usable.
+                  </p>
+                ) : events.length === 0 ? (
                   <p className="px-5 py-6 text-[12px] text-white/40">No audit events yet.</p>
                 ) : events.slice(0, 12).map((event) => (
                   <div key={event.id} className="px-5 py-3">

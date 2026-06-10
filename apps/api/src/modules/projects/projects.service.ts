@@ -190,14 +190,18 @@ export class ProjectsService {
     const project = await this.prisma.project.findFirst({ where: { id, userId }, select: { id: true } });
     if (!project) return { error: "not_found" };
 
-    const events = await (this.prisma as PrismaService & {
-      auditEvent: { findMany: (args: Record<string, unknown>) => Promise<Array<Record<string, unknown>>> };
-    }).auditEvent.findMany({
-      where: { projectId: id, userId },
-      orderBy: { createdAt: "desc" },
-      take: 100
-    });
-    return { events };
+    try {
+      const events = await (this.prisma as PrismaService & {
+        auditEvent: { findMany: (args: Record<string, unknown>) => Promise<Array<Record<string, unknown>>> };
+      }).auditEvent.findMany({
+        where: { projectId: id, userId },
+        orderBy: { createdAt: "desc" },
+        take: 100
+      });
+      return { events };
+    } catch {
+      return { events: [], unavailable: true };
+    }
   }
 
   private async recordAudit(input: {

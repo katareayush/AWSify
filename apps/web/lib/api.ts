@@ -263,7 +263,7 @@ export const api = {
       body: JSON.stringify(body)
     }),
 
-  getProjectAuditEvents: (id: string) => req<{ events: AuditEvent[] }>(`/projects/${id}/audit-events`),
+  getProjectAuditEvents: (id: string) => req<{ events: AuditEvent[]; unavailable?: boolean }>(`/projects/${id}/audit-events`),
 
   publicStatus: () => req<PublicStatus>("/health/public-status")
 };
