@@ -41,15 +41,20 @@ export function LogsPanel({ logs, isRunning }: LogsPanelProps) {
   const setFilter = (v: LevelFilter) => setFilterRaw(v);
   const [fullscreen, setFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const endRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(
     () => (filter === "all" ? logs : logs.filter(l => levelOf(l.status) === filter)),
     [logs, filter]
   );
 
+  // Scroll only the log container — never the page — and only when the
+  // user is already at the bottom, so reading old lines isn't interrupted.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = bodyRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (nearBottom || el.scrollTop === 0) el.scrollTop = el.scrollHeight;
   }, [filtered.length]);
 
   useEffect(() => {
@@ -109,8 +114,9 @@ export function LogsPanel({ logs, isRunning }: LogsPanelProps) {
 
   const body = (
     <div
+      ref={bodyRef}
       className={`overflow-y-auto rounded-lg border border-white/[0.06] bg-black/40 p-4 font-mono text-[12px] leading-[1.7] ${
-        fullscreen ? "flex-1" : "h-[360px]"
+        fullscreen ? "flex-1" : "h-[480px]"
       }`}
     >
       {filtered.length === 0 ? (
@@ -125,7 +131,6 @@ export function LogsPanel({ logs, isRunning }: LogsPanelProps) {
           </div>
         ))
       )}
-      <div ref={endRef} />
     </div>
   );
 

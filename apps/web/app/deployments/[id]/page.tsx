@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Cloud, DollarSign, Loader2, Play, Server, Settings, Trash2 } from "lucide-react";
+import { CheckCircle2, Cloud, DollarSign, FileCode2, LayoutGrid, Loader2, Play, Server, Settings, Settings2, TerminalSquare, Trash2 } from "lucide-react";
+import { useUrlState } from "../../../lib/use-url-state";
 import { ProductShell } from "../../../components/product-shell";
 import { Button } from "../../../components/ui/button";
 import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
@@ -16,6 +17,7 @@ import { api, type DeploymentDetail } from "../../../lib/api";
 import { ArtifactsList } from "../../../components/deployments/artifacts-list";
 import { DeployActionsPanel } from "../../../components/deployments/deploy-actions-panel";
 import { DeploymentHeader } from "../../../components/deployments/deployment-header";
+import { DetailTabs, type DetailTab } from "../../../components/deployments/detail-tabs";
 import { EnvVarsPanel } from "../../../components/deployments/env-vars-panel";
 import { FailurePanel } from "../../../components/deployments/failure-panel";
 import { InfrastructureGraph } from "../../../components/deployments/infrastructure-graph";
@@ -25,7 +27,6 @@ import { SafetyReviewPanel } from "../../../components/deployments/safety-review
 import { ScanReviewPanel } from "../../../components/deployments/scan-review-panel";
 import { StageStrip } from "../../../components/deployments/stage-strip";
 import { TimelinePanel } from "../../../components/deployments/timeline-panel";
-import { SectionLabel } from "../../../components/ui/section-label";
 
 const POLLING_STATUSES = new Set(["queued", "scanning", "deploying"]);
 
@@ -48,6 +49,7 @@ function DeploymentDetailPageInner() {
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [tabRaw, setTabRaw] = useUrlState("tab", "overview");
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function fetchDetail() {
@@ -93,8 +95,15 @@ function DeploymentDetailPageInner() {
   if (!detail) {
     return (
       <ProductShell active="Deployments">
-        <div className="py-24 text-center">
-          <p className="text-[14px] font-medium text-white">Deployment not found</p>
+        <div className="flex flex-col items-center gap-4 py-24 text-center">
+          <Cloud className="h-8 w-8 text-white/20" />
+          <div>
+            <p className="text-[14px] font-medium text-white">Deployment not found</p>
+            <p className="mt-1 text-[12.5px] text-white/45">It may have been deleted, or the link is wrong.</p>
+          </div>
+          <Button asChild variant="secondary">
+            <Link href="/deployments">Back to deployments</Link>
+          </Button>
         </div>
       </ProductShell>
     );
@@ -143,6 +152,15 @@ function DeploymentDetailPageInner() {
     }
   }
 
+  const artifacts = detail.plan?.artifacts ?? [];
+  const tabs: DetailTab[] = [
+    { key: "overview", label: "Overview", icon: LayoutGrid, alert: isAwaitingApproval && isPlanReady },
+    { key: "logs", label: "Logs", icon: TerminalSquare, badge: detail.logs.length, pulse: isRunning },
+    { key: "config", label: "Configuration", icon: Settings2, alert: isScanReviewReady || missingRequiredEnv.length > 0 },
+    ...(artifacts.length > 0 ? [{ key: "files", label: "Files", icon: FileCode2, badge: artifacts.length }] : [])
+  ];
+  const tab = tabs.some((t) => t.key === tabRaw) ? tabRaw : "overview";
+
   const headerChips = [];
   if (detail.plan?.region) {
     headerChips.push({ icon: <Server className="h-3 w-3" />, label: "Region", value: detail.plan.region, mono: true });
@@ -170,22 +188,22 @@ function DeploymentDetailPageInner() {
           action={
             <>
               {detail.projectId && (
-                <Button asChild variant="secondary">
-                  <Link href={`/projects/${detail.projectId}/settings`}>
+                <Button asChild variant="secondary" size="icon" title="Project settings">
+                  <Link href={`/projects/${detail.projectId}/settings`} aria-label="Project settings">
                     <Settings className="h-4 w-4" />
-                    Project settings
                   </Link>
                 </Button>
               )}
               <Button
                 variant="secondary"
+                size="icon"
                 onClick={() => setConfirmDelete(true)}
                 disabled={isRunning || deleting}
                 title={isRunning ? "Wait for this deployment to finish before deleting it." : "Delete deployment"}
+                aria-label="Delete deployment"
                 className="border-red-500/20 bg-red-500/[0.04] text-red-200 hover:border-red-500/30 hover:bg-red-500/[0.08]"
               >
                 {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                Delete
               </Button>
             </>
           }
@@ -197,35 +215,29 @@ function DeploymentDetailPageInner() {
         )}
 
         {isAwaitingApproval && isPlanReady && (
-          <SafetyReviewPanel
-            resources={detail.plan?.resources}
-            estimatedCost={detail.plan?.estimatedCost ?? null}
-            region={detail.plan?.region}
-          />
-        )}
-
-        {isAwaitingApproval && isPlanReady && (
-          <Panel className="border-amber-500/20 bg-amber-500/[0.03] p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
+          <Panel className="border-amber-500/25 bg-amber-500/[0.04] p-4 sm:p-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-500/25 bg-amber-500/10">
                   <CheckCircle2 className="h-4 w-4 text-amber-300" />
+                </span>
+                <div className="min-w-0">
                   <p className="text-[14px] font-medium text-white">Plan ready for review</p>
-                </div>
-                <p className="mt-2 max-w-2xl text-[13px] leading-[1.6] text-white/55">
-                  Review the plan, add any required environment variables, then approve to create AWS resources.
-                </p>
-                {missingRequiredEnv.length > 0 && (
-                  <p className="mt-2 text-[12px] text-amber-300/85">
-                    Heads up: {missingRequiredEnv.length} variable{missingRequiredEnv.length === 1 ? "" : "s"} marked required ({missingRequiredEnv.slice(0, 3).map((envVar) => envVar.name).join(", ")}{missingRequiredEnv.length > 3 ? "…" : ""}) {missingRequiredEnv.length === 1 ? "is" : "are"} unset. You can approve anyway — the deploy may fail at runtime if the app needs them.
+                  <p className="mt-1 text-[12.5px] leading-[1.55] text-white/55">
+                    Review the safety summary below, add any required environment variables, then approve to create AWS resources.
                   </p>
-                )}
-                {actionError && <p className="mt-3 font-mono text-[12px] text-red-400">{actionError}</p>}
+                  {missingRequiredEnv.length > 0 && (
+                    <p className="mt-1.5 text-[12px] text-amber-300/85">
+                      {missingRequiredEnv.length} required variable{missingRequiredEnv.length === 1 ? "" : "s"} ({missingRequiredEnv.slice(0, 3).map((envVar) => envVar.name).join(", ")}{missingRequiredEnv.length > 3 ? "…" : ""}) {missingRequiredEnv.length === 1 ? "is" : "are"} still unset — the deploy may fail at runtime without them.
+                    </p>
+                  )}
+                  {actionError && <p className="mt-2 font-mono text-[12px] text-red-400">{actionError}</p>}
+                </div>
               </div>
               <Button
                 onClick={approveDeployment}
                 disabled={approving}
-                className="shrink-0"
+                className="shrink-0 self-start lg:self-center"
               >
                 {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                 Approve deploy
@@ -235,76 +247,104 @@ function DeploymentDetailPageInner() {
         )}
 
         {isScanReviewReady && (
-          <Panel className="border-violet/20 bg-violet/[0.035] p-5">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-violet-soft" />
-              <p className="text-[14px] font-medium text-white">Scan ready for review</p>
+          <Panel className="border-violet/20 bg-violet/[0.035] p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-violet/25 bg-violet/10">
+                <CheckCircle2 className="h-4 w-4 text-violet-soft" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[14px] font-medium text-white">Scan ready for review</p>
+                <p className="mt-1 text-[12.5px] leading-[1.55] text-white/55">
+                  Confirm the detected framework, commands, port, health path, and variables in the panel on the right. AWSify will create the plan preview after you save this review.
+                </p>
+              </div>
             </div>
-            <p className="mt-2 max-w-2xl text-[13px] leading-[1.6] text-white/55">
-              Confirm the detected framework, commands, port, health path, and variables. AWSify will create the plan preview after you save this review.
-            </p>
           </Panel>
         )}
 
-        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="min-w-0 space-y-5">
-            <SectionLabel>Infrastructure &amp; activity</SectionLabel>
-            <InfrastructureGraph
-              resources={detail.plan?.resources}
-              suggestion={suggestion}
-            />
-            <LogsPanel logs={detail.logs} isRunning={isRunning} />
-            {detail.plan?.artifacts && <ArtifactsList artifacts={detail.plan.artifacts} />}
-          </div>
+        <DetailTabs tabs={tabs} active={tab} onChange={setTabRaw} />
 
-          <div className="min-w-0 space-y-4">
-            <SectionLabel>Status &amp; configuration</SectionLabel>
-            <TimelinePanel logs={detail.logs} status={detail.status} />
-
-            {suggestion && (
-              <ScanReviewPanel
-                deploymentId={id}
+        {tab === "overview" && (
+          <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="min-w-0 space-y-5">
+              {isAwaitingApproval && isPlanReady && (
+                <SafetyReviewPanel
+                  resources={detail.plan?.resources}
+                  estimatedCost={detail.plan?.estimatedCost ?? null}
+                  region={detail.plan?.region}
+                />
+              )}
+              {!detail.plan && !isLive && !isFailed && (
+                <Panel className="p-8">
+                  <div className="flex flex-col items-center gap-3 text-center">
+                    <Cloud className="h-8 w-8 text-white/20" />
+                    <p className="text-[13px] text-white/40">
+                      {isRunning ? "Scanning the repository — the plan will appear here shortly." : "Plan will appear once the scan completes."}
+                    </p>
+                  </div>
+                </Panel>
+              )}
+              <InfrastructureGraph
+                resources={detail.plan?.resources}
                 suggestion={suggestion}
-                editable={isAwaitingApproval}
-                planReady={isPlanReady}
-                envVarCount={envVars.length}
-                planSignature={`${detail.plan?.id ?? ""}:${detail.plan?.updatedAt ?? ""}`}
-                onSaved={async () => { await fetchDetail(); }}
               />
-            )}
-
-            {(isAwaitingApproval || envVars.length + (detail.projectEnvVars?.length ?? 0) > 0) && (
-              <EnvVarsPanel
-                deploymentId={id}
-                detected={envVars}
-                saved={detail.projectEnvVars ?? []}
-                onChange={async () => { await fetchDetail(); }}
+              <PlanInfoPanel
+                suggestion={suggestion}
+                resources={detail.plan?.resources}
+                estimatedCost={detail.plan?.estimatedCost ?? null}
               />
-            )}
-
-            <PlanInfoPanel
-              suggestion={suggestion}
-              resources={detail.plan?.resources}
-              estimatedCost={detail.plan?.estimatedCost ?? null}
-            />
-
-            <DeployActionsPanel
-              deploymentId={id}
-              planStatus={detail.plan?.status}
-              targetBranch={detail.project.branch}
-              hasArtifacts={!!detail.plan?.artifacts && detail.plan.artifacts.length > 0}
-            />
-          </div>
-        </div>
-
-        {!detail.plan && !isLive && !isFailed && (
-          <Panel className="p-10">
-            <div className="flex flex-col items-center gap-3 text-center">
-              <Cloud className="h-8 w-8 text-white/20" />
-              <p className="text-[13px] text-white/40">Plan will appear once the scan completes</p>
             </div>
-          </Panel>
+
+            <div className="min-w-0 space-y-4">
+              <TimelinePanel logs={detail.logs} status={detail.status} />
+            </div>
+          </div>
         )}
+
+        {tab === "logs" && <LogsPanel logs={detail.logs} isRunning={isRunning} />}
+
+        {tab === "config" && (
+          <div className="grid min-w-0 items-start gap-5 lg:grid-cols-2">
+            <div className="min-w-0 space-y-4">
+              {suggestion ? (
+                <ScanReviewPanel
+                  deploymentId={id}
+                  suggestion={suggestion}
+                  editable={isAwaitingApproval}
+                  planReady={isPlanReady}
+                  envVarCount={envVars.length}
+                  planSignature={`${detail.plan?.id ?? ""}:${detail.plan?.updatedAt ?? ""}`}
+                  onSaved={async () => { await fetchDetail(); }}
+                />
+              ) : (
+                <Panel className="p-8">
+                  <div className="flex flex-col items-center gap-3 text-center">
+                    <Settings2 className="h-7 w-7 text-white/20" />
+                    <p className="text-[13px] text-white/40">Configuration appears once the repository scan completes.</p>
+                  </div>
+                </Panel>
+              )}
+            </div>
+            <div className="min-w-0 space-y-4">
+              {(isAwaitingApproval || envVars.length + (detail.projectEnvVars?.length ?? 0) > 0) && (
+                <EnvVarsPanel
+                  deploymentId={id}
+                  detected={envVars}
+                  saved={detail.projectEnvVars ?? []}
+                  onChange={async () => { await fetchDetail(); }}
+                />
+              )}
+              <DeployActionsPanel
+                deploymentId={id}
+                planStatus={detail.plan?.status}
+                targetBranch={detail.project.branch}
+                hasArtifacts={artifacts.length > 0}
+              />
+            </div>
+          </div>
+        )}
+
+        {tab === "files" && <ArtifactsList artifacts={artifacts} />}
 
         <ConfirmDialog
           open={confirmDelete}

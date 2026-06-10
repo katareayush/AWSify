@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUrlNumber, useUrlState } from "../../lib/use-url-state";
@@ -71,7 +71,14 @@ function RepositoriesPageInner() {
     ]).finally(() => setReposLoading(false));
   }, [me?.authenticated, toast]);
 
-  useEffect(() => { setPage(0); }, [query, setPage]);
+  // Reset to the first page only when the search term actually changes —
+  // not on mount (would break ?page= deep links).
+  const prevQuery = useRef(query);
+  useEffect(() => {
+    if (prevQuery.current === query) return;
+    prevQuery.current = query;
+    setPage(0);
+  }, [query, setPage]);
 
   async function handleInstallApp() {
     try {
@@ -96,7 +103,7 @@ function RepositoriesPageInner() {
   }
 
   async function handleDeploy(repo: Repo) {
-    const connection = connections[0];
+    const connection = connections.find((c) => c.status === "valid") ?? connections[0];
     if (!connection) {
       router.push("/connections");
       return;
@@ -354,14 +361,14 @@ function RepoBranchControl({
   const branch = refs?.branch ?? repo.defaultBranch;
 
   return (
-    <div className="min-w-0 rounded-md border border-white/[0.06] bg-white/[0.015] p-2.5">
-      <label className="flex items-center gap-2">
+    <div className="w-full min-w-0 max-w-full overflow-hidden rounded-md border border-white/[0.06] bg-white/[0.015] p-2.5">
+      <label className="flex min-w-0 items-center gap-2">
         <GitBranch className="h-3.5 w-3.5 shrink-0 text-white/40" />
         <select
           value={branch}
           onChange={(event) => onBranchChange(event.target.value)}
           disabled={loading || !refs}
-          className="min-w-0 flex-1 bg-transparent font-mono text-[11.5px] text-white/75 outline-none disabled:opacity-50"
+          className="w-0 min-w-0 flex-1 truncate bg-transparent font-mono text-[11.5px] text-white/75 outline-none disabled:opacity-50"
         >
           {refs ? (
             refs.branches.map((item) => (
@@ -373,8 +380,9 @@ function RepoBranchControl({
             <option value={repo.defaultBranch}>{loading ? "Loading branches..." : repo.defaultBranch}</option>
           )}
         </select>
+        {loading && refs && <Loader2 className="h-3 w-3 shrink-0 animate-spin text-white/35" />}
       </label>
-      <div className="mt-2 space-y-1">
+      <div className="mt-2 min-w-0 space-y-1">
         {loading && commits.length === 0 ? (
           <p className="flex items-center gap-1.5 text-[11px] text-white/35">
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -383,11 +391,11 @@ function RepoBranchControl({
         ) : commits.length > 0 ? (
           commits.slice(0, 2).map((commit) => (
             <div key={commit.sha} className="min-w-0 text-[11px] leading-[1.35]">
-              <p className="truncate text-white/65" title={commit.message}>
-                <GitCommitHorizontal className="mr-1 inline h-3 w-3 text-white/35" />
-                {commit.message}
+              <p className="flex min-w-0 items-center gap-1 text-white/65" title={commit.message}>
+                <GitCommitHorizontal className="h-3 w-3 shrink-0 text-white/35" />
+                <span className="min-w-0 truncate">{commit.message}</span>
               </p>
-              <p className="mt-0.5 font-mono text-white/35">
+              <p className="mt-0.5 truncate font-mono text-white/35">
                 {commit.shortSha} · {commit.author}
               </p>
             </div>

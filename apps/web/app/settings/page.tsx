@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { ArrowRight, Settings } from "lucide-react";
+import { PageHeading } from "../../components/page-heading";
 import { ProductShell } from "../../components/product-shell";
 import { EmptyState } from "../../components/ui/empty-state";
 import { Panel } from "../../components/ui/panel";
 import { PageSkeleton } from "../../components/ui/skeleton";
 import { api, type Deployment } from "../../lib/api";
+import { useAuth } from "../../lib/use-auth";
 import { useToast } from "../../components/ui/toast";
 
 export default function SettingsPage() {
@@ -19,16 +21,22 @@ export default function SettingsPage() {
 }
 
 function SettingsPageInner() {
+  const { me, loading: authLoading } = useAuth();
   const toast = useToast();
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!me?.authenticated) {
+      setLoading(false);
+      return;
+    }
     api.listDeployments()
       .then((result) => setDeployments(result.deployments))
       .catch((err) => toast.error(err instanceof Error ? err.message : "Could not load projects."))
       .finally(() => setLoading(false));
-  }, [toast]);
+  }, [authLoading, me?.authenticated, toast]);
 
   const projects = useMemo(() => {
     const seen = new Set<string>();
@@ -39,7 +47,7 @@ function SettingsPageInner() {
     });
   }, [deployments]);
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <ProductShell active="Settings">
         <PageSkeleton variant="list" />
@@ -50,10 +58,11 @@ function SettingsPageInner() {
   return (
     <ProductShell active="Settings">
       <div className="space-y-5">
-        <div>
-          <h1 className="text-[22px] font-medium tracking-tight text-white">Project settings</h1>
-          <p className="mt-1 text-[13px] text-white/45">Safe controls for branch, runtime, env vars, artifacts, and CI tokens.</p>
-        </div>
+        <PageHeading
+          eyebrow="Configuration"
+          title="Project settings"
+          description="Safe controls for branch, runtime, env vars, artifacts, and CI tokens — pick a project to edit."
+        />
 
         <Panel className="overflow-hidden">
           {projects.length === 0 ? (

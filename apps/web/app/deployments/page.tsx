@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useUrlNumber } from "../../lib/use-url-state";
-import { ArrowRight, FileCode2, Loader2, Trash2 } from "lucide-react";
+import { ArrowRight, ExternalLink, FileCode2, Loader2, Trash2 } from "lucide-react";
 import { PageHeading } from "../../components/page-heading";
 import { ProductShell } from "../../components/product-shell";
 import { Button } from "../../components/ui/button";
@@ -15,14 +15,22 @@ import { EmptyState } from "../../components/ui/empty-state";
 import { useAuth } from "../../lib/use-auth";
 import { useToast } from "../../components/ui/toast";
 import { api, type Deployment } from "../../lib/api";
+import { relativeTime } from "../../lib/utils";
 
 const PAGE_SIZE = 10;
 
-function statusColor(s: string) {
-  if (s === "deployed") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
-  if (s === "failed") return "border-red-500/30 bg-red-500/10 text-red-400";
-  if (s === "deploying" || s === "scanning") return "border-violet/30 bg-violet/10 text-violet-soft";
-  return "border-white/[0.08] bg-white/[0.04] text-white/65";
+const STATUS: Record<string, { dot: string; text: string; pulse?: boolean }> = {
+  deployed: { dot: "bg-emerald-400", text: "text-emerald-300" },
+  failed: { dot: "bg-red-400", text: "text-red-300" },
+  deploying: { dot: "bg-violet-soft", text: "text-violet-soft", pulse: true },
+  scanning: { dot: "bg-violet-soft", text: "text-violet-soft", pulse: true },
+  queued: { dot: "bg-white/40", text: "text-white/55", pulse: true },
+  awaiting_approval: { dot: "bg-amber-300", text: "text-amber-300" }
+};
+
+function statusLabel(s: string) {
+  if (s === "awaiting_approval") return "Awaiting approval";
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 export default function DeploymentsPage() {
@@ -37,16 +45,24 @@ function DeploymentsPageInner() {
   const { me, loading } = useAuth();
   const toast = useToast();
   const [deployments, setDeployments] = useState<Deployment[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<Deployment | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [page, setPage] = useUrlNumber("page", 0);
 
   useEffect(() => {
-    if (!me?.authenticated) return;
-    api.listDeployments().then(r => setDeployments(r.deployments)).catch((err) => {
-      toast.error(err instanceof Error ? err.message : "Could not load deployments.");
-    });
-  }, [me?.authenticated, toast]);
+    if (loading) return;
+    if (!me?.authenticated) {
+      setDataLoading(false);
+      return;
+    }
+    api.listDeployments()
+      .then(r => setDeployments(r.deployments))
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : "Could not load deployments.");
+      })
+      .finally(() => setDataLoading(false));
+  }, [loading, me?.authenticated, toast]);
 
   const totalPages = Math.max(1, Math.ceil(deployments.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);
@@ -74,7 +90,7 @@ function DeploymentsPageInner() {
     }
   }
 
-  if (loading) {
+  if (loading || dataLoading) {
     return (
       <ProductShell active="Deployments">
         <PageSkeleton variant="list" />
@@ -86,17 +102,25 @@ function DeploymentsPageInner() {
     <ProductShell active="Deployments">
       <div className="space-y-5">
         <PageHeading
-          eyebrow="Deployment plans"
-          title="Generated plans"
-          description="Each deployment generates a reviewed plan with Dockerfile, GitHub Actions, resources, and cost estimate."
+          eyebrow="Deployments"
+          title="All deployments"
+          description="Every deployment generates a reviewed plan with Dockerfile, GitHub Actions, resources, and cost estimate before anything is created in AWS."
+          action={
+            <Button asChild>
+              <Link href="/repositories">
+                New deployment
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          }
         />
 
-        <Panel className="p-5">
+        <Panel className="overflow-hidden">
           {deployments.length === 0 ? (
             <EmptyState
               icon={FileCode2}
-              title="No deployment plans yet"
-              description="Select a connected repository and deploy it. AWS-ify generates a plan before creating any AWS resources."
+              title="No deployments yet"
+              description="Select a connected repository and deploy it. AWSify generates a plan before creating any AWS resources."
               action={
                 <Button asChild variant="secondary">
                   <Link href="/repositories">
@@ -108,57 +132,72 @@ function DeploymentsPageInner() {
             />
           ) : (
             <>
-              <div className="divide-y divide-white/[0.05]">
+              <div className="divide-y divide-white/[0.04]">
                 {paginated.map(d => {
                   const isRunning = ["queued", "scanning", "deploying"].includes(d.status);
                   const isDeleting = deletingId === d.id;
+                  const status = STATUS[d.status] ?? { dot: "bg-white/40", text: "text-white/55" };
                   return (
                     <div
                       key={d.id}
-                      className="grid gap-3 py-4 text-[13.5px] transition-colors hover:bg-white/[0.02] sm:grid-cols-[1fr_180px_160px]"
+                      className="group relative flex items-center gap-3 px-5 py-4 transition-colors hover:bg-white/[0.02] sm:gap-4"
                     >
-                      <Link href={`/deployments/${d.id}`} className="min-w-0">
-                        <p className="font-medium text-white">{d.project.name}</p>
-                        <p className="mt-1 truncate font-mono text-[11px] text-white/45">{d.project.repoFullName} · {d.project.branch}</p>
-                      </Link>
-                      <Link href={`/deployments/${d.id}`} className="min-w-0">
-                        {d.liveUrl ? (
-                          <p className="truncate text-[12px] text-violet-soft">{d.liveUrl}</p>
-                        ) : (
-                          <p className="text-[12px] text-white/40">—</p>
+                      <Link
+                        href={`/deployments/${d.id}`}
+                        className="absolute inset-0"
+                        aria-label={`Open deployment ${d.project.name}`}
+                      />
+                      <span className="relative flex h-2 w-2 shrink-0">
+                        {status.pulse && (
+                          <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-50 ${status.dot}`} />
                         )}
-                        <p className="mt-1 font-mono text-[11px] text-white/45">
-                          {new Date(d.createdAt).toLocaleDateString()}
+                        <span className={`relative inline-flex h-2 w-2 rounded-full ${status.dot}`} />
+                      </span>
+                      <div className="pointer-events-none min-w-0 flex-1">
+                        <p className="truncate text-[13.5px] font-medium text-white">{d.project.name}</p>
+                        <p className="mt-0.5 truncate font-mono text-[11px] text-white/40">
+                          {d.project.repoFullName} · {d.project.branch}
                         </p>
-                      </Link>
-                      <div className="flex items-center gap-2 sm:justify-end">
-                        <Link href={`/deployments/${d.id}`}>
-                          <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] ${statusColor(d.status)}`}>
-                            {d.status}
-                          </span>
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDelete(d)}
-                          disabled={isRunning || isDeleting}
-                          title={isRunning ? "Wait for this deployment to finish before deleting it." : "Delete deployment"}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-500/15 bg-red-500/[0.03] text-red-200/70 transition-colors hover:border-red-500/30 hover:bg-red-500/[0.08] hover:text-red-100 disabled:pointer-events-none disabled:opacity-45"
-                          aria-label={`Delete deployment ${d.project.name}`}
-                        >
-                          {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                        </button>
                       </div>
+                      <div className="pointer-events-none hidden min-w-0 max-w-[260px] flex-1 md:block">
+                        {d.liveUrl ? (
+                          <p className="flex min-w-0 items-center gap-1.5 text-[12px] text-emerald-300/85">
+                            <ExternalLink className="h-3 w-3 shrink-0" />
+                            <span className="min-w-0 truncate font-mono">{d.liveUrl.replace(/^https?:\/\//, "")}</span>
+                          </p>
+                        ) : (
+                          <p className="text-[12px] text-white/30">—</p>
+                        )}
+                      </div>
+                      <span className="pointer-events-none hidden shrink-0 text-[11.5px] text-white/35 sm:block">
+                        {relativeTime(d.createdAt)}
+                      </span>
+                      <span className={`pointer-events-none shrink-0 text-[11.5px] font-medium ${status.text}`}>
+                        {statusLabel(d.status)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete(d)}
+                        disabled={isRunning || isDeleting}
+                        title={isRunning ? "Wait for this deployment to finish before deleting it." : "Delete deployment"}
+                        className="relative z-10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-red-500/15 bg-red-500/[0.03] text-red-200/70 transition-colors hover:border-red-500/30 hover:bg-red-500/[0.08] hover:text-red-100 disabled:pointer-events-none disabled:opacity-45"
+                        aria-label={`Delete deployment ${d.project.name}`}
+                      >
+                        {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                      </button>
                     </div>
                   );
                 })}
               </div>
-              <Pagination
-                page={currentPage}
-                pageSize={PAGE_SIZE}
-                total={deployments.length}
-                onPageChange={setPage}
-                label="deployments"
-              />
+              <div className="px-5 pb-4">
+                <Pagination
+                  page={currentPage}
+                  pageSize={PAGE_SIZE}
+                  total={deployments.length}
+                  onPageChange={setPage}
+                  label="deployments"
+                />
+              </div>
             </>
           )}
         </Panel>

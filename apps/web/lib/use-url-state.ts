@@ -9,15 +9,18 @@ export function useUrlState(key: string, defaultValue = ""): [string, (next: str
   const params = useSearchParams();
   const value = params.get(key) ?? defaultValue;
 
+  // Build from window.location at call time so the setter identity stays
+  // stable across URL changes — effects depending on it must not re-fire
+  // after every navigation (that loop froze pagination on /repositories).
   const setValue = useCallback(
     (next: string) => {
-      const sp = new URLSearchParams(params.toString());
+      const sp = new URLSearchParams(window.location.search);
       if (!next || next === defaultValue) sp.delete(key);
       else sp.set(key, next);
       const qs = sp.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [key, defaultValue, params, pathname, router]
+    [key, defaultValue, pathname, router]
   );
 
   return [value, setValue];

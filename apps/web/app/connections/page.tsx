@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeading } from "../../components/page-heading";
 import { ProductShell } from "../../components/product-shell";
 import { PageSkeleton } from "../../components/ui/skeleton";
 import { useAuth } from "../../lib/use-auth";
@@ -20,7 +21,11 @@ export default function ConnectionsPage() {
   return (
     <ProductShell active="Connections">
       <div className="space-y-6">
-        <h1 className="text-[22px] font-medium tracking-tight text-white">Connections</h1>
+        <PageHeading
+          eyebrow="Integrations"
+          title="Connections"
+          description="Link GitHub for repository access and an AWS IAM role for deployments. Both are required before the first deploy."
+        />
 
         <GithubSection authenticated={!!me?.authenticated} login={me?.githubLogin} />
 
