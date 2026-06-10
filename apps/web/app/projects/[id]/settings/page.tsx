@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Activity, ArrowLeft, GitBranch, KeyRound, Loader2, Save, Server } from "lucide-react";
+import { Activity, ChevronRight, ExternalLink, FolderX, GitBranch, KeyRound, Loader2, Save, Server } from "lucide-react";
 import { ProductShell } from "../../../../components/product-shell";
 import { EnvVarsPanel } from "../../../../components/deployments/env-vars-panel";
 import { Button } from "../../../../components/ui/button";
@@ -56,6 +56,10 @@ function ProjectSettingsPageInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  useEffect(() => {
+    if (settings?.name) document.title = `${settings.name} settings — AWS-ify`;
+  }, [settings?.name]);
+
   async function saveSettings() {
     setSaving(true);
     try {
@@ -85,7 +89,16 @@ function ProjectSettingsPageInner() {
   if (!settings) {
     return (
       <ProductShell active="Settings">
-        <div className="py-24 text-center text-[14px] text-white">Project not found</div>
+        <div className="flex flex-col items-center gap-4 py-24 text-center">
+          <FolderX className="h-8 w-8 text-white/20" />
+          <div>
+            <p className="text-[14px] font-medium text-white">Project not found</p>
+            <p className="mt-1 text-[12.5px] text-white/45">It may have been deleted, or the link is wrong.</p>
+          </div>
+          <Button asChild variant="secondary">
+            <Link href="/settings">Back to project settings</Link>
+          </Button>
+        </div>
       </ProductShell>
     );
   }
@@ -95,18 +108,26 @@ function ProjectSettingsPageInner() {
   return (
     <ProductShell active="Settings">
       <div className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Link href={settings.latestDeployment ? `/deployments/${settings.latestDeployment.id}` : "/dashboard"} className="inline-flex items-center gap-1 text-[12px] text-white/45 hover:text-white">
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Back
-            </Link>
-            <h1 className="mt-2 text-[22px] font-medium tracking-tight text-white">{settings.name} settings</h1>
-            <p className="mt-1 text-[13px] text-white/45">{settings.repoFullName}</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <nav className="flex items-center gap-1.5 text-[12px] text-white/40">
+              <Link href="/settings" className="transition-colors hover:text-white">
+                Settings
+              </Link>
+              <ChevronRight className="h-3 w-3 text-white/25" />
+              <span className="truncate text-white/65">{settings.name}</span>
+            </nav>
+            <h1 className="mt-2 truncate text-[24px] font-medium tracking-tight text-white sm:text-[28px]">
+              {settings.name}
+            </h1>
+            <p className="mt-1 truncate font-mono text-[12px] text-white/45">{settings.repoFullName}</p>
           </div>
           {settings.latestDeployment && (
-            <Button asChild variant="secondary">
-              <Link href={`/deployments/${settings.latestDeployment.id}`}>Open latest deployment</Link>
+            <Button asChild variant="secondary" className="shrink-0 self-start sm:self-auto">
+              <Link href={`/deployments/${settings.latestDeployment.id}`}>
+                <ExternalLink className="h-3.5 w-3.5" />
+                Latest deployment
+              </Link>
             </Button>
           )}
         </div>
@@ -160,7 +181,7 @@ function ProjectSettingsPageInner() {
               </div>
               <Meta label="AWS account" value={settings.awsAccountId ?? "Not connected"} />
               <Meta label="Region" value={settings.awsRegion ?? "Unknown"} />
-              <Meta label="Plan" value={settings.plan ? settings.plan.status : "No plan"} />
+              <Meta label="Plan" value={settings.plan ? settings.plan.status.replace(/_/g, " ") : "No plan"} />
               <Meta label="Generated files" value={String(settings.plan?.artifactCount ?? 0)} />
               <Meta label="CI token" value={settings.hasCiToken ? "Generated" : "Not generated"} />
             </Panel>

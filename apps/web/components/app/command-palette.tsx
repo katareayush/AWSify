@@ -4,7 +4,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { navItems } from "./nav-data";
-import { api, type Repo } from "../../lib/api";
+import { api, type Deployment, type Repo } from "../../lib/api";
+
+const STATUS_DOT: Record<string, string> = {
+  deployed: "bg-emerald-400",
+  failed: "bg-red-400",
+  deploying: "bg-violet-soft",
+  scanning: "bg-violet-soft",
+  queued: "bg-white/40",
+  awaiting_approval: "bg-amber-300"
+};
 
 interface CommandItem {
   key: string;
@@ -25,12 +34,15 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [repos, setRepos] = useState<Repo[]>([]);
+  const [deployments, setDeployments] = useState<Deployment[]>([]);
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
     setActive(0);
     requestAnimationFrame(() => inputRef.current?.focus());
+    // Deployments change often — refresh on every open. Repos rarely do.
+    api.listDeployments().then((r) => setDeployments(r.deployments ?? [])).catch(() => {});
   }, [open]);
 
   useEffect(() => {
@@ -46,6 +58,15 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       href: n.href,
       icon: <n.icon className="h-4 w-4 text-white/60" />
     }));
+    const deploymentResults: CommandItem[] = deployments.map((d) => ({
+      key: `dep:${d.id}`,
+      label: d.project.name,
+      hint: d.status === "awaiting_approval" ? "awaiting approval" : d.status,
+      href: `/deployments/${d.id}`,
+      icon: (
+        <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[d.status] ?? "bg-white/40"}`} />
+      )
+    }));
     const repoResults: CommandItem[] = repos.map((r) => ({
       key: `repo:${r.id}`,
       label: r.fullName,
@@ -53,11 +74,11 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       href: `/repositories?q=${encodeURIComponent(r.fullName)}`,
       icon: <span className="text-[10px] font-mono text-white/45">repo</span>
     }));
-    const all = [...navResults, ...repoResults];
-    if (!query.trim()) return all.slice(0, 12);
+    const all = [...navResults, ...deploymentResults.slice(0, 8), ...repoResults];
+    if (!query.trim()) return [...navResults, ...deploymentResults.slice(0, 6)];
     const q = query.toLowerCase();
     return all.filter((i) => i.label.toLowerCase().includes(q) || i.hint?.toLowerCase().includes(q)).slice(0, 16);
-  }, [query, repos]);
+  }, [query, repos, deployments]);
 
   useEffect(() => {
     setActive(0);
@@ -106,21 +127,26 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Search pages, repositories…"
+            placeholder="Search pages, deployments, repositories…"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="command-palette-results"
+            aria-activedescendant={items[active] ? `palette-option-${items[active].key}` : undefined}
             className="h-12 w-full bg-transparent text-[14px] text-white placeholder:text-white/35 focus:outline-none"
           />
           <kbd className="hidden rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-white/45 sm:inline-block">
             esc
           </kbd>
         </div>
-        <ul className="max-h-[55vh] overflow-y-auto py-1.5">
+        <ul id="command-palette-results" role="listbox" className="max-h-[55vh] overflow-y-auto py-1.5">
           {items.length === 0 ? (
             <li className="px-4 py-6 text-center text-[13px] text-white/45">No matches</li>
           ) : (
             items.map((item, i) => (
-              <li key={item.key}>
+              <li key={item.key} id={`palette-option-${item.key}`} role="option" aria-selected={i === active}>
                 <button
                   type="button"
+                  tabIndex={-1}
                   onMouseEnter={() => setActive(i)}
                   onClick={() => go(item)}
                   className={`flex w-full items-center gap-3 px-3.5 py-2 text-left text-[13.5px] transition-colors ${

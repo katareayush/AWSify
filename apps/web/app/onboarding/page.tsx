@@ -118,9 +118,15 @@ function OnboardingPageInner() {
               {!loading && <ArrowRight className="h-4 w-4" />}
             </Button>
 
-            <ol className="mt-10 space-y-3">
-              {steps.slice(1).map((step, i) => (
-                <PendingStep key={step.title} step={step} index={i + 2} />
+            <ol className="mt-10">
+              {steps.map((step, i) => (
+                <OnboardingStep
+                  key={step.title}
+                  step={step}
+                  index={i + 1}
+                  current={i === 0}
+                  isLast={i === steps.length - 1}
+                />
               ))}
             </ol>
           </div>
@@ -157,15 +163,41 @@ function TopNav() {
   );
 }
 
-function PendingStep({ step, index }: { step: StepConfig; index: number }) {
+function OnboardingStep({
+  step,
+  index,
+  current,
+  isLast
+}: {
+  step: StepConfig;
+  index: number;
+  current: boolean;
+  isLast: boolean;
+}) {
   return (
-    <li className="flex items-start gap-3 text-[13px]">
-      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/[0.08] text-[10.5px] text-white/35">
-        {index}
-      </span>
-      <div className="min-w-0">
-        <p className="text-white/70">{step.title}</p>
-        <p className="mt-0.5 text-[12px] text-white/40">{step.description}</p>
+    <li className="flex gap-3 text-[13px]">
+      <div className="flex flex-col items-center">
+        <span
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10.5px] ${
+            current
+              ? "border-violet/50 bg-violet/15 font-medium text-violet-soft shadow-glow"
+              : "border-white/[0.08] text-white/35"
+          }`}
+        >
+          {index}
+        </span>
+        {!isLast && <span className="my-1 w-px flex-1 bg-white/[0.07]" style={{ minHeight: 14 }} />}
+      </div>
+      <div className={`min-w-0 ${isLast ? "" : "pb-4"}`}>
+        <p className={current ? "font-medium text-white" : "text-white/70"}>
+          {step.title}
+          {current && (
+            <span className="ml-2 rounded-full border border-violet/30 bg-violet/10 px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-violet-soft">
+              You are here
+            </span>
+          )}
+        </p>
+        <p className="mt-0.5 text-[12px] leading-[1.5] text-white/40">{step.description}</p>
       </div>
     </li>
   );
