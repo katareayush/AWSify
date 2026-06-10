@@ -14,6 +14,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200m"
+        max-file: "10"
 
   redis:
     image: redis:7-alpine
@@ -24,6 +29,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200m"
+        max-file: "10"
 
 volumes:
   postgres_data:

@@ -16,6 +16,11 @@ services:
     expose:
       - "3000"
     networks: [edge]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200m"
+        max-file: "10"
 
   api:
     build:
@@ -29,6 +34,11 @@ services:
     expose:
       - "4000"
     networks: [edge]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200m"
+        max-file: "10"
 
   worker:
     build:
@@ -41,6 +51,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - pulumi-state:/root/.pulumi
     networks: [edge]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200m"
+        max-file: "10"
 
   caddy:
     image: caddy:2-alpine
@@ -55,6 +70,11 @@ services:
       - caddy-config:/config
     depends_on: [web, api]
     networks: [edge]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200m"
+        max-file: "10"
 
 networks:
   edge:
