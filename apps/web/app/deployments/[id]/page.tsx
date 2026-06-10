@@ -23,7 +23,9 @@ import { LogsPanel } from "../../../components/deployments/logs-panel";
 import { PlanInfoPanel } from "../../../components/deployments/plan-info-panel";
 import { SafetyReviewPanel } from "../../../components/deployments/safety-review-panel";
 import { ScanReviewPanel } from "../../../components/deployments/scan-review-panel";
+import { StageStrip } from "../../../components/deployments/stage-strip";
 import { TimelinePanel } from "../../../components/deployments/timeline-panel";
+import { SectionLabel } from "../../../components/ui/section-label";
 
 const POLLING_STATUSES = new Set(["queued", "scanning", "deploying"]);
 
@@ -166,29 +168,29 @@ function DeploymentDetailPageInner() {
           liveUrl={isLive ? detail.liveUrl : null}
           chips={headerChips}
           action={
-            <Button
-              variant="secondary"
-              onClick={() => setConfirmDelete(true)}
-              disabled={isRunning || deleting}
-              title={isRunning ? "Wait for this deployment to finish before deleting it." : "Delete deployment"}
-              className="border-red-500/20 bg-red-500/[0.04] text-red-200 hover:border-red-500/30 hover:bg-red-500/[0.08]"
-            >
-              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              Delete
-            </Button>
+            <>
+              {detail.projectId && (
+                <Button asChild variant="secondary">
+                  <Link href={`/projects/${detail.projectId}/settings`}>
+                    <Settings className="h-4 w-4" />
+                    Project settings
+                  </Link>
+                </Button>
+              )}
+              <Button
+                variant="secondary"
+                onClick={() => setConfirmDelete(true)}
+                disabled={isRunning || deleting}
+                title={isRunning ? "Wait for this deployment to finish before deleting it." : "Delete deployment"}
+                className="border-red-500/20 bg-red-500/[0.04] text-red-200 hover:border-red-500/30 hover:bg-red-500/[0.08]"
+              >
+                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                Delete
+              </Button>
+            </>
           }
+          footer={<StageStrip status={detail.status} planStatus={detail.plan?.status ?? null} />}
         />
-
-        {detail.projectId && (
-          <div className="flex justify-end">
-            <Button asChild variant="secondary">
-              <Link href={`/projects/${detail.projectId}/settings`}>
-                <Settings className="h-4 w-4" />
-                Project settings
-              </Link>
-            </Button>
-          </div>
-        )}
 
         {isFailed && detail.failureReason && (
           <FailurePanel deploymentId={id} reason={detail.failureReason} logs={detail.logs} />
@@ -246,6 +248,7 @@ function DeploymentDetailPageInner() {
 
         <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="min-w-0 space-y-5">
+            <SectionLabel>Infrastructure &amp; activity</SectionLabel>
             <InfrastructureGraph
               resources={detail.plan?.resources}
               suggestion={suggestion}
@@ -255,6 +258,7 @@ function DeploymentDetailPageInner() {
           </div>
 
           <div className="min-w-0 space-y-4">
+            <SectionLabel>Status &amp; configuration</SectionLabel>
             <TimelinePanel logs={detail.logs} status={detail.status} />
 
             {suggestion && (

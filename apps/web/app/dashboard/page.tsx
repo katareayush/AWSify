@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useUrlNumber } from "../../lib/use-url-state";
-import { AlertTriangle, ArrowRight, CheckCircle2, Cloud, KeyRound, Rocket, TerminalSquare } from "lucide-react";
+import { ArrowRight, CheckCircle2, Cloud, KeyRound, Rocket, TerminalSquare } from "lucide-react";
 import { ProductShell } from "../../components/product-shell";
+import { ConnectionCard } from "../../components/dashboard/connection-card";
+import { DashboardHero } from "../../components/dashboard/dashboard-hero";
 import { DeploymentRow } from "../../components/dashboard/deployment-row";
 import { SetupBanner } from "../../components/dashboard/setup-banner";
 import { StatStrip, type StatItem } from "../../components/dashboard/stat-strip";
@@ -88,92 +90,48 @@ function DashboardPageInner() {
   const finishedCount = liveCount + failedCount;
   const failureRate = finishedCount > 0 ? Math.round((failedCount / finishedCount) * 100) : 0;
   const validConnections = connections.filter((connection) => connection.status === "valid");
-  const invalidConnections = connections.filter((connection) => connection.status === "invalid");
-  const pendingConnections = connections.filter((connection) => connection.status === "pending");
   const githubDone = Boolean(me?.authenticated);
   const awsDone = validConnections.length > 0;
   const canDeploy = githubDone && awsDone;
-  const primaryConnection = validConnections[0] ?? connections[0] ?? null;
-  const awsState = validConnections.length > 0
-    ? "ready"
-    : connections.length > 0
-      ? "attention"
-      : "missing";
 
   const stats: StatItem[] = [
-    { icon: Cloud, label: "Live", value: String(liveCount) },
-    { icon: TerminalSquare, label: "In progress", value: String(pendingCount) },
-    { icon: CheckCircle2, label: "Total", value: String(deployments.length) },
-    { icon: KeyRound, label: "Valid AWS", value: `${validConnections.length}/${connections.length}` }
+    { icon: Cloud, label: "Live", value: String(liveCount), tone: liveCount > 0 ? "emerald" : "neutral", hint: "Healthy and serving traffic" },
+    { icon: TerminalSquare, label: "In progress", value: String(pendingCount), tone: pendingCount > 0 ? "violet" : "neutral", hint: "Scanning or deploying now" },
+    { icon: CheckCircle2, label: "Total", value: String(deployments.length), tone: "neutral", hint: "All deployments to date" },
+    {
+      icon: KeyRound,
+      label: "Valid AWS",
+      value: `${validConnections.length}/${connections.length}`,
+      tone: awsDone ? "emerald" : "amber",
+      hint: awsDone ? "Connections verified" : "Needs a valid IAM role"
+    }
   ];
 
   return (
     <ProductShell active="Overview">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-[22px] font-medium tracking-tight text-white">Deployments</h1>
-          <Button asChild>
-            <Link href="/repositories">
-              New deployment
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
+        <DashboardHero
+          githubLogin={me?.githubLogin}
+          liveCount={liveCount}
+          pendingCount={pendingCount}
+        />
 
         <SetupBanner githubDone={githubDone} awsDone={awsDone} />
 
         <StatStrip items={stats} />
 
-        <div className="rounded-xl border border-white/[0.06] px-5 py-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              {awsState === "ready" ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              ) : (
-                <AlertTriangle className="h-4 w-4 text-amber-300" />
-              )}
-              <div>
-                <p className="text-[13px] font-medium text-white">
-                  {awsState === "ready"
-                    ? "AWS connection ready"
-                    : awsState === "attention"
-                      ? "AWS connection needs attention"
-                      : "AWS connection missing"}
-                </p>
-                <p className="mt-1 text-[11.5px] text-white/40">
-                  {primaryConnection
-                    ? `${primaryConnection.accountId} · ${primaryConnection.defaultRegion} · ${primaryConnection.status}`
-                    : "Connect a valid IAM role before starting deployments."}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="grid grid-cols-3 gap-2 text-right">
-                <MiniMetric label="Invalid" value={invalidConnections.length} />
-                <MiniMetric label="Pending" value={pendingConnections.length} />
-                <MiniMetric label="Failure" value={`${failureRate}%`} />
-              </div>
-              {awsState !== "ready" && (
-                <Button asChild variant="secondary">
-                  <Link href="/connections">
-                    Fix AWS
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+        <ConnectionCard connections={connections} failureRate={failureRate} />
 
-        <div className="rounded-xl border border-white/[0.06]">
+        <div className="overflow-hidden rounded-xl border border-white/[0.07] bg-gradient-to-b from-white/[0.015] to-transparent">
           <div className="flex items-center justify-between border-b border-white/[0.05] px-5 py-3">
-            <p className="text-[13px] text-white/80">Recent deployments</p>
+            <p className="text-[13px] font-medium text-white/80">Recent deployments</p>
             {deployments.length > 0 && (
               <Link
                 href="/deployments"
-                className="text-[12px] text-white/45 transition-colors hover:text-white"
+                className="inline-flex items-center gap-1 text-[12px] text-white/45 transition-colors hover:text-white"
               >
                 View all
+                <ArrowRight className="h-3 w-3" />
               </Link>
             )}
           </div>
@@ -213,14 +171,5 @@ function DashboardPageInner() {
         </div>
       </div>
     </ProductShell>
-  );
-}
-
-function MiniMetric({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div>
-      <p className="font-mono text-[14px] text-white">{value}</p>
-      <p className="text-[10.5px] text-white/35">{label}</p>
-    </div>
   );
 }
