@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useUrlNumber } from "../../lib/use-url-state";
-import { ArrowRight, FileCode2 } from "lucide-react";
+import { ArrowRight, FileCode2, Loader2, Trash2 } from "lucide-react";
 import { PageHeading } from "../../components/page-heading";
 import { ProductShell } from "../../components/product-shell";
 import { Button } from "../../components/ui/button";
+import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import { Panel } from "../../components/ui/panel";
 import { Pagination } from "../../components/ui/pagination";
 import { PageSkeleton } from "../../components/ui/skeleton";
@@ -36,6 +37,8 @@ function DeploymentsPageInner() {
   const { me, loading } = useAuth();
   const toast = useToast();
   const [deployments, setDeployments] = useState<Deployment[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState<Deployment | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [page, setPage] = useUrlNumber("page", 0);
 
   useEffect(() => {
@@ -56,6 +59,20 @@ function DeploymentsPageInner() {
     () => deployments.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE),
     [deployments, currentPage]
   );
+
+  async function deleteDeployment(deployment: Deployment) {
+    setDeletingId(deployment.id);
+    try {
+      await api.deleteDeployment(deployment.id);
+      setDeployments((current) => current.filter((item) => item.id !== deployment.id));
+      toast.success("Deployment deleted.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not delete deployment.");
+    } finally {
+      setDeletingId(null);
+      setConfirmDelete(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -92,33 +109,48 @@ function DeploymentsPageInner() {
           ) : (
             <>
               <div className="divide-y divide-white/[0.05]">
-                {paginated.map(d => (
-                  <Link
-                    key={d.id}
-                    href={`/deployments/${d.id}`}
-                    className="grid gap-3 py-4 text-[13.5px] transition-colors hover:bg-white/[0.02] sm:grid-cols-[1fr_180px_130px]"
-                  >
-                    <div>
-                      <p className="font-medium text-white">{d.project.name}</p>
-                      <p className="mt-1 font-mono text-[11px] text-white/45">{d.project.repoFullName} · {d.project.branch}</p>
+                {paginated.map(d => {
+                  const isRunning = ["queued", "scanning", "deploying"].includes(d.status);
+                  const isDeleting = deletingId === d.id;
+                  return (
+                    <div
+                      key={d.id}
+                      className="grid gap-3 py-4 text-[13.5px] transition-colors hover:bg-white/[0.02] sm:grid-cols-[1fr_180px_160px]"
+                    >
+                      <Link href={`/deployments/${d.id}`} className="min-w-0">
+                        <p className="font-medium text-white">{d.project.name}</p>
+                        <p className="mt-1 truncate font-mono text-[11px] text-white/45">{d.project.repoFullName} · {d.project.branch}</p>
+                      </Link>
+                      <Link href={`/deployments/${d.id}`} className="min-w-0">
+                        {d.liveUrl ? (
+                          <p className="truncate text-[12px] text-violet-soft">{d.liveUrl}</p>
+                        ) : (
+                          <p className="text-[12px] text-white/40">—</p>
+                        )}
+                        <p className="mt-1 font-mono text-[11px] text-white/45">
+                          {new Date(d.createdAt).toLocaleDateString()}
+                        </p>
+                      </Link>
+                      <div className="flex items-center gap-2 sm:justify-end">
+                        <Link href={`/deployments/${d.id}`}>
+                          <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] ${statusColor(d.status)}`}>
+                            {d.status}
+                          </span>
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDelete(d)}
+                          disabled={isRunning || isDeleting}
+                          title={isRunning ? "Wait for this deployment to finish before deleting it." : "Delete deployment"}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-500/15 bg-red-500/[0.03] text-red-200/70 transition-colors hover:border-red-500/30 hover:bg-red-500/[0.08] hover:text-red-100 disabled:pointer-events-none disabled:opacity-45"
+                          aria-label={`Delete deployment ${d.project.name}`}
+                        >
+                          {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
                     </div>
-                    <div>
-                      {d.liveUrl ? (
-                        <p className="truncate text-[12px] text-violet-soft">{d.liveUrl}</p>
-                      ) : (
-                        <p className="text-[12px] text-white/40">—</p>
-                      )}
-                      <p className="mt-1 font-mono text-[11px] text-white/45">
-                        {new Date(d.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="flex items-center sm:justify-end">
-                      <span className={`rounded-full border px-2.5 py-1 text-[11px] ${statusColor(d.status)}`}>
-                        {d.status}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
+                  );
+                })}
               </div>
               <Pagination
                 page={currentPage}
@@ -130,6 +162,15 @@ function DeploymentsPageInner() {
             </>
           )}
         </Panel>
+        <ConfirmDialog
+          open={confirmDelete !== null}
+          title="Delete deployment?"
+          description="This only removes the deployment record, logs, and timeline from AWSify. Any AWS resources, containers, load balancers, ECR images, or log groups already created will stay alive and may keep costing money. Remove them manually in AWS to stop charges."
+          confirmLabel="Delete"
+          tone="danger"
+          onConfirm={() => (confirmDelete ? deleteDeployment(confirmDelete) : Promise.resolve())}
+          onCancel={() => setConfirmDelete(null)}
+        />
       </div>
     </ProductShell>
   );

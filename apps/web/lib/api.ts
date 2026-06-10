@@ -195,6 +195,11 @@ export const api = {
 
   getDeployment: (id: string) => req<{ deployment: DeploymentDetail }>(`/deployments/${id}`),
 
+  deleteDeployment: (id: string) =>
+    req<{ deleted: string }>(`/deployments/${id}`, {
+      method: "DELETE"
+    }),
+
   getDeploymentDiagnosis: (id: string) =>
     req<{ diagnosis: DeploymentDiagnosis }>(`/deployments/${id}/diagnosis`),
 

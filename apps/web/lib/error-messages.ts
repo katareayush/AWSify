@@ -91,6 +91,10 @@ const RULES: Rule[] = [
     message:
       "Deployment is blocked: one or more required environment variables haven't been saved yet. Add them in the Env vars panel and re-run."
   },
+  {
+    match: (s) => /deployment_running/i.test(s),
+    message: "This deployment is still running. Wait for it to finish before deleting it."
+  },
 
   // --- Auth / session ---
   {

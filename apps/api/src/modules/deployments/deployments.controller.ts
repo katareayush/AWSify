@@ -28,6 +28,12 @@ export class DeploymentsController {
     return this.deployments.get(id, token);
   }
 
+  @Delete(":id")
+  delete(@Req() req: Request, @Param("id") id: string) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    return this.deployments.delete(id, token);
+  }
+
   @Post(":id/approve")
   approve(@Req() req: Request, @Param("id") id: string) {
     const token = req.cookies?.[SESSION_COOKIE] as string | undefined;

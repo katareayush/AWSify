@@ -31,17 +31,36 @@ function DashboardPageInner() {
   const toast = useToast();
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [connections, setConnections] = useState<AwsConnection[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
   const [page, setPage] = useUrlNumber("page", 0);
 
   useEffect(() => {
-    if (!me?.authenticated) return;
-    api.listDeployments().then((r) => setDeployments(r.deployments)).catch((err) => {
-      toast.error(err instanceof Error ? err.message : "Could not load deployments.");
+    if (loading) return;
+    if (!me?.authenticated) {
+      setDataLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setDataLoading(true);
+    Promise.all([
+      api.listDeployments().then((r) => r.deployments).catch((err) => {
+        toast.error(err instanceof Error ? err.message : "Could not load deployments.");
+        return [] as Deployment[];
+      }),
+      api.listConnections().then((r) => r.connections).catch((err) => {
+        toast.error(err instanceof Error ? err.message : "Could not load AWS connections.");
+        return [] as AwsConnection[];
+      }),
+    ]).then(([deps, conns]) => {
+      if (cancelled) return;
+      setDeployments(deps);
+      setConnections(conns);
+      setDataLoading(false);
     });
-    api.listConnections().then((r) => setConnections(r.connections)).catch((err) => {
-      toast.error(err instanceof Error ? err.message : "Could not load AWS connections.");
-    });
-  }, [me?.authenticated, toast]);
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, me?.authenticated, toast]);
 
   const totalPages = Math.max(1, Math.ceil(deployments.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);
@@ -55,7 +74,7 @@ function DashboardPageInner() {
     [deployments, currentPage]
   );
 
-  if (loading) {
+  if (loading || dataLoading) {
     return (
       <ProductShell active="Overview">
         <PageSkeleton />

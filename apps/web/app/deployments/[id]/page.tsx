@@ -1,11 +1,12 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Cloud, DollarSign, Loader2, Play, Server, Settings } from "lucide-react";
+import { CheckCircle2, Cloud, DollarSign, Loader2, Play, Server, Settings, Trash2 } from "lucide-react";
 import { ProductShell } from "../../../components/product-shell";
 import { Button } from "../../../components/ui/button";
+import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { Panel } from "../../../components/ui/panel";
 import { PageSkeleton } from "../../../components/ui/skeleton";
 import { useToast } from "../../../components/ui/toast";
@@ -37,10 +38,13 @@ export default function DeploymentDetailPage() {
 function DeploymentDetailPageInner() {
   const { me, loading } = useAuth();
   const toast = useToast();
+  const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const [detail, setDetail] = useState<DeploymentDetail | null>(null);
   const [fetching, setFetching] = useState(true);
   const [approving, setApproving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -123,6 +127,20 @@ function DeploymentDetailPageInner() {
     }
   }
 
+  async function deleteDeployment() {
+    setDeleting(true);
+    try {
+      await api.deleteDeployment(id);
+      toast.success("Deployment deleted.");
+      router.push("/deployments");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not delete deployment.");
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
+
   const headerChips = [];
   if (detail.plan?.region) {
     headerChips.push({ icon: <Server className="h-3 w-3" />, label: "Region", value: detail.plan.region, mono: true });
@@ -147,6 +165,18 @@ function DeploymentDetailPageInner() {
           isRunning={isRunning}
           liveUrl={isLive ? detail.liveUrl : null}
           chips={headerChips}
+          action={
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmDelete(true)}
+              disabled={isRunning || deleting}
+              title={isRunning ? "Wait for this deployment to finish before deleting it." : "Delete deployment"}
+              className="border-red-500/20 bg-red-500/[0.04] text-red-200 hover:border-red-500/30 hover:bg-red-500/[0.08]"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Delete
+            </Button>
+          }
         />
 
         {detail.projectId && (
@@ -271,6 +301,16 @@ function DeploymentDetailPageInner() {
             </div>
           </Panel>
         )}
+
+        <ConfirmDialog
+          open={confirmDelete}
+          title="Delete deployment?"
+          description="This only removes the deployment record, logs, and timeline from AWSify. Any AWS resources, containers, load balancers, ECR images, or log groups already created will stay alive and may keep costing money. Remove them manually in AWS to stop charges."
+          confirmLabel="Delete"
+          tone="danger"
+          onConfirm={deleteDeployment}
+          onCancel={() => setConfirmDelete(false)}
+        />
       </div>
     </ProductShell>
   );

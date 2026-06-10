@@ -229,6 +229,34 @@ export class DeploymentsService {
     };
   }
 
+  async delete(deploymentId: string, sessionToken: string | undefined) {
+    const userId = this.getUserId(sessionToken);
+    if (!userId) return { error: "not_authenticated" };
+
+    const deployment = await this.prisma.deployment.findFirst({
+      where: { id: deploymentId, actorUserId: userId },
+      select: { id: true, projectId: true, status: true }
+    });
+    if (!deployment) return { error: "not_found" };
+    if (["queued", "scanning", "deploying"].includes(deployment.status)) {
+      return { error: "deployment_running" };
+    }
+
+    await this.recordAudit({
+      userId,
+      projectId: deployment.projectId,
+      type: "deployment_delete",
+      message: "Deleted deployment record.",
+      metadata: { deploymentId, status: deployment.status }
+    });
+
+    await this.prisma.deployment.delete({
+      where: { id: deploymentId }
+    });
+
+    return { deleted: deploymentId };
+  }
+
   async getDiagnosis(deploymentId: string, sessionToken: string | undefined) {
     const userId = this.getUserId(sessionToken);
     if (!userId) return { error: "not_authenticated" };
