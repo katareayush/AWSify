@@ -32,14 +32,16 @@ export function InfrastructureGraph({ resources = [], suggestion }: Infrastructu
   const resourceByType = useMemo(() => new Map(resources.map((resource) => [resource.type, resource])), [resources]);
 
   const nodes = useMemo<Node<InfraNodeData>[]>(() => {
+    const databaseProvisioned = resourceByType.has("rds.instance");
+    const cacheProvisioned = resourceByType.has("elasticache.replicationGroup");
     const base: Node<InfraNodeData>[] = [
       node("alb", "ALB", resourceByType.get("elasticloadbalancingv2.loadBalancer")?.name ?? "Application Load Balancer", "Public HTTP entrypoint", "alb", "network", 40, 86),
       node("ecs", "ECS Fargate", resourceByType.get("ecs.service")?.name ?? "Service + tasks", "Runs the approved container", "ecs", "core", 300, 86),
       node("ecr", "ECR", resourceByType.get("ecr.repository")?.name ?? "Container repository", "Stores built images", "ecr", "storage", 300, 238),
       node("logs", "CloudWatch", resourceByType.get("cloudwatch.logGroup")?.name ?? "Log group", "Receives app logs", "logs", "observability", 560, 86),
       node("iam", "IAM role", resourceByType.get("iam.role")?.name ?? "Task execution role", "Limits AWS permissions", "iam", "security", 560, 238),
-      node("rds", database ? "RDS" : "Future RDS", database ? "Detected database dependency" : "Optional database later", database ? "Planned signal" : "Not provisioned in MVP", "rds", database ? "storage" : "future", 40, 238),
-      node("redis", cache ? "Redis" : "Future Redis", cache ? "Detected cache dependency" : "Optional cache later", cache ? "Planned signal" : "Not provisioned in MVP", "redis", cache ? "storage" : "future", 40, 390)
+      node("rds", databaseProvisioned ? "RDS" : "Optional RDS", database ? "Detected database dependency" : "Optional database later", databaseProvisioned ? "Provisioned by this plan" : "Not requested", "rds", databaseProvisioned ? "storage" : "future", 40, 238),
+      node("redis", cacheProvisioned ? "Redis" : "Optional Redis", cache ? "Detected cache dependency" : "Optional cache later", cacheProvisioned ? "Provisioned by this plan" : "Not requested", "redis", cacheProvisioned ? "storage" : "future", 40, 390)
     ];
     return base;
   }, [cache, database, resourceByType]);
@@ -49,8 +51,8 @@ export function InfrastructureGraph({ resources = [], suggestion }: Infrastructu
     edge("ecs", "ecr", "pulls image"),
     edge("ecs", "logs", "logs"),
     edge("iam", "ecs", "permits"),
-    ...(database ? [edge("ecs", "rds", "future data")] : []),
-    ...(cache ? [edge("ecs", "redis", "future cache")] : [])
+    ...(database ? [edge("ecs", "rds", "data")] : []),
+    ...(cache ? [edge("ecs", "redis", "cache")] : [])
   ], [cache, database]);
 
   if (!hasPlan) return null;

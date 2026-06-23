@@ -33,4 +33,4 @@ The first production milestone should take one Express repository and return a l
 5. User approval.
 6. Worker builds image, pushes to ECR, runs Pulumi, polls ECS health, returns URL.
 
-RDS, custom domains, TLS, secrets manager, preview environments, and multi-service deploys should wait until this path is reliable.
+Custom domains, TLS, preview environments, team access controls, and multi-service deploys should wait until the ECS/RDS/Redis path and teardown workflow are reliable.

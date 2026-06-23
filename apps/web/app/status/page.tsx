@@ -54,7 +54,10 @@ export default function StatusPage() {
     setRefreshing(true);
     try {
       const response = await fetch(`${API_BASE}/health/public-status`);
-      setStatus(await response.json());
+      if (!response.ok) throw new Error(`Status check failed: HTTP ${response.status}`);
+      const data = await response.json();
+      if (!isPublicStatus(data)) throw new Error("Status response was malformed.");
+      setStatus(data);
     } catch {
       setStatus({
         state: "degraded",
@@ -194,6 +197,22 @@ export default function StatusPage() {
         </p>
       </section>
     </main>
+  );
+}
+
+function isPublicStatus(value: unknown): value is PublicStatus {
+  if (!value || typeof value !== "object") return false;
+  const status = value as Partial<PublicStatus>;
+  return (
+    typeof status.state === "string" &&
+    typeof status.checkedAt === "string" &&
+    Array.isArray(status.services) &&
+    Boolean(status.recent) &&
+    typeof status.recent?.active === "number" &&
+    typeof status.recent?.deployed === "number" &&
+    typeof status.recent?.failed === "number" &&
+    typeof status.recent?.total === "number" &&
+    typeof status.recent?.failureRate === "number"
   );
 }
 

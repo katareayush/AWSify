@@ -26,6 +26,8 @@ function statusTone(s: string) {
   if (s === "deployed") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
   if (s === "failed") return "border-red-500/30 bg-red-500/10 text-red-300";
   if (s === "awaiting_approval") return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+  if (s === "destroying") return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+  if (s === "destroyed") return "border-white/[0.08] bg-white/[0.04] text-white/45";
   if (["queued", "scanning", "deploying"].includes(s)) return "border-violet/30 bg-violet/10 text-violet-soft";
   return "border-white/[0.08] bg-white/[0.04] text-white/65";
 }
@@ -34,12 +36,16 @@ function statusDot(s: string) {
   if (s === "deployed") return "bg-emerald-400";
   if (s === "failed") return "bg-red-400";
   if (s === "awaiting_approval") return "bg-amber-300";
+  if (s === "destroying") return "bg-amber-300";
+  if (s === "destroyed") return "bg-white/30";
   if (["queued", "scanning", "deploying"].includes(s)) return "bg-violet-soft";
   return "bg-white/50";
 }
 
 function statusLabel(s: string) {
   if (s === "awaiting_approval") return "Awaiting approval";
+  if (s === "destroying") return "Destroying";
+  if (s === "destroyed") return "Destroyed";
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 

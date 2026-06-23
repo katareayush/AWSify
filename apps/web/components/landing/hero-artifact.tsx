@@ -15,10 +15,10 @@ type Icon = typeof Cloud;
 export function HeroArtifact() {
   return (
     <div className="relative">
-      <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-violet/30 via-white/5 to-transparent opacity-60 blur-[2px]" />
-      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0c]/80 shadow-[0_30px_120px_-20px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+      <div className="absolute -inset-px rounded-xl bg-gradient-to-b from-violet/30 via-white/5 to-transparent opacity-60 blur-[2px] sm:rounded-2xl" />
+      <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0a0a0c]/80 shadow-[0_30px_120px_-20px_rgba(0,0,0,0.6)] backdrop-blur-xl sm:rounded-2xl">
         <WindowChrome />
-        <div className="grid min-h-[360px] grid-cols-12 lg:min-h-[420px]">
+        <div className="grid grid-cols-12 sm:min-h-[360px] lg:min-h-[420px]">
           <FileTree />
           <PlanPanel />
           <GuardrailsPanel />
@@ -30,17 +30,17 @@ export function HeroArtifact() {
 
 function WindowChrome() {
   return (
-    <div className="flex h-10 items-center justify-between border-b border-white/[0.06] bg-white/[0.015] px-4">
+    <div className="flex h-9 items-center justify-between border-b border-white/[0.06] bg-white/[0.015] px-3 sm:h-10 sm:px-4">
       <div className="flex items-center gap-1.5">
-        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
-        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
-        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+        <span className="h-2 w-2 rounded-full bg-white/15 sm:h-2.5 sm:w-2.5" />
+        <span className="h-2 w-2 rounded-full bg-white/15 sm:h-2.5 sm:w-2.5" />
+        <span className="h-2 w-2 rounded-full bg-white/15 sm:h-2.5 sm:w-2.5" />
       </div>
-      <div className="flex items-center gap-2 text-[11px] font-mono text-white/40">
+      <div className="hidden items-center gap-2 text-[11px] font-mono text-white/40 xs:flex">
         <GitBranch className="h-3 w-3" />
-        api-gateway · main · plan #042
+        <span className="hidden sm:inline">api-gateway · main · </span>plan #042
       </div>
-      <div className="flex items-center gap-1.5 text-[11px] text-white/40">
+      <div className="flex items-center gap-1.5 text-[10.5px] text-white/40 sm:text-[11px]">
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/80" />
         connected
       </div>
@@ -104,27 +104,27 @@ function StackRow({ label, value }: { label: string; value: string }) {
 
 function PlanPanel() {
   return (
-    <section className="col-span-12 p-5 lg:col-span-6 lg:p-7">
-      <div className="flex items-start justify-between">
-        <div>
+    <section className="col-span-12 p-4 sm:p-5 lg:col-span-6 lg:p-7">
+      <div className="flex flex-col gap-3 xs:flex-row xs:items-start xs:justify-between">
+        <div className="min-w-0">
           <p className="font-mono text-[10px] uppercase tracking-wider text-white/35">
             Deployment plan
           </p>
-          <h3 className="mt-2 text-[19px] font-medium tracking-tight text-white">
+          <h3 className="mt-2 text-[17px] font-medium tracking-tight text-white sm:text-[19px]">
             ECS Fargate · us-east-1
           </h3>
-          <p className="mt-1.5 text-[13px] text-white/55">
+          <p className="mt-1.5 text-[12.5px] text-white/55 sm:text-[13px]">
             Reviewed schema · 7 resources · $48.20 / mo est.
           </p>
         </div>
-        <span className="rounded-full border border-violet/30 bg-violet/10 px-2.5 py-1 text-[11px] font-medium text-violet-soft">
+        <span className="w-fit rounded-full border border-violet/30 bg-violet/10 px-2.5 py-1 text-[11px] font-medium text-violet-soft">
           awaiting approval
         </span>
       </div>
 
       <MiniInfraDiagram />
 
-      <div className="mt-5 grid grid-cols-3 gap-2">
+      <div className="mt-4 grid grid-cols-3 gap-1.5 sm:mt-5 sm:gap-2">
         <Pill icon={Boxes} label="ECR" />
         <Pill icon={Cloud} label="Fargate × 2" />
         <Pill icon={Network} label="ALB" />
@@ -135,25 +135,25 @@ function PlanPanel() {
 
 function Pill({ icon: Icon, label }: { icon: Icon; label: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+    <div className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2 py-2 sm:justify-start sm:gap-2 sm:px-3 sm:py-2.5">
       <Icon className="h-3.5 w-3.5 text-violet-soft" />
-      <span className="text-[12.5px] text-white/85">{label}</span>
+      <span className="truncate text-[11.5px] text-white/85 sm:text-[12.5px]">{label}</span>
     </div>
   );
 }
 
 function MiniInfraDiagram() {
   return (
-    <div className="mt-5 overflow-hidden rounded-xl border border-white/[0.06] bg-black/30 p-5">
-      <div className="grid grid-cols-5 items-center gap-2 text-[10.5px] font-mono text-white/55">
+    <div className="mt-4 overflow-hidden rounded-xl border border-white/[0.06] bg-black/30 p-3 sm:mt-5 sm:p-5">
+      <div className="grid grid-cols-5 items-center gap-1.5 text-[10px] font-mono text-white/55 sm:gap-2 sm:text-[10.5px]">
         <Node icon={Github} label="GitHub" />
         <Arrow />
         <Node icon={Boxes} label="ECR" />
         <Arrow />
         <Node icon={Cloud} label="Fargate" highlight />
       </div>
-      <div className="my-3 ml-[14%] h-3 w-px bg-white/[0.08]" />
-      <div className="grid grid-cols-5 items-center gap-2 text-[10.5px] font-mono text-white/55">
+      <div className="my-2 ml-[14%] h-3 w-px bg-white/[0.08] sm:my-3" />
+      <div className="grid grid-cols-5 items-center gap-1.5 text-[10px] font-mono text-white/55 sm:gap-2 sm:text-[10.5px]">
         <Node icon={Network} label="ALB" />
         <Arrow reverse />
         <Node icon={TerminalSquare} label="Logs" />
@@ -177,7 +177,7 @@ function Node({
 }) {
   return (
     <div
-      className={`flex items-center gap-1.5 rounded-md border px-2 py-1.5 ${
+      className={`flex min-w-0 items-center justify-center gap-1 rounded-md border px-1.5 py-1.5 sm:justify-start sm:gap-1.5 sm:px-2 ${
         highlight
           ? "border-violet/40 bg-violet/10 text-violet-soft"
           : muted
@@ -185,8 +185,8 @@ function Node({
             : "border-white/[0.08] bg-white/[0.02] text-white/80"
       }`}
     >
-      <Icon className="h-3 w-3" />
-      <span className="truncate">{label}</span>
+      <Icon className="h-3 w-3 shrink-0" />
+      <span className="hidden truncate xs:inline">{label}</span>
     </div>
   );
 }
@@ -208,7 +208,7 @@ const guardrails = [
 
 function GuardrailsPanel() {
   return (
-    <aside className="col-span-12 border-t border-white/[0.06] p-5 lg:col-span-3 lg:border-l lg:border-t-0">
+    <aside className="col-span-12 hidden border-t border-white/[0.06] p-5 sm:block lg:col-span-3 lg:border-l lg:border-t-0">
       <p className="font-mono text-[10px] uppercase tracking-wider text-white/35">Guardrails</p>
       <ul className="mt-4 space-y-2.5 text-[12.5px] text-white/75">
         {guardrails.map((text) => (

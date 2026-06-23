@@ -98,7 +98,10 @@ exports.deploymentPlanSchema = zod_1.z.object({
             "elasticloadbalancingv2.targetGroup",
             "cloudwatch.logGroup",
             "iam.role",
-            "ec2.securityGroup"
+            "ec2.securityGroup",
+            "rds.instance",
+            "elasticache.replicationGroup",
+            "secretsmanager.secret"
         ]),
         name: zod_1.z.string(),
         purpose: zod_1.z.string()
@@ -113,6 +116,7 @@ exports.deploymentPlanSchema = zod_1.z.object({
     status: zod_1.z.enum(["draft", "awaiting_approval", "approved", "rejected", "deploying", "deployed", "failed"])
 });
 exports.deploymentJobSchema = zod_1.z.object({
+    action: zod_1.z.enum(["deploy", "destroy"]).default("deploy"),
     projectId: zod_1.z.string(),
     repoFullName: zod_1.z.string(),
     branch: zod_1.z.string(),

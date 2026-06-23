@@ -11,12 +11,12 @@ interface GithubSectionProps {
 }
 
 export function GithubSection({ authenticated, login }: GithubSectionProps) {
-  async function handleInstall() {
+  async function handleConnect() {
     try {
-      const { url } = await api.appInstallUrl();
+      const { url } = await api.loginUrl();
       window.location.href = url;
     } catch {
-      /* ignore */
+      window.location.href = "/";
     }
   }
 
@@ -32,9 +32,9 @@ export function GithubSection({ authenticated, login }: GithubSectionProps) {
           Signed in as <span className="text-white/80">@{login}</span>
         </p>
       ) : (
-        <Button variant="secondary" onClick={handleInstall}>
+        <Button variant="secondary" onClick={handleConnect}>
           <Github className="h-4 w-4" />
-          Install GitHub App
+          Connect GitHub
         </Button>
       )}
     </Section>

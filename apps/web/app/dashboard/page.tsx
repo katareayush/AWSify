@@ -85,7 +85,7 @@ function DashboardPageInner() {
   }
 
   const liveCount = deployments.filter((d) => d.status === "deployed").length;
-  const pendingCount = deployments.filter((d) => ["queued", "scanning", "deploying"].includes(d.status)).length;
+  const pendingCount = deployments.filter((d) => ["queued", "scanning", "deploying", "destroying"].includes(d.status)).length;
   const failedCount = deployments.filter((d) => d.status === "failed").length;
   const finishedCount = liveCount + failedCount;
   const failureRate = finishedCount > 0 ? Math.round((failedCount / finishedCount) * 100) : 0;
@@ -96,7 +96,7 @@ function DashboardPageInner() {
 
   const stats: StatItem[] = [
     { icon: Cloud, label: "Live", value: String(liveCount), tone: liveCount > 0 ? "emerald" : "neutral", hint: "Healthy and serving traffic" },
-    { icon: TerminalSquare, label: "In progress", value: String(pendingCount), tone: pendingCount > 0 ? "violet" : "neutral", hint: "Scanning or deploying now" },
+    { icon: TerminalSquare, label: "In progress", value: String(pendingCount), tone: pendingCount > 0 ? "violet" : "neutral", hint: "Scanning, deploying, or tearing down" },
     { icon: CheckCircle2, label: "Total", value: String(deployments.length), tone: "neutral", hint: "All deployments to date" },
     {
       icon: KeyRound,

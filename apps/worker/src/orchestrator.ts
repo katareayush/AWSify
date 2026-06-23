@@ -11,7 +11,7 @@ import type { DeploymentJob, DeploymentPlan, DeploymentSuggestion, GeneratedArti
 import { collectKeyFiles, scanRepository, type RepoScanResult } from "@awsify/repo-scanner";
 import { generateDockerfile } from "@awsify/templates";
 import { createStack } from "@awsify/pulumi-templates";
-import { ECRClient, CreateRepositoryCommand, DescribeRepositoriesCommand, GetAuthorizationTokenCommand } from "@aws-sdk/client-ecr";
+import { ECRClient, CreateRepositoryCommand, DeleteRepositoryCommand, DescribeRepositoriesCommand, GetAuthorizationTokenCommand } from "@aws-sdk/client-ecr";
 import { STSClient, AssumeRoleCommand } from "@aws-sdk/client-sts";
 import { LocalWorkspace, type PulumiFn } from "@pulumi/pulumi/automation";
 import { redactSecrets } from "./redact";
@@ -19,7 +19,7 @@ import { redactSecrets } from "./redact";
 const execFileAsync = promisify(execFile);
 
 export interface DeploymentEvent {
-  status: "queued" | "scanning" | "awaiting_approval" | "deploying" | "deployed" | "failed";
+  status: "queued" | "scanning" | "awaiting_approval" | "deploying" | "deployed" | "destroying" | "destroyed" | "failed";
   message: string;
   at: string;
 }
@@ -55,6 +55,10 @@ export class DeploymentOrchestrator {
     };
 
     try {
+    if (job.action === "destroy") {
+      return await this.destroy(job, emit);
+    }
+
     await emit("scanning", "Deployment job accepted by worker.");
 
     const planRecord = await this.prisma.deploymentPlan.findUnique({
@@ -144,6 +148,45 @@ export class DeploymentOrchestrator {
     }
   }
 
+  private async destroy(
+    job: DeploymentJob,
+    emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
+  ) {
+    await emit("destroying", "Teardown job accepted by worker.");
+
+    const planRecord = await this.prisma.deploymentPlan.findUnique({
+      where: { id: job.approvedPlanId },
+      include: { artifacts: true }
+    });
+    if (!planRecord) throw new Error(`Deployment plan ${job.approvedPlanId} not found.`);
+
+    const region = process.env.AWS_REGION;
+    if (!region) throw new Error("AWS_REGION must be configured.");
+
+    const connection = await this.prisma.awsConnection.findUnique({ where: { id: job.awsConnectionId } });
+    if (!connection) throw new Error(`AWS connection ${job.awsConnectionId} not found.`);
+
+    await emit("destroying", `Assuming customer role ${connection.roleArn}`);
+    const credentials = await this.assumeRole(connection.roleArn, connection.externalId, region);
+    const plan = hydratePlan(planRecord);
+
+    await emit("destroying", `Running Pulumi destroy for ${plan.appName}/production.`);
+    await this.destroyPulumiStack(plan, credentials, emit);
+
+    await emit("destroying", `Deleting ECR repository ${plan.appName} if it still exists.`);
+    await this.deleteEcrRepo(plan.appName, region, credentials, emit);
+
+    await emit("destroyed", "Infrastructure teardown completed.");
+    if (job.deploymentId) {
+      await this.prisma.deployment.update({
+        where: { id: job.deploymentId },
+        data: { status: "destroyed" as never, liveUrl: null, failureReason: null }
+      }).catch(() => {});
+    }
+
+    return { status: "destroyed", events: [] };
+  }
+
   /**
    * Two-tier Dockerfile resolution:
    *   1. Repo already has one: use it, nothing to write.
@@ -229,6 +272,33 @@ export class DeploymentOrchestrator {
       if ((err as { name?: string }).name === "RepositoryAlreadyExistsException") {
         const existing = await ecr.send(new DescribeRepositoriesCommand({ repositoryNames: [appName] }));
         return existing.repositories![0].repositoryUri!;
+      }
+      throw err;
+    }
+  }
+
+  private async deleteEcrRepo(
+    appName: string,
+    region: string,
+    credentials: AwsCredentials,
+    emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
+  ) {
+    const ecr = new ECRClient({
+      region,
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+        sessionToken: credentials.sessionToken
+      }
+    });
+
+    try {
+      await ecr.send(new DeleteRepositoryCommand({ repositoryName: appName, force: true }));
+      await emit("destroying", `ECR repository ${appName} deleted.`);
+    } catch (err: unknown) {
+      if ((err as { name?: string }).name === "RepositoryNotFoundException") {
+        await emit("destroying", `ECR repository ${appName} was already absent.`);
+        return;
       }
       throw err;
     }
@@ -341,6 +411,47 @@ export class DeploymentOrchestrator {
     }
 
     return result.outputs as Record<string, { value: string }>;
+  }
+
+  private async destroyPulumiStack(
+    plan: DeploymentPlan,
+    credentials: AwsCredentials,
+    emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
+  ) {
+    const stateDir = join(tmpdir(), "awsify-state", plan.projectId);
+    mkdirSync(stateDir, { recursive: true });
+
+    const program: PulumiFn = async () => {
+      return createStack({ plan, imageUri: "awsify-destroy-placeholder:latest", environment: {} });
+    };
+
+    const stack = await LocalWorkspace.createOrSelectStack(
+      { stackName: "production", projectName: plan.appName, program },
+      {
+        workDir: stateDir,
+        envVars: {
+          PULUMI_BACKEND_URL: `file://${stateDir}`,
+          PULUMI_CONFIG_PASSPHRASE: requireEnv("PULUMI_CONFIG_PASSPHRASE"),
+          AWS_ACCESS_KEY_ID: credentials.accessKeyId,
+          AWS_SECRET_ACCESS_KEY: credentials.secretAccessKey,
+          AWS_SESSION_TOKEN: credentials.sessionToken,
+          AWS_REGION: plan.region
+        }
+      }
+    );
+
+    await stack.setConfig("aws:region", { value: plan.region });
+
+    try {
+      await stack.destroy({
+        onOutput: msg => {
+          const trimmed = msg.trim();
+          if (trimmed) emit("destroying", trimmed);
+        }
+      });
+    } catch (error) {
+      throw new Error(`Pulumi destroy failed. Check AWS role permissions and whether the stack state is still available. ${extractProcessError(error)}`);
+    }
   }
 }
 

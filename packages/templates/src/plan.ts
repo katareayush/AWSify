@@ -81,6 +81,21 @@ function buildResources(input: TemplateInput): DeploymentPlan["resources"] {
     ...shared
   );
 
+  if (suggestion.database.required && suggestion.database.engine !== "mongodb") {
+    resources.push(
+      { type: "rds.instance", name: `${appName}-db`, purpose: "Managed relational database for application data." },
+      { type: "secretsmanager.secret", name: `/awsify/${appName}/db-password`, purpose: "Stores the generated database password." },
+      { type: "ec2.securityGroup", name: `${appName}-db-sg`, purpose: "Allows database access from ECS tasks only." }
+    );
+  }
+
+  if (suggestion.cache.required) {
+    resources.push(
+      { type: "elasticache.replicationGroup", name: `${appName}-redis`, purpose: "Managed Redis cache for the application." },
+      { type: "ec2.securityGroup", name: `${appName}-redis-sg`, purpose: "Allows Redis access from ECS tasks only." }
+    );
+  }
+
   return resources;
 }
 
@@ -91,12 +106,18 @@ function estimateCost(suggestion: DeploymentSuggestion): DeploymentPlan["estimat
 
   notes.push("Fargate (0.25 vCPU / 0.5 GB) + ALB + ECR + logs.");
 
-  if (suggestion.database.required) {
-    notes.push("Database was detected, but RDS is not provisioned by the MVP template yet.");
+  if (suggestion.database.required && suggestion.database.engine !== "mongodb") {
+    low += 15;
+    high += 55;
+    notes.push("Includes a small single-AZ RDS instance and Secrets Manager database password.");
+  } else if (suggestion.database.required) {
+    notes.push("MongoDB was detected; AWSify does not provision MongoDB yet. Bring an external DATABASE_URL.");
   }
 
   if (suggestion.cache.required) {
-    notes.push("Redis/cache was detected, but ElastiCache is not provisioned by the MVP template yet.");
+    low += 12;
+    high += 45;
+    notes.push("Includes a single-node ElastiCache Redis replication group.");
   }
 
   return { low, high, notes };

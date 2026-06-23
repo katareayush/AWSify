@@ -58,7 +58,7 @@ export class HealthController {
         take: 25,
         select: { status: true }
       });
-      const active = recent.filter((deployment) => ["queued", "scanning", "deploying"].includes(deployment.status)).length;
+      const active = recent.filter((deployment) => ["queued", "scanning", "deploying", "destroying"].includes(deployment.status)).length;
       const failedRecent = recent.filter((deployment) => deployment.status === "failed").length;
       const deployedRecent = recent.filter((deployment) => deployment.status === "deployed").length;
       const finished = failedRecent + deployedRecent;

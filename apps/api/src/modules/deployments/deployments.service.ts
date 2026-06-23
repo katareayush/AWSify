@@ -112,6 +112,7 @@ export class DeploymentsService {
 
     try {
       await this.queue.enqueueDeployment({
+        action: "deploy",
         projectId: project.id,
         repoFullName: repo.fullName,
         branch: input.branch,
@@ -170,6 +171,7 @@ export class DeploymentsService {
     });
 
     await this.queue.enqueueDeployment({
+      action: "deploy",
       projectId: source.projectId,
       repoFullName: source.project.repository.fullName,
       branch: source.project.branch,
@@ -191,6 +193,72 @@ export class DeploymentsService {
     return { deploymentId: deployment.id, status: "queued" };
   }
 
+  async destroyInfrastructure(deploymentId: string, sessionToken: string | undefined) {
+    const userId = this.getUserId(sessionToken);
+    if (!userId) return { error: "not_authenticated" };
+
+    const deployment = await this.prisma.deployment.findFirst({
+      where: { id: deploymentId, actorUserId: userId },
+      include: { project: { include: { repository: true } }, plan: true }
+    });
+    if (!deployment) return { error: "not_found" };
+    if (String(deployment.status) === "destroyed") {
+      return { deploymentId: deployment.id, status: "destroyed" };
+    }
+    if (["queued", "scanning", "deploying", "destroying"].includes(deployment.status)) {
+      return { error: "deployment_running" };
+    }
+    if (!deployment.project.awsConnectionId) return { error: "missing_aws_connection" };
+    if (!["approved", "deploying", "deployed", "failed"].includes(deployment.plan.status)) {
+      return { error: "plan_not_approved" };
+    }
+
+    await this.updateStatus(deployment.id, {
+      status: "destroying",
+      appendLog: {
+        status: "destroying",
+        message: "Infrastructure teardown queued. AWSify will destroy the Pulumi-managed stack and ECR repository.",
+        at: new Date().toISOString()
+      }
+    });
+
+    try {
+      await this.queue.enqueueDeployment({
+        action: "destroy",
+        projectId: deployment.projectId,
+        repoFullName: deployment.project.repository.fullName,
+        branch: deployment.project.branch,
+        awsConnectionId: deployment.project.awsConnectionId,
+        approvedPlanId: deployment.planId,
+        actorUserId: userId,
+        deploymentId: deployment.id
+      });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      await this.updateStatus(deployment.id, {
+        status: "failed",
+        failureReason: `Could not enqueue the teardown job: ${detail}`,
+        appendLog: {
+          status: "failed",
+          message: `Queue unavailable: ${detail}`,
+          at: new Date().toISOString()
+        }
+      }).catch(() => undefined);
+      return { error: "queue_unavailable", detail };
+    }
+
+    await this.recordAudit({
+      userId,
+      projectId: deployment.projectId,
+      deploymentId: deployment.id,
+      type: "infrastructure_destroy_queued",
+      message: "Queued infrastructure teardown.",
+      metadata: { appName: deployment.plan.appName, branch: deployment.project.branch }
+    });
+
+    return { deploymentId: deployment.id, status: "destroying" };
+  }
+
   async list(sessionToken: string | undefined) {
     const userId = this.getUserId(sessionToken);
     if (!userId) return { error: "not_authenticated" };
@@ -198,8 +266,7 @@ export class DeploymentsService {
     const deployments = await this.prisma.deployment.findMany({
       where: { actorUserId: userId },
       include: { project: { include: { repository: true } } },
-      orderBy: { createdAt: "desc" },
-      take: 50
+      orderBy: { createdAt: "desc" }
     });
 
     return {
@@ -599,6 +666,7 @@ export class DeploymentsService {
       token,
       secretName: "AWSIFY_API_TOKEN",
       variableName: "AWSIFY_API_URL",
+      variableValue: process.env.API_URL ?? "",
       projectId: deployment.projectId
     };
   }
@@ -642,6 +710,7 @@ export class DeploymentsService {
     });
 
     await this.queue.enqueueDeployment({
+      action: "deploy",
       projectId: project.id,
       repoFullName: project.repository.fullName,
       branch,
@@ -708,15 +777,30 @@ export class DeploymentsService {
       }
     });
 
-    await this.queue.enqueueDeployment({
-      projectId: deployment.projectId,
-      repoFullName: deployment.project.repository.fullName,
-      branch: deployment.project.branch,
-      awsConnectionId: deployment.project.awsConnectionId,
-      approvedPlanId: deployment.planId,
-      actorUserId: userId,
-      deploymentId: deployment.id
-    });
+    try {
+      await this.queue.enqueueDeployment({
+        action: "deploy",
+        projectId: deployment.projectId,
+        repoFullName: deployment.project.repository.fullName,
+        branch: deployment.project.branch,
+        awsConnectionId: deployment.project.awsConnectionId,
+        approvedPlanId: deployment.planId,
+        actorUserId: userId,
+        deploymentId: deployment.id
+      });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      await this.updateStatus(deployment.id, {
+        status: "failed",
+        failureReason: `Could not enqueue the deployment job: ${detail}`,
+        appendLog: {
+          status: "failed",
+          message: `Queue unavailable: ${detail}`,
+          at: new Date().toISOString()
+        }
+      }).catch(() => undefined);
+      return { error: "queue_unavailable", detail };
+    }
 
     await this.recordAudit({
       userId,

@@ -1,6 +1,8 @@
 import * as aws from "@pulumi/aws";
 import * as pulumi from "@pulumi/pulumi";
 import type { DeploymentPlan } from "@awsify/deployment-schemas";
+import { createElastiCacheRedis } from "./elasticache.js";
+import { createRdsInstance } from "./rds.js";
 
 export interface EcsFargateInput {
   plan: DeploymentPlan;
@@ -15,6 +17,8 @@ export interface EcsFargateOutputs {
   liveUrl: pulumi.Output<string>;
   repositoryUrl: pulumi.Output<string>;
   logGroupName: pulumi.Output<string>;
+  databaseEndpoint?: pulumi.Output<string>;
+  redisEndpoint?: pulumi.Output<string>;
 }
 
 export function createEcsFargateStack(input: EcsFargateInput): EcsFargateOutputs {
@@ -52,6 +56,51 @@ export function createEcsFargateStack(input: EcsFargateInput): EcsFargateOutputs
     ingress: [{ protocol: "tcp", fromPort: port, toPort: port, securityGroups: [albSg.id] }],
     egress: [{ protocol: "-1", fromPort: 0, toPort: 0, cidrBlocks: ["0.0.0.0/0"] }]
   });
+
+  let runtimeEnvironment: Record<string, pulumi.Input<string>> = { ...input.environment };
+  let databaseEndpoint: pulumi.Output<string> | undefined;
+  let redisEndpoint: pulumi.Output<string> | undefined;
+
+  if (input.plan.suggestion.database.required && input.plan.suggestion.database.engine !== "mongodb") {
+    const engine = input.plan.suggestion.database.engine ?? "postgresql";
+    const dbName = appName.replace(/-/g, "_");
+    const rds = createRdsInstance({
+      appName,
+      engine,
+      instanceClass: input.plan.suggestion.database.instanceClass,
+      vpcId: vpc.id,
+      subnetIds,
+      allowedSecurityGroupId: taskSg.id
+    });
+    databaseEndpoint = rds.endpoint;
+    const scheme = engine === "mysql" ? "mysql" : "postgresql";
+    runtimeEnvironment = {
+      DATABASE_URL: pulumi.interpolate`${scheme}://awsify:${rds.password}@${rds.endpoint}/${dbName}`,
+      DB_HOST: rds.endpoint,
+      DB_PORT: rds.port.apply(String),
+      DB_NAME: dbName,
+      DB_USER: "awsify",
+      DB_PASSWORD: rds.password,
+      ...runtimeEnvironment
+    };
+  }
+
+  if (input.plan.suggestion.cache.required) {
+    const redis = createElastiCacheRedis({
+      appName,
+      nodeType: input.plan.suggestion.cache.nodeType,
+      vpcId: vpc.id,
+      subnetIds,
+      allowedSecurityGroupId: taskSg.id
+    });
+    redisEndpoint = redis.endpoint;
+    runtimeEnvironment = {
+      REDIS_URL: pulumi.interpolate`rediss://${redis.endpoint}:${redis.port}`,
+      REDIS_HOST: redis.endpoint,
+      REDIS_PORT: redis.port.apply(String),
+      ...runtimeEnvironment
+    };
+  }
 
   const cluster = new aws.ecs.Cluster(`${appName}-cluster`, { name: `${appName}-cluster` });
 
@@ -99,7 +148,7 @@ export function createEcsFargateStack(input: EcsFargateInput): EcsFargateOutputs
     executionRoleArn: executionRole.arn,
     taskRoleArn: taskRole.arn,
     containerDefinitions: pulumi
-      .all([input.imageUri, logGroup.name, pulumi.output(input.environment)])
+      .all([input.imageUri, logGroup.name, pulumi.output(runtimeEnvironment)])
       .apply(([imageUri, logGroupName, env]) =>
         JSON.stringify([{
           name: appName,
@@ -140,6 +189,8 @@ export function createEcsFargateStack(input: EcsFargateInput): EcsFargateOutputs
   return {
     liveUrl: pulumi.interpolate`http://${alb.dnsName}`,
     repositoryUrl: repository.repositoryUrl,
-    logGroupName: logGroup.name
+    logGroupName: logGroup.name,
+    databaseEndpoint,
+    redisEndpoint
   };
 }

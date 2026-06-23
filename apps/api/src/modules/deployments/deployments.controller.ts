@@ -46,6 +46,12 @@ export class DeploymentsController {
     return this.deployments.redeployLatest(id, token);
   }
 
+  @Post(":id/destroy")
+  destroyInfrastructure(@Req() req: Request, @Param("id") id: string) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    return this.deployments.destroyInfrastructure(id, token);
+  }
+
   @Post(":id/env")
   saveEnvVars(
     @Req() req: Request,

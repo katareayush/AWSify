@@ -73,6 +73,32 @@ export function buildTimeline(logs: DeploymentDetail["logs"], status: string): A
   const deployed = status === "deployed";
   const deploying = status === "deploying";
 
+  if (status === "destroying" || status === "destroyed") {
+    const destroyed = status === "destroyed";
+    return [
+      {
+        label: "Teardown queued",
+        detail: "AWSify accepted the teardown request for this deployment.",
+        state: "done"
+      },
+      {
+        label: "Pulumi destroy",
+        detail: "Destroy the Pulumi-managed ECS, ALB, IAM, logging, database, and cache resources.",
+        state: destroyed || has("pulumi destroy") ? "done" : "active"
+      },
+      {
+        label: "ECR cleanup",
+        detail: "Delete the container repository if it still exists.",
+        state: destroyed || has("ecr repository") ? "done" : has("pulumi destroy") ? "active" : "pending"
+      },
+      {
+        label: "Destroyed",
+        detail: "Mark the deployment as torn down and clear the live URL.",
+        state: destroyed ? "done" : "pending"
+      }
+    ];
+  }
+
   return [
     {
       label: "Scan",

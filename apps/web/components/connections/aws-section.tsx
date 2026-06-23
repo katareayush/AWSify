@@ -70,12 +70,19 @@ export function AwsSection() {
     }
   }
 
+  const validCount = connections.filter((connection) => connection.status === "valid").length;
+  const statusText = validCount > 0
+    ? `${validCount}/${connections.length} valid`
+    : connections.length > 0
+      ? "Needs attention"
+      : "Not connected";
+
   return (
     <Section
       icon={<KeyRound className="h-4 w-4 text-white/55" />}
       title="AWS"
-      status={connections.length > 0 ? `${connections.length} connected` : "Not connected"}
-      statusTone={connections.length > 0 ? "ok" : "muted"}
+      status={statusText}
+      statusTone={validCount > 0 ? "ok" : "muted"}
     >
       {connections.length > 0 && (
         <div className="mb-4 divide-y divide-white/[0.04] rounded-lg border border-white/[0.05]">

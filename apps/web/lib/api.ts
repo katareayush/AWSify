@@ -260,8 +260,13 @@ export const api = {
       method: "POST"
     }),
 
+  destroyDeploymentInfrastructure: (id: string) =>
+    req<{ deploymentId: string; status: string }>(`/deployments/${id}/destroy`, {
+      method: "POST"
+    }),
+
   rotateDeploymentCiToken: (id: string) =>
-    req<{ token: string; secretName: string; variableName: string; projectId: string }>(`/deployments/${id}/ci-token`, {
+    req<{ token: string; secretName: string; variableName: string; variableValue: string; projectId: string }>(`/deployments/${id}/ci-token`, {
       method: "POST"
     }),
 

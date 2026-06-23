@@ -10,6 +10,8 @@ const STATUS_DOT: Record<string, string> = {
   deployed: "bg-emerald-400",
   failed: "bg-red-400",
   deploying: "bg-violet-soft",
+  destroying: "bg-amber-300",
+  destroyed: "bg-white/25",
   scanning: "bg-violet-soft",
   queued: "bg-white/40",
   awaiting_approval: "bg-amber-300"

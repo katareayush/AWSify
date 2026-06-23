@@ -258,22 +258,7 @@ export class GithubService {
     const token = await createInstallationToken(String(installation.id));
     const repositories = await fetchInstallationRepositories(token);
 
-    await this.prisma.$transaction([
-      this.prisma.repository.deleteMany({
-        where: { installationId: savedInstallation.id }
-      }),
-      ...repositories.map((repo) =>
-        this.prisma.repository.create({
-          data: {
-            githubId: String(repo.id),
-            fullName: repo.full_name,
-            defaultBranch: repo.default_branch,
-            private: repo.private,
-            installationId: savedInstallation.id
-          }
-        })
-      )
-    ]);
+    await this.syncRepositories(savedInstallation.id, repositories);
 
     return {
       installation: {
@@ -297,23 +282,41 @@ export class GithubService {
     for (const installation of installations) {
       const token = await createInstallationToken(installation.installationId);
       const repositories = await fetchInstallationRepositories(token);
-      await this.prisma.$transaction([
-        this.prisma.repository.deleteMany({ where: { installationId: installation.id } }),
-        ...repositories.map((repo) =>
-          this.prisma.repository.create({
-            data: {
-              githubId: String(repo.id),
-              fullName: repo.full_name,
-              defaultBranch: repo.default_branch,
-              private: repo.private,
-              installationId: installation.id
-            }
-          })
-        )
-      ]);
+      await this.syncRepositories(installation.id, repositories);
     }
 
     return this.listRepositories(sessionToken!);
+  }
+
+  private async syncRepositories(installationId: string, repositories: GitHubRepositoryResponse[]) {
+    const githubIds = repositories.map((repo) => String(repo.id));
+    await this.prisma.$transaction([
+      this.prisma.repository.deleteMany({
+        where: {
+          installationId,
+          githubId: { notIn: githubIds },
+          projects: { none: {} }
+        }
+      }),
+      ...repositories.map((repo) => {
+        const githubId = String(repo.id);
+        return this.prisma.repository.upsert({
+          where: { installationId_githubId: { installationId, githubId } },
+          create: {
+            githubId,
+            fullName: repo.full_name,
+            defaultBranch: repo.default_branch,
+            private: repo.private,
+            installationId
+          },
+          update: {
+            fullName: repo.full_name,
+            defaultBranch: repo.default_branch,
+            private: repo.private
+          }
+        });
+      })
+    ]);
   }
 
   signSession(payload: Omit<SessionPayload, "exp">): string {

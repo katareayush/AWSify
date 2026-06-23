@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Cloud, DollarSign, FileCode2, LayoutGrid, Loader2, Play, Server, Settings, Settings2, TerminalSquare, Trash2 } from "lucide-react";
+import { CheckCircle2, Cloud, CloudOff, DollarSign, FileCode2, LayoutGrid, Loader2, Play, Server, Settings, Settings2, TerminalSquare, Trash2 } from "lucide-react";
 import { useUrlState } from "../../../lib/use-url-state";
 import { ProductShell } from "../../../components/product-shell";
 import { Button } from "../../../components/ui/button";
@@ -28,7 +28,7 @@ import { ScanReviewPanel } from "../../../components/deployments/scan-review-pan
 import { StageStrip } from "../../../components/deployments/stage-strip";
 import { TimelinePanel } from "../../../components/deployments/timeline-panel";
 
-const POLLING_STATUSES = new Set(["queued", "scanning", "deploying"]);
+const POLLING_STATUSES = new Set(["queued", "scanning", "deploying", "destroying"]);
 
 export default function DeploymentDetailPage() {
   return (
@@ -45,8 +45,11 @@ function DeploymentDetailPageInner() {
   const { id } = useParams<{ id: string }>();
   const [detail, setDetail] = useState<DeploymentDetail | null>(null);
   const [fetching, setFetching] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
+  const [destroying, setDestroying] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDestroy, setConfirmDestroy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [tabRaw, setTabRaw] = useUrlState("tab", "overview");
@@ -54,12 +57,17 @@ function DeploymentDetailPageInner() {
 
   async function fetchDetail() {
     try {
+      setFetchError(null);
       const r = await api.getDeployment(id);
       setDetail(r.deployment);
       return r.deployment;
     } catch (err) {
       // Deleted elsewhere — show "not found" instead of polling stale data.
-      if (err instanceof ApiError && err.status === 404) setDetail(null);
+      if (err instanceof ApiError && err.status === 404) {
+        setDetail(null);
+      } else {
+        setFetchError(err instanceof Error ? err.message : "Could not load deployment.");
+      }
       return null;
     } finally {
       setFetching(false);
@@ -92,7 +100,7 @@ function DeploymentDetailPageInner() {
       if (pollRef.current) clearTimeout(pollRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me?.authenticated, id]);
+  }, [me?.authenticated, id, detail?.status]);
 
   if (loading || fetching) {
     return (
@@ -108,8 +116,12 @@ function DeploymentDetailPageInner() {
         <div className="flex flex-col items-center gap-4 py-24 text-center">
           <Cloud className="h-8 w-8 text-white/20" />
           <div>
-            <p className="text-[14px] font-medium text-white">Deployment not found</p>
-            <p className="mt-1 text-[12.5px] text-white/45">It may have been deleted, or the link is wrong.</p>
+            <p className="text-[14px] font-medium text-white">
+              {fetchError ? "Could not load deployment" : "Deployment not found"}
+            </p>
+            <p className="mt-1 max-w-md text-[12.5px] text-white/45">
+              {fetchError ?? "It may have been deleted, or the link is wrong."}
+            </p>
           </div>
           <Button asChild variant="secondary">
             <Link href="/deployments">Back to deployments</Link>
@@ -143,6 +155,7 @@ function DeploymentDetailPageInner() {
       const msg = err instanceof Error ? err.message : String(err);
       setActionError(msg);
       toast.error(msg);
+      await fetchDetail();
     } finally {
       setApproving(false);
     }
@@ -159,6 +172,20 @@ function DeploymentDetailPageInner() {
     } finally {
       setDeleting(false);
       setConfirmDelete(false);
+    }
+  }
+
+  async function destroyInfrastructure() {
+    setDestroying(true);
+    try {
+      await api.destroyDeploymentInfrastructure(id);
+      toast.success("Infrastructure teardown queued.");
+      await fetchDetail();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not queue teardown.");
+    } finally {
+      setDestroying(false);
+      setConfirmDestroy(false);
     }
   }
 
@@ -204,6 +231,17 @@ function DeploymentDetailPageInner() {
                   </Link>
                 </Button>
               )}
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={() => setConfirmDestroy(true)}
+                disabled={isRunning || destroying || detail.status === "destroyed"}
+                title={isRunning ? "Wait for this deployment to finish before tearing down infrastructure." : "Destroy AWS infrastructure"}
+                aria-label="Destroy AWS infrastructure"
+                className="border-amber-500/20 bg-amber-500/[0.04] text-amber-200 hover:border-amber-500/30 hover:bg-amber-500/[0.08]"
+              >
+                {destroying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudOff className="h-4 w-4" />}
+              </Button>
               <Button
                 variant="secondary"
                 size="icon"
@@ -356,6 +394,15 @@ function DeploymentDetailPageInner() {
 
         {tab === "files" && <ArtifactsList artifacts={artifacts} />}
 
+        <ConfirmDialog
+          open={confirmDestroy}
+          title="Destroy AWS infrastructure?"
+          description="This queues a teardown job for the Pulumi-managed AWS stack and ECR repository for this deployment. The app URL will stop working, resources may be deleted permanently, and any external resources not managed by AWSify may need manual cleanup."
+          confirmLabel="Destroy infrastructure"
+          tone="danger"
+          onConfirm={destroyInfrastructure}
+          onCancel={() => setConfirmDestroy(false)}
+        />
         <ConfirmDialog
           open={confirmDelete}
           title="Delete deployment?"

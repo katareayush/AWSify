@@ -1,4 +1,4 @@
-import { Check, FileSearch, Globe, Loader2, Rocket, ShieldCheck, X } from "lucide-react";
+import { Check, CloudOff, FileSearch, Globe, Loader2, Rocket, ShieldCheck, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 type StageState = "done" | "active" | "failed" | "pending";
@@ -15,6 +15,15 @@ interface StageStripProps {
 }
 
 function buildStages(status: string, planStatus?: string | null): Stage[] {
+  if (status === "destroying" || status === "destroyed") {
+    const destroying = status === "destroying";
+    return [
+      { label: "Deployed", icon: Globe, state: "done" },
+      { label: "Teardown", icon: CloudOff, state: destroying ? "active" : "done" },
+      { label: "Destroyed", icon: Check, state: destroying ? "pending" : "done" }
+    ];
+  }
+
   // Index of the stage the deployment is currently in (or died in).
   let current: number;
   if (status === "deployed") current = 4;
@@ -50,7 +59,7 @@ const STATE_STYLES: Record<StageState, { dot: string; label: string }> = {
 export function StageStrip({ status, planStatus }: StageStripProps) {
   const stages = buildStages(status, planStatus);
   // Awaiting approval is "active" but waiting on the user, not working — no spinner.
-  const spinning = ["queued", "scanning", "deploying"].includes(status);
+  const spinning = ["queued", "scanning", "deploying", "destroying"].includes(status);
 
   return (
     <ol className="flex items-center">

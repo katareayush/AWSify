@@ -14,6 +14,7 @@ export interface RdsOutputs {
   endpoint: pulumi.Output<string>;
   port: pulumi.Output<number>;
   secretArn: pulumi.Output<string>;
+  password: pulumi.Output<string>;
 }
 
 export function createRdsInstance(input: RdsInput): RdsOutputs {
@@ -77,6 +78,7 @@ export function createRdsInstance(input: RdsInput): RdsOutputs {
   return {
     endpoint: dbInstance.endpoint,
     port: dbInstance.port,
-    secretArn: dbPassword.arn
+    secretArn: dbPassword.arn,
+    password: dbPasswordValue.secretString.apply(s => (JSON.parse(s ?? "{}") as { password: string }).password)
   };
 }

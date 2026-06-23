@@ -7,6 +7,8 @@ const STATUS: Record<string, { dot: string; text: string; pulse?: boolean }> = {
   deployed: { dot: "bg-emerald-400", text: "text-emerald-300" },
   failed: { dot: "bg-red-400", text: "text-red-300" },
   deploying: { dot: "bg-violet-soft", text: "text-violet-soft", pulse: true },
+  destroying: { dot: "bg-amber-300", text: "text-amber-300", pulse: true },
+  destroyed: { dot: "bg-white/25", text: "text-white/40" },
   scanning: { dot: "bg-violet-soft", text: "text-violet-soft", pulse: true },
   queued: { dot: "bg-white/40", text: "text-white/55", pulse: true },
   awaiting_approval: { dot: "bg-amber-300", text: "text-amber-300" }
@@ -14,6 +16,8 @@ const STATUS: Record<string, { dot: string; text: string; pulse?: boolean }> = {
 
 function statusLabel(s: string) {
   if (s === "awaiting_approval") return "Awaiting approval";
+  if (s === "destroying") return "Destroying";
+  if (s === "destroyed") return "Destroyed";
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 

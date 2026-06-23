@@ -11,6 +11,7 @@ import { Panel } from "../../../../components/ui/panel";
 import { PageSkeleton } from "../../../../components/ui/skeleton";
 import { useToast } from "../../../../components/ui/toast";
 import { api, type AuditEvent, type ProjectSettings } from "../../../../lib/api";
+import { useAuth } from "../../../../lib/use-auth";
 
 export default function ProjectSettingsPage() {
   return (
@@ -21,6 +22,7 @@ export default function ProjectSettingsPage() {
 }
 
 function ProjectSettingsPageInner() {
+  const { me, loading: authLoading } = useAuth();
   const { id } = useParams<{ id: string }>();
   const toast = useToast();
   const [settings, setSettings] = useState<ProjectSettings | null>(null);
@@ -50,11 +52,16 @@ function ProjectSettingsPageInner() {
   }
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!me?.authenticated) {
+      setLoading(false);
+      return;
+    }
     load().catch((err) => {
       toast.error(err instanceof Error ? err.message : "Could not load project settings.");
     }).finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [authLoading, me?.authenticated, id]);
 
   useEffect(() => {
     if (settings?.name) document.title = `${settings.name} settings — AWS-ify`;
@@ -78,7 +85,7 @@ function ProjectSettingsPageInner() {
     }
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <ProductShell active="Settings">
         <PageSkeleton variant="detail" />

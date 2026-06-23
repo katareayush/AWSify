@@ -114,7 +114,10 @@ export const deploymentPlanSchema = z.object({
         "elasticloadbalancingv2.targetGroup",
         "cloudwatch.logGroup",
         "iam.role",
-        "ec2.securityGroup"
+        "ec2.securityGroup",
+        "rds.instance",
+        "elasticache.replicationGroup",
+        "secretsmanager.secret"
       ]),
       name: z.string(),
       purpose: z.string()
@@ -133,6 +136,7 @@ export const deploymentPlanSchema = z.object({
 export type DeploymentPlan = z.infer<typeof deploymentPlanSchema>;
 
 export const deploymentJobSchema = z.object({
+  action: z.enum(["deploy", "destroy"]).default("deploy"),
   projectId: z.string(),
   repoFullName: z.string(),
   branch: z.string(),

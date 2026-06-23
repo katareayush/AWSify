@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { STSClient, AssumeRoleCommand, GetCallerIdentityCommand } from "@aws-sdk/client-sts";
 import { PrismaService } from "../prisma.service";
 import { generateCloudFormationRoleTemplate } from "@awsify/templates";
@@ -97,7 +97,7 @@ export class AwsService {
 }
 
 function createExternalId(userId: string): string {
-  const nonce = randomUUID();
+  const nonce = "default";
   const payload = `awsify:${userId}:${nonce}`;
   const signature = signExternalId(payload);
   return `${payload}:${signature}`;

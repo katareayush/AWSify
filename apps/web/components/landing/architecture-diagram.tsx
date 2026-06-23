@@ -12,7 +12,7 @@ const rows: Array<{ icon: Icon; label: string; sub: string; highlight?: boolean 
 
 export function ArchitectureDiagram() {
   return (
-    <div className="scan-line relative h-full overflow-hidden rounded-2xl border border-white/[0.08] bg-[#070708] p-6">
+    <div className="scan-line relative h-full overflow-hidden rounded-xl border border-white/[0.08] bg-[#070708] p-4 sm:rounded-2xl sm:p-6">
       <div className="flex items-center justify-between">
         <p className="font-mono text-[10.5px] uppercase tracking-wider text-white/40">
           architecture
@@ -44,19 +44,19 @@ interface DiagRowProps {
 function DiagRow({ icon: Icon, label, sub, highlight = false }: DiagRowProps) {
   return (
     <div
-      className={`flex items-center justify-between rounded-lg border px-3.5 py-2.5 ${
+      className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 sm:px-3.5 ${
         highlight
           ? "border-violet/40 bg-violet/[0.08]"
           : "border-white/[0.08] bg-white/[0.02]"
       }`}
     >
-      <div className="flex items-center gap-2.5">
+      <div className="flex min-w-0 items-center gap-2.5">
         <Icon className={`h-3.5 w-3.5 ${highlight ? "text-violet-soft" : "text-white/55"}`} />
-        <span className={`text-[13px] ${highlight ? "text-white" : "text-white/80"}`}>
+        <span className={`truncate text-[13px] ${highlight ? "text-white" : "text-white/80"}`}>
           {label}
         </span>
       </div>
-      <span className="font-mono text-[10.5px] text-white/35">{sub}</span>
+      <span className="shrink-0 font-mono text-[10.5px] text-white/35">{sub}</span>
     </div>
   );
 }

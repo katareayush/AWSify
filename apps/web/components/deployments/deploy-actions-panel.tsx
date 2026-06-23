@@ -19,6 +19,7 @@ interface CiToken {
   token: string;
   secretName: string;
   variableName: string;
+  variableValue: string;
   projectId: string;
 }
 
@@ -223,6 +224,7 @@ export function DeployActionsPanel({ deploymentId, planStatus, targetBranch, has
               <div className="space-y-1 border-t border-amber-500/10 pt-2">
                 <MiniRow label="Secret" value={ciToken.secretName} />
                 <MiniRow label="Variable" value={ciToken.variableName} />
+                <MiniRow label="Value" value={ciToken.variableValue || "(API_URL not configured)"} />
               </div>
               <p className="text-[10.5px] text-white/40">Shown once. Rotating replaces the previous token.</p>
             </div>

@@ -15,7 +15,8 @@ The safety rule is the product boundary:
 - Bounded AI recommendation schema.
 - Generated Dockerfile, GitHub Actions workflow, and infra plan preview.
 - Worker-driven deployment to ECR, ECS Fargate, ALB, and CloudWatch through Pulumi Automation API.
-- Database and Redis dependencies are detected and shown in the plan, but RDS and ElastiCache provisioning are not part of the current MVP template.
+- Database and Redis dependencies can be provisioned as managed RDS and ElastiCache resources when the approved plan requires them.
+- Approved deployments can be torn down through a queued Pulumi destroy workflow.
 - GitHub Actions redeploy for already-approved infrastructure.
 
 ## Local Setup
@@ -47,6 +48,7 @@ After the first approved deployment, generate a CI token from the deployment det
 No Docker installed? Use [docs/local-without-docker.md](docs/local-without-docker.md).
 
 Frontend direction is tracked in [docs/frontend-roadmap.md](docs/frontend-roadmap.md).
+Product expansion work is tracked in [docs/product-roadmap.md](docs/product-roadmap.md).
 
 Apps:
 

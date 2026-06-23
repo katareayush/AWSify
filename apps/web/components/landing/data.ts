@@ -155,7 +155,7 @@ export const faqs = [
   },
   {
     q: "What stacks are supported today?",
-    a: "Node.js backends and Next.js apps that build to a Docker image, deployed to ECS Fargate behind an ALB. PostgreSQL detection is shown in the plan, but RDS provisioning is not part of the first MVP path."
+    a: "Node.js backends and Next.js apps that build to a Docker image, deployed to ECS Fargate behind an ALB. PostgreSQL/MySQL and Redis dependencies can be provisioned as managed RDS and ElastiCache resources."
   },
   {
     q: "Can I edit the generated infrastructure code?",
