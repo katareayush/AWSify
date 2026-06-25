@@ -123,7 +123,7 @@ export class DeploymentsController {
   @Post("redeploy")
   redeploy(
     @Headers("authorization") authorization: string | undefined,
-    @Body() body: { projectId: string; branch?: string }
+    @Body() body: { projectId: string; branch?: string; imageUri?: string }
   ) {
     return this.deployments.redeployWithToken(body, authorization);
   }

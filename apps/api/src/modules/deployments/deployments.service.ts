@@ -13,6 +13,7 @@ import { QueueService } from "../queue/queue.service";
 import { GithubCommitService } from "../github/github-commit.service";
 import { GithubService } from "../github/github.service";
 import { diagnoseDeploymentFailure } from "./diagnosis";
+import { isValidEcrImageUri } from "./image-uri";
 
 function sanitizeAppName(repoFullName: string): string {
   const name = repoFullName.split("/").pop() ?? "awsify-app";
@@ -643,7 +644,7 @@ export class DeploymentsService {
 
     const deployment = await this.prisma.deployment.findFirst({
       where: { id: deploymentId, actorUserId: userId },
-      include: { project: true }
+      include: { project: { include: { awsConnection: true } } }
     });
     if (!deployment) return { error: "not_found" };
 
@@ -659,19 +660,29 @@ export class DeploymentsService {
       deploymentId,
       type: "ci_token_rotate",
       message: "Rotated CI redeploy token.",
-      metadata: { secretName: "AWSIFY_API_TOKEN", variableName: "AWSIFY_API_URL" }
+      metadata: { secretName: "AWSIFY_API_TOKEN", variables: ["AWSIFY_API_URL", "AWSIFY_DEPLOY_ROLE_ARN"] }
     });
 
+    // The GitHub Action needs three repo settings: one secret (the CI token) and
+    // two variables (the API URL and the OIDC role ARN it assumes to push to ECR).
     return {
       token,
       secretName: "AWSIFY_API_TOKEN",
+      variables: [
+        { name: "AWSIFY_API_URL", value: process.env.API_URL ?? "" },
+        { name: "AWSIFY_DEPLOY_ROLE_ARN", value: deployment.project.awsConnection?.roleArn ?? "" }
+      ],
+      // Retained for backwards compatibility with existing UI callers.
       variableName: "AWSIFY_API_URL",
       variableValue: process.env.API_URL ?? "",
       projectId: deployment.projectId
     };
   }
 
-  async redeployWithToken(input: { projectId: string; branch?: string }, authorization: string | undefined) {
+  async redeployWithToken(
+    input: { projectId: string; branch?: string; imageUri?: string },
+    authorization: string | undefined
+  ) {
     const token = parseBearerToken(authorization);
     if (!token) return { error: "not_authenticated" };
 
@@ -683,6 +694,11 @@ export class DeploymentsService {
       return { error: "invalid_deploy_token" };
     }
     if (!project.awsConnectionId) return { error: "missing_aws_connection" };
+
+    const imageUri = input.imageUri?.trim();
+    if (imageUri && !isValidEcrImageUri(imageUri)) {
+      return { error: "invalid_image_uri" };
+    }
 
     const approvedPlan = await this.prisma.deploymentPlan.findFirst({
       where: { projectId: project.id, status: "approved" },
@@ -703,7 +719,9 @@ export class DeploymentsService {
         status: "queued",
         logs: [{
           status: "queued",
-          message: "Code redeploy queued by GitHub Actions.",
+          message: imageUri
+            ? `Code redeploy queued by GitHub Actions with prebuilt image ${imageUri}.`
+            : "Code redeploy queued by GitHub Actions.",
           at: new Date().toISOString()
         }]
       }
@@ -717,7 +735,8 @@ export class DeploymentsService {
       awsConnectionId: project.awsConnectionId,
       approvedPlanId: approvedPlan.id,
       actorUserId: project.userId,
-      deploymentId: deployment.id
+      deploymentId: deployment.id,
+      ...(imageUri ? { imageUri } : {})
     });
 
     return { deploymentId: deployment.id, status: "queued" };
