@@ -12,9 +12,22 @@ import { collectKeyFiles, scanRepository, type RepoScanResult } from "@awsify/re
 import { generateDockerfile } from "@awsify/templates";
 import { createStack } from "@awsify/pulumi-templates";
 import { ECRClient, CreateRepositoryCommand, DeleteRepositoryCommand, DescribeRepositoriesCommand, GetAuthorizationTokenCommand } from "@aws-sdk/client-ecr";
+import {
+  SecretsManagerClient,
+  CreateSecretCommand,
+  DescribeSecretCommand,
+  GetSecretValueCommand,
+  PutSecretValueCommand,
+  DeleteSecretCommand
+} from "@aws-sdk/client-secrets-manager";
 import { STSClient, AssumeRoleCommand } from "@aws-sdk/client-sts";
 import { LocalWorkspace, type PulumiFn } from "@pulumi/pulumi/automation";
 import { redactSecrets } from "./redact";
+import { performBlueGreenShift } from "./codedeploy";
+
+function envSecretName(appName: string): string {
+  return `/awsify/${appName}/env`;
+}
 
 const execFileAsync = promisify(execFile);
 
@@ -67,22 +80,24 @@ export class DeploymentOrchestrator {
     });
     if (!planRecord) throw new Error(`Deployment plan ${job.approvedPlanId} not found.`);
 
-    const repoPath = await this.cloneRepository(job);
-    await emit("scanning", "Repository cloned; running static scanner.");
-
     const region = process.env.AWS_REGION;
     const awsifyAccountId = process.env.AWSIFY_AWS_ACCOUNT_ID;
     if (!region || !awsifyAccountId) {
       throw new Error("AWS_REGION and AWSIFY_AWS_ACCOUNT_ID must be configured.");
     }
 
-    const scan = scanRepository(repoPath);
+    // A pre-built image (GitHub Actions path) needs no checkout. Otherwise clone
+    // so we can scan the repo and build the image on the worker.
+    const needsRepo = planRecord.status !== "approved" || !job.imageUri;
+    const repoPath = needsRepo ? await this.cloneRepository(job) : null;
+    if (repoPath) await emit("scanning", "Repository cloned; running static scanner.");
+    const scan = repoPath ? scanRepository(repoPath) : null;
 
     if (planRecord.status !== "approved") {
-      const keyFiles = collectKeyFiles(repoPath);
-      await emit("scanning", `Scan complete: ${scan.appType} -> ${scan.computeTarget} (${scan.signals.length} signals). Sending to Claude.`);
+      const keyFiles = collectKeyFiles(repoPath!);
+      await emit("scanning", `Scan complete: ${scan!.appType} -> ${scan!.computeTarget} (${scan!.signals.length} signals). Sending to Claude.`);
 
-      const aiResult = await this.ai.recommendDeployment({ repoFullName: job.repoFullName, scan, keyFiles });
+      const aiResult = await this.ai.recommendDeployment({ repoFullName: job.repoFullName, scan: scan!, keyFiles });
       const { suggestion } = aiResult;
       await emit("scanning", `AI recommendation: ${suggestion.appType} on ${suggestion.computeTarget} (confidence ${suggestion.confidence.toFixed(2)})`);
 
@@ -100,6 +115,9 @@ export class DeploymentOrchestrator {
     }
 
     const plan = hydratePlan(planRecord);
+    // ECR, Secrets Manager, CodeDeploy and the Pulumi stack must all operate in
+    // the plan's region so the ECS task can resolve the image and secret ARNs.
+    const deployRegion = plan.region;
     await emit("deploying", "Approved plan loaded; starting AWS deployment.");
 
     // Load customer AWS connection
@@ -107,18 +125,30 @@ export class DeploymentOrchestrator {
     if (!connection) throw new Error(`AWS connection ${job.awsConnectionId} not found.`);
 
     await emit("deploying", `Assuming customer role ${connection.roleArn}`);
-    const credentials = await this.assumeRole(connection.roleArn, connection.externalId, region);
+    const credentials = await this.assumeRole(connection.roleArn, connection.externalId, deployRegion);
 
-    const dockerfilePath = await this.resolveDockerfile(repoPath, scan, plan, emit);
-    await emit("deploying", `Dockerfile source: ${dockerfilePath}`);
-    await emit("deploying", "Creating ECR repository and building container image.");
-    const repositoryUri = await this.ensureEcrRepo(plan.appName, region, credentials);
-    const imageUri = `${repositoryUri}:${job.branch.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
-    await this.buildAndPushImage(repoPath, imageUri, repositoryUri, region, credentials);
-    await emit("deploying", `Image pushed: ${imageUri}`);
+    let imageUri: string;
+    if (job.imageUri) {
+      imageUri = job.imageUri;
+      await emit("deploying", `Using image built by GitHub Actions: ${imageUri}`);
+    } else {
+      const dockerfilePath = await this.resolveDockerfile(repoPath!, scan!, plan, emit);
+      await emit("deploying", `Dockerfile source: ${dockerfilePath}`);
+      await emit("deploying", "Creating ECR repository and building container image.");
+      const repositoryUri = await this.ensureEcrRepo(plan.appName, deployRegion, credentials);
+      // Tag uniquely per deployment so a redeploy produces a fresh task-definition
+      // revision; otherwise blue-green (CodeDeploy) would see no change to roll out.
+      const tagBase = job.branch.replace(/[^a-zA-Z0-9._-]/g, "-");
+      const tag = job.deploymentId ? `${tagBase}-${job.deploymentId.slice(-8)}` : tagBase;
+      imageUri = `${repositoryUri}:${tag}`;
+      await this.buildAndPushImage(repoPath!, imageUri, repositoryUri, deployRegion, credentials);
+      await emit("deploying", `Image pushed: ${imageUri}`);
+    }
 
     await emit("deploying", `Running Pulumi stack (${plan.suggestion.computeTarget}).`);
-    const outputs = await this.runPulumiStack(plan, imageUri, credentials, repoPath, emit);
+    const outputs = await this.runPulumiStack(plan, imageUri, credentials, deployRegion, Boolean(job.imageUri), emit);
+
+    await this.maybeBlueGreenShift(outputs, credentials, deployRegion, emit);
 
     const liveUrl =
       typeof outputs.liveUrl?.value === "string"
@@ -160,21 +190,24 @@ export class DeploymentOrchestrator {
     });
     if (!planRecord) throw new Error(`Deployment plan ${job.approvedPlanId} not found.`);
 
-    const region = process.env.AWS_REGION;
-    if (!region) throw new Error("AWS_REGION must be configured.");
+    if (!process.env.AWS_REGION) throw new Error("AWS_REGION must be configured.");
 
     const connection = await this.prisma.awsConnection.findUnique({ where: { id: job.awsConnectionId } });
     if (!connection) throw new Error(`AWS connection ${job.awsConnectionId} not found.`);
 
+    const plan = hydratePlan(planRecord);
+    const region = plan.region;
+
     await emit("destroying", `Assuming customer role ${connection.roleArn}`);
     const credentials = await this.assumeRole(connection.roleArn, connection.externalId, region);
-    const plan = hydratePlan(planRecord);
 
     await emit("destroying", `Running Pulumi destroy for ${plan.appName}/production.`);
     await this.destroyPulumiStack(plan, credentials, emit);
 
     await emit("destroying", `Deleting ECR repository ${plan.appName} if it still exists.`);
     await this.deleteEcrRepo(plan.appName, region, credentials, emit);
+
+    await this.deleteEnvSecret(envSecretName(plan.appName), region, credentials, emit);
 
     await emit("destroyed", "Infrastructure teardown completed.");
     if (job.deploymentId) {
@@ -354,31 +387,32 @@ export class DeploymentOrchestrator {
     plan: DeploymentPlan,
     imageUri: string | undefined,
     credentials: AwsCredentials,
-    _repoPath: string,
+    region: string,
+    prebuilt: boolean,
     emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
   ) {
     const stateDir = join(tmpdir(), "awsify-state", plan.projectId);
     mkdirSync(stateDir, { recursive: true });
 
-    const storedEnvVars = await this.prisma.projectEnvVar.findMany({
-      where: { projectId: plan.projectId }
-    });
-    const storedByName = new Map(storedEnvVars.map((envVar) => [envVar.name, envVar]));
-    const missingRequiredEnv = plan.suggestion.envVars.filter((envVar) => envVar.required && !storedByName.has(envVar.name));
-    if (missingRequiredEnv.length > 0) {
-      throw new Error(`Deployment requires project env vars that are not stored yet: ${missingRequiredEnv.map((envVar) => envVar.name).join(", ")}`);
-    }
-    const environment = Object.fromEntries(
-      plan.suggestion.envVars
-        .map((envVar) => {
-          const stored = storedByName.get(envVar.name);
-          return stored ? [envVar.name, decryptSecret(stored.encryptedValue)] : null;
-        })
-        .filter((entry): entry is [string, string] => entry !== null)
+    // Env is delivered through a Secrets Manager secret the ECS task reads at
+    // launch. On the GitHub Actions path the workflow already wrote it; on the
+    // one-click UI path we seed it here from the project's stored env vars.
+    const secretName = envSecretName(plan.appName);
+    const seed = prebuilt ? undefined : await this.collectStoredEnv(plan.projectId);
+    const presentKeys = await this.ensureEnvSecret(secretName, region, credentials, seed);
+
+    const missingRequiredEnv = plan.suggestion.envVars.filter(
+      (envVar) => envVar.required && !presentKeys.includes(envVar.name)
     );
+    if (missingRequiredEnv.length > 0) {
+      const source = prebuilt ? "the repo's GitHub secrets/variables" : "the project env vars";
+      throw new Error(
+        `Deployment requires env vars that are not set in ${source}: ${missingRequiredEnv.map((envVar) => envVar.name).join(", ")}`
+      );
+    }
 
     const program: PulumiFn = async () => {
-      return createStack({ plan, imageUri, environment });
+      return createStack({ plan, imageUri, environment: {}, envSecretName: secretName, secretKeys: presentKeys });
     };
 
     const stack = await LocalWorkspace.createOrSelectStack(
@@ -411,6 +445,88 @@ export class DeploymentOrchestrator {
     }
 
     return result.outputs as Record<string, { value: string }>;
+  }
+
+  private async collectStoredEnv(projectId: string): Promise<Record<string, string>> {
+    const stored = await this.prisma.projectEnvVar.findMany({ where: { projectId } });
+    return Object.fromEntries(stored.map((envVar) => [envVar.name, decryptSecret(envVar.encryptedValue)]));
+  }
+
+  /**
+   * Guarantees the env Secrets Manager secret exists before Pulumi looks it up.
+   * When `seed` is provided (UI path) the secret is (re)written from it; on the
+   * GitHub path the workflow owns the values, so we only ensure existence.
+   * Returns the JSON keys currently present in the secret.
+   */
+  private async ensureEnvSecret(
+    secretName: string,
+    region: string,
+    credentials: AwsCredentials,
+    seed?: Record<string, string>
+  ): Promise<string[]> {
+    const sm = new SecretsManagerClient({ region, credentials });
+
+    let exists = true;
+    try {
+      await sm.send(new DescribeSecretCommand({ SecretId: secretName }));
+    } catch (err) {
+      if ((err as { name?: string }).name === "ResourceNotFoundException") exists = false;
+      else throw err;
+    }
+
+    if (!exists) {
+      await sm.send(new CreateSecretCommand({ Name: secretName, SecretString: JSON.stringify(seed ?? {}) }));
+    } else if (seed) {
+      await sm.send(new PutSecretValueCommand({ SecretId: secretName, SecretString: JSON.stringify(seed) }));
+    }
+
+    const current = await sm.send(new GetSecretValueCommand({ SecretId: secretName }));
+    return Object.keys(parseSecretObject(current.SecretString));
+  }
+
+  private async deleteEnvSecret(
+    secretName: string,
+    region: string,
+    credentials: AwsCredentials,
+    emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
+  ) {
+    const sm = new SecretsManagerClient({ region, credentials });
+    try {
+      await sm.send(new DeleteSecretCommand({ SecretId: secretName, ForceDeleteWithoutRecovery: true }));
+      await emit("destroying", `Deleted env secret ${secretName}.`);
+    } catch (err) {
+      if ((err as { name?: string }).name === "ResourceNotFoundException") return;
+      throw err;
+    }
+  }
+
+  private async maybeBlueGreenShift(
+    outputs: Record<string, { value: unknown } | undefined>,
+    credentials: AwsCredentials,
+    region: string,
+    emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
+  ) {
+    if (outStr(outputs, "deploymentStrategy") !== "blue-green") return;
+
+    const applicationName = outStr(outputs, "codeDeployAppName");
+    const deploymentGroupName = outStr(outputs, "codeDeployDeploymentGroupName");
+    const clusterName = outStr(outputs, "clusterName");
+    const serviceName = outStr(outputs, "serviceName");
+    const taskDefinitionArn = outStr(outputs, "taskDefinitionArn");
+    const containerName = outStr(outputs, "containerName");
+    const containerPort = outNum(outputs, "containerPort");
+
+    if (!applicationName || !deploymentGroupName || !clusterName || !serviceName || !taskDefinitionArn || !containerName || containerPort === undefined) {
+      await emit("deploying", "Blue-green outputs incomplete; skipping CodeDeploy traffic shift.");
+      return;
+    }
+
+    await emit("deploying", "Initiating blue-green traffic shift via CodeDeploy.");
+    const result = await performBlueGreenShift(
+      { region, credentials, clusterName, serviceName, applicationName, deploymentGroupName, taskDefinitionArn, containerName, containerPort },
+      (message) => emit("deploying", message)
+    );
+    await emit("deploying", result === "shifted" ? "Blue-green shift complete; new version is serving traffic." : "Blue-green shift not required for this deploy.");
   }
 
   private async destroyPulumiStack(
@@ -524,6 +640,26 @@ function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} must be configured.`);
   return value;
+}
+
+function parseSecretObject(secretString: string | undefined): Record<string, unknown> {
+  if (!secretString) return {};
+  try {
+    const parsed = JSON.parse(secretString);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function outStr(outputs: Record<string, { value: unknown } | undefined>, key: string): string | undefined {
+  const value = outputs[key]?.value;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function outNum(outputs: Record<string, { value: unknown } | undefined>, key: string): number | undefined {
+  const value = outputs[key]?.value;
+  return typeof value === "number" ? value : undefined;
 }
 
 async function waitForHttpHealth(

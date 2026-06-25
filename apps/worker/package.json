@@ -12,8 +12,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@aws-sdk/client-codedeploy": "^3.716.0",
     "@aws-sdk/client-ecr": "^3.716.0",
     "@aws-sdk/client-ecs": "^3.716.0",
+    "@aws-sdk/client-secrets-manager": "^3.716.0",
     "@aws-sdk/client-sts": "^3.716.0",
     "@awsify/ai": "workspace:*",
     "@awsify/config": "workspace:*",
