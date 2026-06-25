@@ -215,6 +215,15 @@ Resources:
                       - ecs.amazonaws.com
                       - codedeploy.amazonaws.com
                       - elasticloadbalancing.amazonaws.com
+              # Bootstraps self-healing: lets AWS-ify keep the AWSifyManagedPipeline
+              # inline policy current on this role, so future permission additions
+              # apply automatically on the next deploy with no stack update.
+              - Effect: Allow
+                Action:
+                  - iam:GetRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                Resource: !Sub "arn:aws:iam::\${AWS::AccountId}:role/${roleName}"
 Outputs:
   RoleArn:
     Description: Set this as the AWSIFY_DEPLOY_ROLE_ARN variable in your GitHub repo and paste it into AWS-ify.

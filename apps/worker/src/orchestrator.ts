@@ -9,8 +9,10 @@ import { decryptSecret } from "@awsify/config";
 import { PrismaClient, createPrismaAdapter } from "@awsify/database";
 import type { DeploymentJob, DeploymentPlan, DeploymentSuggestion, GeneratedArtifact } from "@awsify/deployment-schemas";
 import { collectKeyFiles, scanRepository, type RepoScanResult } from "@awsify/repo-scanner";
-import { generateDockerfile } from "@awsify/templates";
+import { generateDockerfile, MANAGED_PIPELINE_POLICY_NAME, buildManagedPipelinePolicy } from "@awsify/templates";
 import { createStack } from "@awsify/pulumi-templates";
+import { IAMClient, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { CodeDeployClient, ListApplicationsCommand } from "@aws-sdk/client-codedeploy";
 import { ECRClient, CreateRepositoryCommand, DeleteRepositoryCommand, DescribeRepositoriesCommand, GetAuthorizationTokenCommand } from "@aws-sdk/client-ecr";
 import {
   SecretsManagerClient,
@@ -132,6 +134,11 @@ export class DeploymentOrchestrator {
 
     await emit("deploying", `Assuming customer role ${connection.roleArn}`);
     const credentials = await this.assumeRole(connection.roleArn, connection.externalId, deployRegion);
+
+    // Keep the role's permissions current before touching any infra, and fail
+    // fast with a clear message if an old role can neither self-heal nor already
+    // has what the pipeline needs — never leave a half-built deployment.
+    await this.ensureRolePermissions(connection, deployRegion, credentials, emit);
 
     let imageUri: string;
     if (job.imageUri) {
@@ -506,6 +513,76 @@ export class DeploymentOrchestrator {
     }
   }
 
+  /**
+   * Self-heals the deployment role to the latest permission set, then (only if
+   * it could not) preflights the actions the pipeline needs and aborts early
+   * when they are missing — so a stale role fails fast instead of half-deploying.
+   */
+  private async ensureRolePermissions(
+    connection: { roleArn: string; accountId: string },
+    region: string,
+    credentials: AwsCredentials,
+    emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
+  ) {
+    if (await this.selfHealRolePolicy(connection, region, credentials, emit)) return;
+
+    await emit("deploying", "Deployment role cannot self-update its permissions; checking what it has.");
+    const missing = await this.preflightPermissions(region, credentials);
+    if (missing.length > 0) {
+      throw new Error(
+        `Deployment role ${connection.roleArn} is missing required permissions (${missing.join(", ")}) and cannot self-update. ` +
+        `Update its CloudFormation stack to the latest AWSify template (it lets the role keep its own permissions current), then retry.`
+      );
+    }
+    await emit("deploying", "Deployment role already has the required permissions.");
+  }
+
+  /** Applies the managed pipeline policy to the role. Returns false if the role lacks self-update rights. */
+  private async selfHealRolePolicy(
+    connection: { roleArn: string; accountId: string },
+    region: string,
+    credentials: AwsCredentials,
+    emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
+  ): Promise<boolean> {
+    const roleName = connection.roleArn.split("/").pop();
+    if (!roleName) return false;
+    const iam = new IAMClient({ region, credentials });
+    try {
+      await iam.send(new PutRolePolicyCommand({
+        RoleName: roleName,
+        PolicyName: MANAGED_PIPELINE_POLICY_NAME,
+        PolicyDocument: JSON.stringify(buildManagedPipelinePolicy(connection.accountId, roleName))
+      }));
+      await emit("deploying", "Deployment role permissions refreshed to the latest set (self-healed).");
+      return true;
+    } catch (err) {
+      if (isAccessDenied(err)) return false;
+      throw err;
+    }
+  }
+
+  /** Probes representative actions per pipeline capability; returns the missing capability names. */
+  private async preflightPermissions(region: string, credentials: AwsCredentials): Promise<string[]> {
+    const missing: string[] = [];
+
+    const sm = new SecretsManagerClient({ region, credentials });
+    try {
+      await sm.send(new DescribeSecretCommand({ SecretId: "/awsify/__preflight__" }));
+    } catch (err) {
+      // ResourceNotFoundException means the action is allowed (the secret just doesn't exist).
+      if (isAccessDenied(err)) missing.push("secretsmanager");
+    }
+
+    const codedeploy = new CodeDeployClient({ region, credentials });
+    try {
+      await codedeploy.send(new ListApplicationsCommand({}));
+    } catch (err) {
+      if (isAccessDenied(err)) missing.push("codedeploy");
+    }
+
+    return missing;
+  }
+
   private async maybeBlueGreenShift(
     outputs: Record<string, { value: unknown } | undefined>,
     credentials: AwsCredentials,
@@ -646,6 +723,12 @@ function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} must be configured.`);
   return value;
+}
+
+function isAccessDenied(err: unknown): boolean {
+  const name = (err as { name?: string })?.name ?? "";
+  const message = err instanceof Error ? err.message : String(err);
+  return /AccessDenied|UnauthorizedOperation/i.test(name) || /not authorized|access denied/i.test(message);
 }
 
 function parseSecretObject(secretString: string | undefined): Record<string, unknown> {
