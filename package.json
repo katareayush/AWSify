@@ -13,6 +13,7 @@
     "db:generate": "pnpm --filter @awsify/database prisma:generate",
     "db:migrate": "pnpm --filter @awsify/database prisma:migrate",
     "db:studio": "pnpm --filter @awsify/database prisma:studio",
+    "wipe:deployments": "pnpm --filter @awsify/worker wipe",
     "worker": "pnpm --filter @awsify/worker dev",
     "api": "pnpm --filter @awsify/api dev",
     "web": "pnpm --filter @awsify/web dev"
