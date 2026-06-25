@@ -1,6 +1,26 @@
 name: awsify
 
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # noeviction is required by BullMQ so queued jobs are never dropped under
+    # memory pressure; appendonly persists the queue across restarts.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-data:/data
+    networks: [edge]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200m"
+        max-file: "10"
+
   web:
     build:
       context: ..
@@ -33,6 +53,9 @@ services:
       PORT: 4000
     expose:
       - "4000"
+    depends_on:
+      redis:
+        condition: service_healthy
     networks: [edge]
     logging:
       driver: "json-file"
@@ -50,6 +73,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - pulumi-state:/root/.pulumi
+    depends_on:
+      redis:
+        condition: service_healthy
     networks: [edge]
     logging:
       driver: "json-file"
@@ -83,3 +109,4 @@ volumes:
   caddy-data:
   caddy-config:
   pulumi-state:
+  redis-data:
