@@ -5,18 +5,40 @@ export function generateCloudFormationRoleTemplate(input: {
 }): string {
   const roleName = input.roleName ?? "AWSifyDeploymentRole";
   const externalIdRef = input.externalId ?? "!Ref ExternalId";
-  const parametersBlock = input.externalId
-    ? "Parameters: {}"
-    : `Parameters:
-  ExternalId:
+  const externalIdParam = input.externalId
+    ? ""
+    : `  ExternalId:
     Type: String
     Description: Unique ID issued by AWS-ify. Do not modify.
-    NoEcho: true`;
+    NoEcho: true
+`;
 
   return `AWSTemplateFormatVersion: "2010-09-09"
-Description: AWS-ify deployment role - grants only the permissions needed for the ECS Fargate MVP.
-${parametersBlock}
+Description: AWS-ify deployment role - grants the permissions needed for the ECS Fargate blue-green MVP, assumable by AWS-ify and by GitHub Actions via OIDC.
+Parameters:
+${externalIdParam}  GitHubRepo:
+    Type: String
+    Default: ""
+    Description: "owner/repo allowed to assume this role from GitHub Actions (e.g. acme/web). Leave blank to allow any repo using this account's GitHub OIDC provider."
+  CreateGitHubOidcProvider:
+    Type: String
+    Default: "Yes"
+    AllowedValues: ["Yes", "No"]
+    Description: Create the GitHub Actions OIDC provider. Choose No if your account already has one.
+Conditions:
+  CreateOidc: !Equals [!Ref CreateGitHubOidcProvider, "Yes"]
+  ScopeToRepo: !Not [!Equals [!Ref GitHubRepo, ""]]
 Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateOidc
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
   AWSifyDeploymentRole:
     Type: AWS::IAM::Role
     Properties:
@@ -31,12 +53,27 @@ Resources:
             Condition:
               StringEquals:
                 sts:ExternalId: ${externalIdRef}
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - CreateOidc
+                - !Ref GitHubOidcProvider
+                - !Sub "arn:aws:iam::\${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition: !If
+              - ScopeToRepo
+              - StringEquals:
+                  token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                StringLike:
+                  token.actions.githubusercontent.com:sub: !Sub "repo:\${GitHubRepo}:*"
+              - StringEquals:
+                  token.actions.githubusercontent.com:aud: sts.amazonaws.com
       Policies:
         - PolicyName: AWSifyEcsFargateDeployPolicy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              # ECR repositories and images created for approved deployments.
+              # ECR repositories and images, built by the worker or by GitHub Actions.
               - Effect: Allow
                 Action:
                   - ecr:CreateRepository
@@ -49,9 +86,10 @@ Resources:
                   - ecr:CompleteLayerUpload
                   - ecr:PutImage
                   - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
                   - ecr:DescribeImages
                 Resource: "*"
-              # ECS Fargate cluster, service, and task definition lifecycle.
+              # ECS Fargate cluster, service, task definition, and CodeDeploy task sets.
               - Effect: Allow
                 Action:
                   - ecs:CreateCluster
@@ -64,9 +102,45 @@ Resources:
                   - ecs:UpdateService
                   - ecs:DeleteService
                   - ecs:DescribeServices
+                  - ecs:CreateTaskSet
+                  - ecs:DeleteTaskSet
+                  - ecs:DescribeTaskSets
+                  - ecs:UpdateServicePrimaryTaskSet
                   - ecs:ListTasks
                   - ecs:DescribeTasks
+                  - ecs:TagResource
                 Resource: "*"
+              # Blue-green orchestration.
+              - Effect: Allow
+                Action:
+                  - codedeploy:CreateApplication
+                  - codedeploy:GetApplication
+                  - codedeploy:DeleteApplication
+                  - codedeploy:CreateDeploymentGroup
+                  - codedeploy:UpdateDeploymentGroup
+                  - codedeploy:GetDeploymentGroup
+                  - codedeploy:DeleteDeploymentGroup
+                  - codedeploy:CreateDeployment
+                  - codedeploy:GetDeployment
+                  - codedeploy:GetDeploymentConfig
+                  - codedeploy:RegisterApplicationRevision
+                  - codedeploy:ListDeployments
+                  - codedeploy:StopDeployment
+                  - codedeploy:ContinueDeployment
+                  - codedeploy:BatchGetApplications
+                  - codedeploy:BatchGetDeployments
+                Resource: "*"
+              # GitHub-managed environment values delivered to the ECS task.
+              - Effect: Allow
+                Action:
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:UpdateSecret
+                  - secretsmanager:DeleteSecret
+                  - secretsmanager:TagResource
+                Resource: !Sub "arn:aws:secretsmanager:*:\${AWS::AccountId}:secret:/awsify/*"
               # VPC discovery and security groups for the public ALB and Fargate tasks.
               - Effect: Allow
                 Action:
@@ -83,7 +157,7 @@ Resources:
                   - ec2:CreateTags
                   - ec2:DeleteTags
                 Resource: "*"
-              # Public HTTP load balancer.
+              # Public HTTP load balancer with blue + green target groups.
               - Effect: Allow
                 Action:
                   - elasticloadbalancing:CreateLoadBalancer
@@ -92,11 +166,17 @@ Resources:
                   - elasticloadbalancing:CreateTargetGroup
                   - elasticloadbalancing:DeleteTargetGroup
                   - elasticloadbalancing:DescribeTargetGroups
+                  - elasticloadbalancing:DescribeTargetHealth
                   - elasticloadbalancing:CreateListener
                   - elasticloadbalancing:DeleteListener
                   - elasticloadbalancing:DescribeListeners
                   - elasticloadbalancing:ModifyListener
                   - elasticloadbalancing:ModifyTargetGroup
+                  - elasticloadbalancing:DescribeRules
+                  - elasticloadbalancing:CreateRule
+                  - elasticloadbalancing:DeleteRule
+                  - elasticloadbalancing:ModifyRule
+                  - elasticloadbalancing:SetRulePriorities
                   - elasticloadbalancing:AddTags
                   - elasticloadbalancing:RemoveTags
                 Resource: "*"
@@ -113,7 +193,7 @@ Resources:
                   - cloudwatch:DeleteAlarms
                   - cloudwatch:DescribeAlarms
                 Resource: "*"
-              # IAM roles AWS-ify creates for ECS task execution.
+              # IAM roles AWS-ify creates for ECS task execution and CodeDeploy.
               - Effect: Allow
                 Action:
                   - iam:CreateRole
@@ -125,8 +205,19 @@ Resources:
                   - iam:AttachRolePolicy
                   - iam:DetachRolePolicy
                 Resource: !Sub "arn:aws:iam::\${AWS::AccountId}:role/awsify-*"
+              # Service-linked roles ECS, ELB, and CodeDeploy create on first use.
+              - Effect: Allow
+                Action: iam:CreateServiceLinkedRole
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    iam:AWSServiceName:
+                      - ecs.amazonaws.com
+                      - codedeploy.amazonaws.com
+                      - elasticloadbalancing.amazonaws.com
 Outputs:
   RoleArn:
+    Description: Set this as the AWSIFY_DEPLOY_ROLE_ARN variable in your GitHub repo and paste it into AWS-ify.
     Value: !GetAtt AWSifyDeploymentRole.Arn
 `;
 }

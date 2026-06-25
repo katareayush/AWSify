@@ -17,6 +17,7 @@ function baseSuggestion(overrides: Partial<DeploymentSuggestion>): DeploymentSug
     envVars: [],
     database: { required: false },
     cache: { required: false },
+    deploymentStrategy: "blue-green",
     confidence: 0.9,
     notes: [],
     ...overrides

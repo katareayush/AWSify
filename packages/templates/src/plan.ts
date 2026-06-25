@@ -71,15 +71,27 @@ function buildResources(input: TemplateInput): DeploymentPlan["resources"] {
     { type: "ec2.securityGroup" as const, name: `${appName}-sg`, purpose: "Controls inbound / outbound traffic." }
   ];
 
+  const blueGreen = suggestion.deploymentStrategy !== "rolling";
+
   resources.push(
     { type: "ecr.repository", name: `${appName}-repo`, purpose: "Stores container images." },
     { type: "ecs.cluster", name: `${appName}-cluster`, purpose: "Runs the Fargate service." },
     { type: "ecs.taskDefinition", name: `${appName}-task`, purpose: "Defines CPU, memory, image, port, and env vars." },
     { type: "ecs.service", name: `${appName}-service`, purpose: "Keeps the app running on Fargate." },
     { type: "elasticloadbalancingv2.loadBalancer", name: `${appName}-alb`, purpose: "Public HTTP entrypoint." },
-    { type: "elasticloadbalancingv2.targetGroup", name: `${appName}-tg`, purpose: "Routes ALB traffic to ECS tasks." },
+    { type: "elasticloadbalancingv2.targetGroup", name: `${appName}-tg-blue`, purpose: "Live traffic target group (blue)." },
+    { type: "secretsmanager.secret", name: `/awsify/${appName}/env`, purpose: "Holds env vars synced from GitHub; read by the ECS task." },
     ...shared
   );
+
+  if (blueGreen) {
+    resources.push(
+      { type: "elasticloadbalancingv2.targetGroup", name: `${appName}-tg-green`, purpose: "Replacement traffic target group (green)." },
+      { type: "codedeploy.application", name: `${appName}-cd-app`, purpose: "Owns the blue-green deployment configuration." },
+      { type: "codedeploy.deploymentGroup", name: `${appName}-cd-group`, purpose: "Shifts ALB traffic from blue to green with automatic rollback." },
+      { type: "iam.role", name: `${appName}-codedeploy-role`, purpose: "Lets CodeDeploy manage the ECS blue-green rollout." }
+    );
+  }
 
   if (suggestion.database.required && suggestion.database.engine !== "mongodb") {
     resources.push(
