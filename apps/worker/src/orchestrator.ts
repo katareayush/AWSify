@@ -101,6 +101,12 @@ export class DeploymentOrchestrator {
       const { suggestion } = aiResult;
       await emit("scanning", `AI recommendation: ${suggestion.appType} on ${suggestion.computeTarget} (confidence ${suggestion.confidence.toFixed(2)})`);
 
+      if (aiResult.usage) {
+        const u = aiResult.usage;
+        const cost = u.costUsd !== undefined ? `$${u.costUsd.toFixed(4)}` : "n/a";
+        await emit("scanning", `Claude analysis cost: ${cost} (${u.model}: ${u.inputTokens} input / ${u.outputTokens} output tokens).`);
+      }
+
       await this.prisma.deploymentPlan.update({
         where: { id: job.approvedPlanId },
         data: {

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { deploymentSuggestionSchema, type DeploymentSuggestion } from "@awsify/deployment-schemas";
 import type { RepoScanResult, KeyFile } from "@awsify/repo-scanner";
+import { estimateCostUsd, type TokenUsage } from "./pricing.js";
 
 export interface AiRecommendationInput {
   repoFullName: string;
@@ -8,8 +9,16 @@ export interface AiRecommendationInput {
   keyFiles: KeyFile[];
 }
 
+export interface AiUsage extends TokenUsage {
+  model: string;
+  /** Estimated USD cost of this deployment's Claude analysis; undefined if the model is unpriced. */
+  costUsd?: number;
+}
+
 export interface AiRecommendationResult {
   suggestion: DeploymentSuggestion;
+  /** Token usage and estimated cost of the Claude call that produced the suggestion. */
+  usage?: AiUsage;
   /** Reserved for future review-only artifact generation. Never executed directly by the worker. */
   dockerfile?: string;
 }
@@ -119,7 +128,24 @@ export class ClaudeAiProvider implements AiProvider {
       .join("")
       .trim();
 
-    return parseAiResponse(raw);
+    const result = parseAiResponse(raw);
+    result.usage = this.buildUsage(message.usage);
+    return result;
+  }
+
+  private buildUsage(usage: Anthropic.Usage): AiUsage {
+    // SDK 0.32 types only input/output tokens; cache fields exist at runtime
+    // when prompt caching is used. Read them defensively (0 when absent).
+    const raw = usage as { cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
+    const tokens: AiUsage = {
+      model: this.model,
+      inputTokens: usage.input_tokens ?? 0,
+      outputTokens: usage.output_tokens ?? 0,
+      cacheReadTokens: raw.cache_read_input_tokens ?? 0,
+      cacheWriteTokens: raw.cache_creation_input_tokens ?? 0
+    };
+    tokens.costUsd = estimateCostUsd(tokens.model, tokens);
+    return tokens;
   }
 }
 
