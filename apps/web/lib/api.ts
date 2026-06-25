@@ -266,7 +266,14 @@ export const api = {
     }),
 
   rotateDeploymentCiToken: (id: string) =>
-    req<{ token: string; secretName: string; variableName: string; variableValue: string; projectId: string }>(`/deployments/${id}/ci-token`, {
+    req<{
+      token: string;
+      secretName: string;
+      variables: { name: string; value: string }[];
+      variableName: string;
+      variableValue: string;
+      projectId: string;
+    }>(`/deployments/${id}/ci-token`, {
       method: "POST"
     }),
 

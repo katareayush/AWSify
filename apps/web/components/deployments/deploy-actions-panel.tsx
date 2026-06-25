@@ -18,6 +18,7 @@ interface DeployActionsPanelProps {
 interface CiToken {
   token: string;
   secretName: string;
+  variables?: { name: string; value: string }[];
   variableName: string;
   variableValue: string;
   projectId: string;
@@ -197,7 +198,7 @@ export function DeployActionsPanel({ deploymentId, planStatus, targetBranch, has
             <p className="text-[12.5px] font-medium text-white/85">CI redeploy token</p>
           </div>
           <p className="mt-1.5 text-[11.5px] leading-[1.55] text-white/45">
-            Generate a deploy token. Add it as repo secret <span className="font-mono text-white/65">AWSIFY_API_TOKEN</span> and variable <span className="font-mono text-white/65">AWSIFY_API_URL</span>.
+            Generate a deploy token. Add it as repo secret <span className="font-mono text-white/65">AWSIFY_API_TOKEN</span>, plus variables <span className="font-mono text-white/65">AWSIFY_API_URL</span> and <span className="font-mono text-white/65">AWSIFY_DEPLOY_ROLE_ARN</span>.
           </p>
           <Button
             className="mt-3 w-full"
@@ -223,8 +224,13 @@ export function DeployActionsPanel({ deploymentId, planStatus, targetBranch, has
               </div>
               <div className="space-y-1 border-t border-amber-500/10 pt-2">
                 <MiniRow label="Secret" value={ciToken.secretName} />
-                <MiniRow label="Variable" value={ciToken.variableName} />
-                <MiniRow label="Value" value={ciToken.variableValue || "(API_URL not configured)"} />
+                {(ciToken.variables ?? [{ name: ciToken.variableName, value: ciToken.variableValue }]).map((variable) => (
+                  <MiniRow
+                    key={variable.name}
+                    label={variable.name}
+                    value={variable.value || "(not configured)"}
+                  />
+                ))}
               </div>
               <p className="text-[10.5px] text-white/40">Shown once. Rotating replaces the previous token.</p>
             </div>
