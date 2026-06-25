@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Copy, ExternalLink, KeyRound, Loader2 } from "lucide-react";
+import { Check, Copy, ExternalLink, KeyRound, Loader2, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { useToast } from "../ui/toast";
 import { api, type AwsConnection } from "../../lib/api";
@@ -18,6 +18,7 @@ export function AwsSection() {
   const [error, setError] = useState<string | null>(null);
   const [showManual, setShowManual] = useState(false);
   const [externalIdCopied, setExternalIdCopied] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   useEffect(() => {
     api.listConnections().then((r) => setConnections(r.connections)).catch((err) => {
@@ -41,10 +42,33 @@ export function AwsSection() {
       const r = await api.listConnections();
       setConnections(r.connections);
       setRoleArn("");
+      // Issue a fresh external ID + launch URL so the user can connect another account.
+      const next = await api.cfnTemplate();
+      setExternalId(next.externalId);
+      setTemplate(next.template);
+      setLaunchStackUrl(next.launchStackUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not connect to AWS.");
     } finally {
       setConnecting(false);
+    }
+  }
+
+  async function handleDisconnect(connection: AwsConnection) {
+    const confirmed = window.confirm(
+      `Disconnect AWS account ${connection.accountId}? Projects using it will need a connection re-selected before they can deploy.`
+    );
+    if (!confirmed) return;
+    setRemovingId(connection.id);
+    try {
+      const result = await api.deleteConnection(connection.id);
+      if (result.error) throw new Error(result.error);
+      setConnections((prev) => prev.filter((c) => c.id !== connection.id));
+      toast.success(`Disconnected AWS account ${connection.accountId}.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not disconnect the AWS account.");
+    } finally {
+      setRemovingId(null);
     }
   }
 
@@ -87,12 +111,28 @@ export function AwsSection() {
       {connections.length > 0 && (
         <div className="mb-4 divide-y divide-white/[0.04] rounded-lg border border-white/[0.05]">
           {connections.map((c) => (
-            <div key={c.id} className="flex flex-col gap-1 px-4 py-3 text-[12.5px] sm:flex-row sm:items-center sm:justify-between">
-              <span className="min-w-0 truncate font-mono text-white/75" title={c.accountId}>{c.accountId}</span>
-              <span className="shrink-0 text-white/40">{c.defaultRegion} · {c.status}</span>
+            <div key={c.id} className="flex items-center justify-between gap-3 px-4 py-3 text-[12.5px]">
+              <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <span className="min-w-0 truncate font-mono text-white/75" title={c.accountId}>{c.accountId}</span>
+                <span className="shrink-0 text-white/40">{c.defaultRegion} · {c.status}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDisconnect(c)}
+                disabled={removingId === c.id}
+                title="Disconnect this AWS account"
+                aria-label={`Disconnect AWS account ${c.accountId}`}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+              >
+                {removingId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              </button>
             </div>
           ))}
         </div>
+      )}
+
+      {connections.length > 0 && (
+        <p className="mb-3 text-[12px] font-medium text-white/70">Connect another AWS account</p>
       )}
 
       <ol className="space-y-4">

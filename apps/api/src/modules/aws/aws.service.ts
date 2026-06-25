@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { STSClient, AssumeRoleCommand, GetCallerIdentityCommand } from "@aws-sdk/client-sts";
 import { PrismaService } from "../prisma.service";
 import { generateCloudFormationRoleTemplate } from "@awsify/templates";
@@ -94,10 +94,22 @@ export class AwsService {
     });
     return { connections };
   }
+
+  async deleteConnection(userId: string, connectionId: string) {
+    const connection = await this.prisma.awsConnection.findFirst({ where: { id: connectionId, userId } });
+    if (!connection) return { error: "not_found" };
+    // Projects referencing this connection have an optional FK, so deleting it
+    // unsets project.awsConnectionId (they fall back to "AWS not connected").
+    await this.prisma.awsConnection.delete({ where: { id: connectionId } });
+    return { ok: true };
+  }
 }
 
 function createExternalId(userId: string): string {
-  const nonce = "default";
+  // A unique nonce per connection so a user can link several AWS accounts —
+  // each gets its own external ID (and therefore its own connection row),
+  // instead of a deterministic ID that overwrites the previous account.
+  const nonce = randomBytes(8).toString("hex");
   const payload = `awsify:${userId}:${nonce}`;
   const signature = signExternalId(payload);
   return `${payload}:${signature}`;

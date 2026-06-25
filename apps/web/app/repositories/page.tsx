@@ -56,6 +56,7 @@ function RepositoriesPageInner() {
   const [reposLoading, setReposLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [deploymentProfile, setDeploymentProfile] = useState("lean");
+  const [selectedAwsId, setSelectedAwsId] = useState<string | null>(null);
   const [repoRefs, setRepoRefs] = useState<Record<string, RepoRefSummary>>({});
   const [refsLoading, setRefsLoading] = useState<Record<string, boolean>>({});
 
@@ -70,6 +71,13 @@ function RepositoriesPageInner() {
       })
     ]).finally(() => setReposLoading(false));
   }, [me?.authenticated, toast]);
+
+  // Default the deploy-time AWS account to the first valid connection; keep the
+  // user's choice if it's still valid.
+  useEffect(() => {
+    const valid = connections.filter((c) => c.status === "valid");
+    setSelectedAwsId((prev) => (prev && valid.some((c) => c.id === prev) ? prev : valid[0]?.id ?? null));
+  }, [connections]);
 
   // Reset to the first page only when the search term actually changes —
   // not on mount (would break ?page= deep links).
@@ -103,7 +111,8 @@ function RepositoriesPageInner() {
   }
 
   async function handleDeploy(repo: Repo) {
-    const connection = connections.find((c) => c.status === "valid");
+    const valid = connections.filter((c) => c.status === "valid");
+    const connection = valid.find((c) => c.id === selectedAwsId) ?? valid[0];
     if (!connection) {
       router.push("/connections");
       return;
@@ -169,7 +178,8 @@ function RepositoriesPageInner() {
     );
   }
 
-  const hasAws = connections.some((connection) => connection.status === "valid");
+  const validConnections = connections.filter((connection) => connection.status === "valid");
+  const hasAws = validConnections.length > 0;
   const hasBrokenAws = !hasAws && connections.length > 0;
 
   return (
@@ -222,6 +232,26 @@ function RepositoriesPageInner() {
         )}
 
         <Panel className="p-6">
+          {validConnections.length > 1 && (
+            <div className="mb-5 rounded-lg border border-white/[0.06] bg-white/[0.015] p-3">
+              <div className="mb-3 flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-violet-soft" />
+                <p className="text-[12.5px] font-medium text-white/85">AWS account</p>
+              </div>
+              <select
+                value={selectedAwsId ?? ""}
+                onChange={(e) => setSelectedAwsId(e.target.value)}
+                className="h-9 w-full rounded-md border border-white/[0.08] bg-white/[0.02] px-3 text-[12.5px] text-white/80 outline-none focus:border-white/20"
+              >
+                {validConnections.map((c) => (
+                  <option key={c.id} value={c.id} className="bg-[#0a0a0d]">
+                    {c.accountId} · {c.defaultRegion}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="mb-5 rounded-lg border border-white/[0.06] bg-white/[0.015] p-3">
             <div className="mb-3 flex items-center gap-2">
               <Users className="h-4 w-4 text-violet-soft" />

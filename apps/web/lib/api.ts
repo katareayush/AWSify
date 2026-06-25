@@ -197,6 +197,9 @@ export const api = {
 
   listConnections: () => req<{ connections: AwsConnection[] }>("/aws/connections"),
 
+  deleteConnection: (id: string) =>
+    req<{ ok?: boolean; error?: string }>(`/aws/connections/${id}`, { method: "DELETE" }),
+
   triggerDeploy: (body: { repoId: string; branch: string; awsConnectionId: string; deploymentProfile?: string }) =>
     req<{ deploymentId: string }>("/deployments/trigger", {
       method: "POST",

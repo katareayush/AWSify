@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Post, Req, Res } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, Param, Post, Req, Res } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { GithubService } from "../github/github.service";
 import { SESSION_COOKIE } from "../github/session-cookie";
@@ -55,5 +55,13 @@ export class AwsController {
     const session = token ? this.github.verifySession(token) : null;
     if (!session) return { error: "not_authenticated" };
     return this.aws.listConnections(session.userId);
+  }
+
+  @Delete("connections/:id")
+  async deleteConnection(@Req() req: Request, @Param("id") id: string) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    const session = token ? this.github.verifySession(token) : null;
+    if (!session) return { error: "not_authenticated" };
+    return this.aws.deleteConnection(session.userId, id);
   }
 }
