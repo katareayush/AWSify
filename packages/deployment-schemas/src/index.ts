@@ -81,6 +81,10 @@ export const deploymentSuggestionSchema = z.object({
       note: z.string().max(300).optional()
     })
     .default({ required: false }),
+  // Rollout mechanism on ECS. "blue-green" provisions two target groups and
+  // shifts traffic via CodeDeploy for zero-downtime releases; "rolling" is the
+  // ECS-native in-place update. Defaults to blue-green so deploys never drop traffic.
+  deploymentStrategy: z.enum(["rolling", "blue-green"]).default("blue-green"),
   confidence: z.number().min(0).max(1),
   notes: z.array(z.string().max(300)).default([])
 });
@@ -117,7 +121,9 @@ export const deploymentPlanSchema = z.object({
         "ec2.securityGroup",
         "rds.instance",
         "elasticache.replicationGroup",
-        "secretsmanager.secret"
+        "secretsmanager.secret",
+        "codedeploy.application",
+        "codedeploy.deploymentGroup"
       ]),
       name: z.string(),
       purpose: z.string()
@@ -143,7 +149,11 @@ export const deploymentJobSchema = z.object({
   awsConnectionId: z.string(),
   approvedPlanId: z.string(),
   actorUserId: z.string(),
-  deploymentId: z.string().optional()
+  deploymentId: z.string().optional(),
+  // When present, the image was already built and pushed to ECR by the
+  // customer's GitHub Action. The worker skips clone+build and deploys this
+  // image directly. Absent for one-click deploys triggered from the AWSify UI.
+  imageUri: z.string().optional()
 });
 
 export type DeploymentJob = z.infer<typeof deploymentJobSchema>;

@@ -155,6 +155,7 @@ export function scanToSuggestion(scan: RepoScanResult): DeploymentSuggestion {
     cache: scan.cacheRequired
       ? { required: true, note: "Detected Redis dependency. ElastiCache provisioning is planned, but not part of the current ECS Fargate MVP template." }
       : { required: false },
+    deploymentStrategy: "blue-green",
     confidence: scan.signals.length >= 2 ? 0.82 : 0.55,
     notes: scan.signals
   };
