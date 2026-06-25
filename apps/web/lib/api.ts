@@ -165,6 +165,8 @@ export const api = {
 
   loginUrl: () => req<{ url: string }>("/github/login-url"),
 
+  logout: () => req<{ ok: boolean }>("/github/logout"),
+
   appInstallUrl: () => req<{ url: string }>("/github/app-install-url"),
 
   repositories: () => req<{ repositories: Repo[] }>("/github/repositories"),

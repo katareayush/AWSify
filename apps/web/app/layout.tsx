@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import { ToastProvider } from "../components/ui/toast";
+import { SidebarProvider } from "../components/app/sidebar-context";
 import "./globals.css";
 
 const inter = Inter({
@@ -35,7 +36,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable}`}>
       <body className="font-sans">
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          {/* Persist sidebar collapse state across navigations so it never
+              flashes open-then-collapsed when the per-page shell re-mounts. */}
+          <SidebarProvider>{children}</SidebarProvider>
+        </ToastProvider>
       </body>
     </html>
   );

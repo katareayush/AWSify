@@ -2,19 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AppRoot, CommandPalette, PageTransition, Sidebar, TopBar } from "./app";
-import { SidebarProvider, useSidebar } from "./app/sidebar-context";
+import { useSidebar } from "./app/sidebar-context";
 
 interface ProductShellProps {
   children: React.ReactNode;
   active?: string;
 }
 
+// SidebarProvider lives in the root layout so its state survives the per-page
+// re-mount of this shell — that's what prevents the collapse/expand flash.
 export function ProductShell({ children, active = "Deployments" }: ProductShellProps) {
   return (
     <AppRoot>
-      <SidebarProvider>
-        <ShellLayout active={active}>{children}</ShellLayout>
-      </SidebarProvider>
+      <ShellLayout active={active}>{children}</ShellLayout>
     </AppRoot>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { useState } from "react";
+import { LogOut, Plus, Search } from "lucide-react";
 import { Button } from "../ui/button";
 import { Wordmark } from "../landing/primitives/wordmark";
 import { api } from "../../lib/api";
@@ -15,6 +16,8 @@ interface TopBarProps {
 
 export function TopBar({ active, onOpenCommandPalette }: TopBarProps) {
   const { me, loading } = useAuth({ redirect: false });
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleConnect() {
     try {
@@ -23,6 +26,16 @@ export function TopBar({ active, onOpenCommandPalette }: TopBarProps) {
     } catch {
       window.location.href = "/";
     }
+  }
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await api.logout();
+    } catch {
+      /* clear client state regardless */
+    }
+    window.location.href = "/";
   }
 
   return (
@@ -68,8 +81,47 @@ export function TopBar({ active, onOpenCommandPalette }: TopBarProps) {
                     <Plus className="h-4 w-4" />
                   </Link>
                 </Button>
-                <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.1] bg-white/[0.06] text-[12px] font-medium text-white/80">
-                  {me.githubLogin?.[0]?.toUpperCase() ?? "?"}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setMenuOpen((open) => !open)}
+                    aria-label="Account menu"
+                    aria-haspopup="menu"
+                    aria-expanded={menuOpen}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.1] bg-white/[0.06] text-[12px] font-medium text-white/80 transition-colors hover:border-white/25 hover:text-white"
+                  >
+                    {me.githubLogin?.[0]?.toUpperCase() ?? "?"}
+                  </button>
+                  {menuOpen && (
+                    <>
+                      <button
+                        type="button"
+                        aria-hidden
+                        tabIndex={-1}
+                        onClick={() => setMenuOpen(false)}
+                        className="fixed inset-0 z-30 cursor-default"
+                      />
+                      <div
+                        role="menu"
+                        className="absolute right-0 top-full z-40 mt-2 w-52 overflow-hidden rounded-lg border border-white/[0.08] bg-[#0a0a0d]/95 py-1 shadow-xl backdrop-blur-xl"
+                      >
+                        <div className="border-b border-white/[0.06] px-3 py-2">
+                          <p className="text-[11px] text-white/40">Signed in as</p>
+                          <p className="truncate text-[13px] font-medium text-white/85">{me.githubLogin ?? "GitHub user"}</p>
+                        </div>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={handleLogout}
+                          disabled={loggingOut}
+                          className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-white/65 transition-colors hover:bg-white/[0.05] hover:text-white disabled:opacity-50"
+                        >
+                          <LogOut className="h-4 w-4 text-white/45" />
+                          {loggingOut ? "Logging out…" : "Log out"}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </>
             ) : (
