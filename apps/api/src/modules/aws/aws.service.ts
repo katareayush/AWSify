@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { STSClient, AssumeRoleCommand, GetCallerIdentityCommand } from "@aws-sdk/client-sts";
 import { PrismaService } from "../prisma.service";
 import { generateCloudFormationRoleTemplate } from "@awsify/templates";
@@ -71,19 +71,24 @@ export class AwsService {
     const validation = await this.validateConnection(userId, { ...input, region });
     if (validation.status !== "valid") return { error: "aws_validation_failed", validation };
     if (!validation.accountId) return { error: "missing_account_id_from_sts" };
-    const connection = await this.prisma.awsConnection.upsert({
-      where: { id: input.externalId },
-      create: {
-        id: input.externalId,
-        accountId: validation.accountId,
-        roleArn: input.roleArn,
-        externalId: input.externalId,
-        defaultRegion: region,
-        status: "valid",
-        userId
-      },
-      update: { roleArn: input.roleArn, defaultRegion: region, status: "valid" }
+    // De-duplicate by AWS account: re-connecting the same account updates it,
+    // while a different account creates a new row. The connection id is an
+    // internal cuid (decoupled from the external ID), so several accounts can
+    // share one stable external ID.
+    const existing = await this.prisma.awsConnection.findFirst({
+      where: { userId, accountId: validation.accountId }
     });
+    const data = {
+      roleArn: input.roleArn,
+      externalId: input.externalId,
+      defaultRegion: region,
+      status: "valid" as const
+    };
+    const connection = existing
+      ? await this.prisma.awsConnection.update({ where: { id: existing.id }, data })
+      : await this.prisma.awsConnection.create({
+          data: { ...data, accountId: validation.accountId, userId }
+        });
     return { connection };
   }
 
@@ -106,10 +111,11 @@ export class AwsService {
 }
 
 function createExternalId(userId: string): string {
-  // A unique nonce per connection so a user can link several AWS accounts —
-  // each gets its own external ID (and therefore its own connection row),
-  // instead of a deterministic ID that overwrites the previous account.
-  const nonce = randomBytes(8).toString("hex");
+  // Deterministic per user so it never rotates between page loads — the External
+  // ID baked into the role's trust policy always matches what AWS-ify sends when
+  // assuming the role. Multiple AWS accounts can safely share it; connections are
+  // de-duplicated by AWS account, not by external ID.
+  const nonce = "default";
   const payload = `awsify:${userId}:${nonce}`;
   const signature = signExternalId(payload);
   return `${payload}:${signature}`;
