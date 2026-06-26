@@ -148,10 +148,7 @@ Resources:
               # VPC discovery and security groups for the public ALB and Fargate tasks.
               - Effect: Allow
                 Action:
-                  - ec2:DescribeVpcs
-                  - ec2:DescribeSubnets
-                  - ec2:DescribeSecurityGroups
-                  - ec2:DescribeInternetGateways
+                  - ec2:Describe*
                   - ec2:CreateSecurityGroup
                   - ec2:DeleteSecurityGroup
                   - ec2:AuthorizeSecurityGroupIngress

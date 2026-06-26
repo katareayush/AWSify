@@ -105,6 +105,13 @@ export function buildManagedPipelinePolicy(accountId: string, roleName: string):
         Resource: "*"
       },
       {
+        // All read-only EC2 lookups Pulumi performs on the default VPC/subnets/AZs.
+        Sid: "AwsifyEc2Read",
+        Effect: "Allow",
+        Action: "ec2:Describe*",
+        Resource: "*"
+      },
+      {
         // Lets the role keep this very policy current on itself going forward.
         Sid: "AwsifySelfHeal",
         Effect: "Allow",
