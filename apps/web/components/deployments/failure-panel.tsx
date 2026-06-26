@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, Copy, Loader2, ServerCrash, Wrench } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronDown, ChevronUp, Copy, Loader2, RotateCw, ServerCrash, Wrench } from "lucide-react";
 import { Panel } from "../ui/panel";
 import { useToast } from "../ui/toast";
 import { api, type DeploymentDiagnosis } from "../../lib/api";
@@ -18,9 +19,25 @@ export function FailurePanel({
   logs: Array<{ status: string; message: string; at: string }>;
 }) {
   const toast = useToast();
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [diagnosis, setDiagnosis] = useState<DeploymentDiagnosis | null>(null);
   const [loadingDiagnosis, setLoadingDiagnosis] = useState(false);
+
+  async function retry() {
+    setRetrying(true);
+    try {
+      // Re-runs the same approved plan; Pulumi is stateful, so it resumes
+      // from where it failed (e.g. after a permission fix) rather than starting over.
+      const result = await api.redeployLatest(deploymentId);
+      toast.success("Retrying deployment with the same plan.");
+      router.push(`/deployments/${result.deploymentId}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not retry the deployment.");
+      setRetrying(false);
+    }
+  }
   const isLong = reason.length > 400 || reason.split("\n").length > 6;
   const bundle = useMemo(
     () => [
@@ -66,6 +83,16 @@ export function FailurePanel({
           <div className="flex items-center justify-between gap-3">
             <p className="text-[13px] font-medium text-red-400">Deployment failed</p>
             <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={retry}
+                disabled={retrying}
+                title="Re-run this deployment with the same plan"
+                className="flex items-center gap-1 rounded border border-violet/30 bg-violet/10 px-2 py-1 text-[11px] font-medium text-violet-soft transition-colors hover:bg-violet/20 disabled:opacity-50"
+              >
+                {retrying ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
+                {retrying ? "Retrying…" : "Retry"}
+              </button>
               <button
                 type="button"
                 onClick={() => copy(bundle)}
