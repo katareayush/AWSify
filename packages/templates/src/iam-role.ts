@@ -19,19 +19,22 @@ Parameters:
 ${externalIdParam}  GitHubRepo:
     Type: String
     Default: ""
-    Description: "owner/repo allowed to assume this role from GitHub Actions (e.g. acme/web). Leave blank to allow any repo using this account's GitHub OIDC provider."
+    Description: "owner/repo allowed to deploy from GitHub Actions (e.g. acme/web). Required to enable the GitHub Actions image-build path; leave blank for an AWS-ify-only role (no GitHub OIDC trust)."
   CreateGitHubOidcProvider:
     Type: String
     Default: "Yes"
     AllowedValues: ["Yes", "No"]
-    Description: Create the GitHub Actions OIDC provider. Choose No if your account already has one.
+    Description: Create the GitHub Actions OIDC provider (only used when GitHubRepo is set). Choose No if your account already has one.
 Conditions:
   CreateOidc: !Equals [!Ref CreateGitHubOidcProvider, "Yes"]
   ScopeToRepo: !Not [!Equals [!Ref GitHubRepo, ""]]
+  # AWS rejects an OIDC trust that doesn't scope :sub, so only wire OIDC when a
+  # repo is provided — and only create the provider when it will actually be used.
+  CreateOidcProvider: !And [!Condition CreateOidc, !Condition ScopeToRepo]
 Resources:
   GitHubOidcProvider:
     Type: AWS::IAM::OIDCProvider
-    Condition: CreateOidc
+    Condition: CreateOidcProvider
     Properties:
       Url: https://token.actions.githubusercontent.com
       ClientIdList:
@@ -53,21 +56,22 @@ Resources:
             Condition:
               StringEquals:
                 sts:ExternalId: ${externalIdRef}
-          - Effect: Allow
-            Principal:
-              Federated: !If
-                - CreateOidc
-                - !Ref GitHubOidcProvider
-                - !Sub "arn:aws:iam::\${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
-            Action: sts:AssumeRoleWithWebIdentity
-            Condition: !If
-              - ScopeToRepo
-              - StringEquals:
+          # Only present when GitHubRepo is set; AWS requires the :sub scope below.
+          - !If
+            - ScopeToRepo
+            - Effect: Allow
+              Principal:
+                Federated: !If
+                  - CreateOidcProvider
+                  - !Ref GitHubOidcProvider
+                  - !Sub "arn:aws:iam::\${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+              Action: sts:AssumeRoleWithWebIdentity
+              Condition:
+                StringEquals:
                   token.actions.githubusercontent.com:aud: sts.amazonaws.com
                 StringLike:
                   token.actions.githubusercontent.com:sub: !Sub "repo:\${GitHubRepo}:*"
-              - StringEquals:
-                  token.actions.githubusercontent.com:aud: sts.amazonaws.com
+            - !Ref "AWS::NoValue"
       Policies:
         - PolicyName: AWSifyEcsFargateDeployPolicy
           PolicyDocument:
