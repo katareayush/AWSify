@@ -36,6 +36,14 @@ export interface EcsFargateOutputs {
   codeDeployDeploymentGroupName?: pulumi.Output<string>;
 }
 
+// ELB load balancers and target groups cap names at 32 chars (alphanumeric +
+// hyphens, no leading/trailing hyphen). Truncate the app-name prefix so
+// "<base>-<suffix>" always fits, regardless of how long the app name is.
+function boundedElbName(appName: string, suffix: string): string {
+  const base = appName.slice(0, 32 - suffix.length - 1).replace(/-+$/, "");
+  return `${base}-${suffix}`;
+}
+
 export function createEcsFargateStack(input: EcsFargateInput): EcsFargateOutputs {
   const appName = input.plan.appName;
   const port = input.plan.suggestion.port;
@@ -158,10 +166,13 @@ export function createEcsFargateStack(input: EcsFargateInput): EcsFargateOutputs
   const healthCheck = { path: healthPath, matcher: "200-399", interval: 30, timeout: 5, healthyThreshold: 2, unhealthyThreshold: 3 };
   const targetGroupArgs = { vpcId: vpc.id, port, protocol: "HTTP", targetType: "ip", healthCheck } as const;
 
-  const blueTargetGroup = new aws.lb.TargetGroup(`${appName}-tg-blue`, targetGroupArgs);
-  const greenTargetGroup = blueGreen ? new aws.lb.TargetGroup(`${appName}-tg-green`, targetGroupArgs) : undefined;
+  const blueTargetGroup = new aws.lb.TargetGroup(`${appName}-tg-blue`, { ...targetGroupArgs, name: boundedElbName(appName, "blue") });
+  const greenTargetGroup = blueGreen
+    ? new aws.lb.TargetGroup(`${appName}-tg-green`, { ...targetGroupArgs, name: boundedElbName(appName, "green") })
+    : undefined;
 
   const alb = new aws.lb.LoadBalancer(`${appName}-alb`, {
+    name: boundedElbName(appName, "alb"),
     loadBalancerType: "application",
     securityGroups: [albSg.id],
     subnets: subnetIds
