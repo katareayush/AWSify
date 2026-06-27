@@ -454,6 +454,15 @@ export class DeploymentOrchestrator {
 
     await stack.setConfig("aws:region", { value: plan.region });
 
+    // Reconcile state with reality before applying, so drift (e.g. a resource
+    // deleted out-of-band, or an ECS cluster left INACTIVE) is detected and
+    // recreated instead of breaking the apply. Best-effort — never block on it.
+    try {
+      await stack.refresh({ onOutput: msg => { const t = msg.trim(); if (t) emit("deploying", t); } });
+    } catch (error) {
+      await emit("deploying", `State refresh skipped: ${extractProcessError(error)}`);
+    }
+
     let result;
     try {
       result = await stack.up({
