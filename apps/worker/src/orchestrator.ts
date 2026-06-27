@@ -31,6 +31,15 @@ function envSecretName(appName: string): string {
   return `/awsify/${appName}/env`;
 }
 
+function pulumiStateDir(projectId: string): string {
+  // Persist Pulumi state outside the container's ephemeral /tmp so retries (and
+  // platform rebuilds) keep the stack state and don't try to recreate resources
+  // that already exist. Set AWSIFY_PULUMI_STATE_DIR to a volume-backed path in
+  // production; falls back to /tmp for local dev.
+  const base = process.env.AWSIFY_PULUMI_STATE_DIR ?? join(tmpdir(), "awsify-state");
+  return join(base, projectId);
+}
+
 const execFileAsync = promisify(execFile);
 
 export interface DeploymentEvent {
@@ -404,7 +413,7 @@ export class DeploymentOrchestrator {
     prebuilt: boolean,
     emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
   ) {
-    const stateDir = join(tmpdir(), "awsify-state", plan.projectId);
+    const stateDir = pulumiStateDir(plan.projectId);
     mkdirSync(stateDir, { recursive: true });
 
     // Env is delivered through a Secrets Manager secret the ECS task reads at
@@ -617,7 +626,7 @@ export class DeploymentOrchestrator {
     credentials: AwsCredentials,
     emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
   ) {
-    const stateDir = join(tmpdir(), "awsify-state", plan.projectId);
+    const stateDir = pulumiStateDir(plan.projectId);
     mkdirSync(stateDir, { recursive: true });
 
     const program: PulumiFn = async () => {

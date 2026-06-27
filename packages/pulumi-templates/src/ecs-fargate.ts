@@ -22,7 +22,6 @@ export interface EcsFargateInput {
 
 export interface EcsFargateOutputs {
   liveUrl: pulumi.Output<string>;
-  repositoryUrl: pulumi.Output<string>;
   logGroupName: pulumi.Output<string>;
   databaseEndpoint?: pulumi.Output<string>;
   redisEndpoint?: pulumi.Output<string>;
@@ -46,11 +45,9 @@ export function createEcsFargateStack(input: EcsFargateInput): EcsFargateOutputs
   const vpc = aws.ec2.getVpcOutput({ default: true });
   const subnetIds = aws.ec2.getSubnetsOutput({ filters: [{ name: "vpc-id", values: [vpc.id] }] }).ids;
 
-  const repository = new aws.ecr.Repository(`${appName}-repo`, {
-    name: appName,
-    forceDelete: true,
-    imageScanningConfiguration: { scanOnPush: true }
-  });
+  // The ECR repository is created and owned outside Pulumi — by the worker
+  // (UI build path) or the GitHub Action — so the image already exists when this
+  // stack runs. Pulumi must NOT also create it, or it collides on every deploy.
 
   const logGroup = new aws.cloudwatch.LogGroup(`${appName}-logs`, {
     name: `/awsify/${appName}`,
@@ -244,7 +241,6 @@ export function createEcsFargateStack(input: EcsFargateInput): EcsFargateOutputs
 
   return {
     liveUrl: pulumi.interpolate`http://${alb.dnsName}`,
-    repositoryUrl: repository.repositoryUrl,
     logGroupName: logGroup.name,
     databaseEndpoint,
     redisEndpoint,

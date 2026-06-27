@@ -27,7 +27,6 @@ export interface StackInput {
 
 export interface StackOutputs {
   liveUrl: pulumi.Output<string>;
-  repositoryUrl?: pulumi.Output<string>;
   logGroupName?: pulumi.Output<string>;
   databaseEndpoint?: pulumi.Output<string>;
   redisEndpoint?: pulumi.Output<string>;

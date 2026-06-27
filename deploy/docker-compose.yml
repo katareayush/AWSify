@@ -70,6 +70,10 @@ services:
     image: awsify-worker:latest
     restart: unless-stopped
     env_file: .env
+    environment:
+      # Persist Pulumi stack state on a volume so retries/rebuilds don't recreate
+      # resources that already exist.
+      AWSIFY_PULUMI_STATE_DIR: /root/.pulumi/awsify-state
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - pulumi-state:/root/.pulumi
