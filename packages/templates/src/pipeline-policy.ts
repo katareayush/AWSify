@@ -1,13 +1,14 @@
 /**
- * The single source of truth for the deployment role's drift-prone permissions.
+ * The single source of truth for the deployment role's pipeline permissions.
  *
  * The worker re-applies this as an inline policy (named below) on the role at the
- * start of every deploy, so when AWSify adds a feature that needs a new IAM
- * action we only edit this file — every subsequent deploy self-heals the role.
+ * start of every deploy, so when AWSify needs a new IAM action we only edit this
+ * file — every subsequent deploy self-heals the role.
  *
- * The CloudFormation role template additionally grants the role permission to
- * manage *this one policy* on itself (the bootstrap that makes self-heal work);
- * see iam-role.ts. Roles created before that grant get a one-time manual update.
+ * It is intentionally generous (full management of the services AWSify owns in
+ * the account) so Pulumi's read-after-create lookups (tags, inline policies)
+ * never trip an AccessDenied. The CloudFormation role template additionally
+ * grants the role permission to manage this one policy on itself (see iam-role.ts).
  */
 export const MANAGED_PIPELINE_POLICY_NAME = "AWSifyManagedPipeline";
 
@@ -21,6 +22,7 @@ export function buildManagedPipelinePolicy(accountId: string, roleName: string):
     Version: "2012-10-17",
     Statement: [
       {
+        // GitHub-managed env values delivered to the ECS task.
         Sid: "AwsifyEnvSecrets",
         Effect: "Allow",
         Action: [
@@ -34,54 +36,28 @@ export function buildManagedPipelinePolicy(accountId: string, roleName: string):
         ],
         Resource: `arn:aws:secretsmanager:*:${accountId}:secret:/awsify/*`
       },
+      // Services AWSify fully owns in the account — granted broadly so Pulumi's
+      // create + read-back (describe/list-tags/list-policies) never trips up.
+      { Sid: "AwsifyEcs", Effect: "Allow", Action: "ecs:*", Resource: "*" },
+      { Sid: "AwsifyElb", Effect: "Allow", Action: "elasticloadbalancing:*", Resource: "*" },
+      { Sid: "AwsifyCodeDeploy", Effect: "Allow", Action: "codedeploy:*", Resource: "*" },
+      { Sid: "AwsifyLogs", Effect: "Allow", Action: "logs:*", Resource: "*" },
+      { Sid: "AwsifyEcr", Effect: "Allow", Action: "ecr:*", Resource: "*" },
       {
-        Sid: "AwsifyBlueGreen",
+        Sid: "AwsifyEc2",
         Effect: "Allow",
+        Resource: "*",
         Action: [
-          "codedeploy:CreateApplication",
-          "codedeploy:GetApplication",
-          "codedeploy:DeleteApplication",
-          "codedeploy:CreateDeploymentGroup",
-          "codedeploy:UpdateDeploymentGroup",
-          "codedeploy:GetDeploymentGroup",
-          "codedeploy:DeleteDeploymentGroup",
-          "codedeploy:CreateDeployment",
-          "codedeploy:GetDeployment",
-          "codedeploy:GetDeploymentConfig",
-          "codedeploy:RegisterApplicationRevision",
-          "codedeploy:ListApplications",
-          "codedeploy:ListDeployments",
-          "codedeploy:StopDeployment",
-          "codedeploy:ContinueDeployment",
-          "codedeploy:BatchGetApplications",
-          "codedeploy:BatchGetDeployments"
-        ],
-        Resource: "*"
-      },
-      {
-        Sid: "AwsifyEcsTaskSets",
-        Effect: "Allow",
-        Action: [
-          "ecs:CreateTaskSet",
-          "ecs:DeleteTaskSet",
-          "ecs:DescribeTaskSets",
-          "ecs:UpdateServicePrimaryTaskSet",
-          "ecs:TagResource"
-        ],
-        Resource: "*"
-      },
-      {
-        Sid: "AwsifyElbRules",
-        Effect: "Allow",
-        Action: [
-          "elasticloadbalancing:DescribeRules",
-          "elasticloadbalancing:CreateRule",
-          "elasticloadbalancing:DeleteRule",
-          "elasticloadbalancing:ModifyRule",
-          "elasticloadbalancing:SetRulePriorities",
-          "elasticloadbalancing:DescribeTargetHealth"
-        ],
-        Resource: "*"
+          "ec2:Describe*",
+          "ec2:CreateSecurityGroup",
+          "ec2:DeleteSecurityGroup",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupEgress",
+          "ec2:CreateTags",
+          "ec2:DeleteTags"
+        ]
       },
       {
         Sid: "AwsifyServiceLinkedRoles",
@@ -99,17 +75,27 @@ export function buildManagedPipelinePolicy(accountId: string, roleName: string):
         }
       },
       {
-        Sid: "AwsifyEcrPull",
+        // The ECS task-execution / task / CodeDeploy roles AWSify creates per app.
+        Sid: "AwsifyAppRoles",
         Effect: "Allow",
-        Action: "ecr:GetDownloadUrlForLayer",
-        Resource: "*"
-      },
-      {
-        // All read-only EC2 lookups Pulumi performs on the default VPC/subnets/AZs.
-        Sid: "AwsifyEc2Read",
-        Effect: "Allow",
-        Action: "ec2:Describe*",
-        Resource: "*"
+        Resource: `arn:aws:iam::${accountId}:role/awsify-*`,
+        Action: [
+          "iam:CreateRole",
+          "iam:DeleteRole",
+          "iam:GetRole",
+          "iam:PassRole",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:GetRolePolicy",
+          "iam:ListRolePolicies",
+          "iam:AttachRolePolicy",
+          "iam:DetachRolePolicy",
+          "iam:ListAttachedRolePolicies",
+          "iam:ListRoleTags",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:ListInstanceProfilesForRole"
+        ]
       },
       {
         // Lets the role keep this very policy current on itself going forward.
