@@ -458,19 +458,14 @@ export class DeploymentOrchestrator {
     // deleted out-of-band, or an ECS cluster left INACTIVE) is detected and
     // recreated instead of breaking the apply. Best-effort — never block on it.
     try {
-      await stack.refresh({ onOutput: msg => { const t = msg.trim(); if (t) emit("deploying", t); } });
+      await stack.refresh({ onOutput: msg => emitPulumi(emit, msg) });
     } catch (error) {
       await emit("deploying", `State refresh skipped: ${extractProcessError(error)}`);
     }
 
     let result;
     try {
-      result = await stack.up({
-        onOutput: msg => {
-          const trimmed = msg.trim();
-          if (trimmed) emit("deploying", trimmed);
-        }
-      });
+      result = await stack.up({ onOutput: msg => emitPulumi(emit, msg) });
     } catch (error) {
       throw new Error(`Pulumi apply failed. Check AWS role permissions, default VPC availability, and ECS/ALB quotas. ${extractProcessError(error)}`);
     }
@@ -660,12 +655,7 @@ export class DeploymentOrchestrator {
     await stack.setConfig("aws:region", { value: plan.region });
 
     try {
-      await stack.destroy({
-        onOutput: msg => {
-          const trimmed = msg.trim();
-          if (trimmed) emit("destroying", trimmed);
-        }
-      });
+      await stack.destroy({ onOutput: msg => emitPulumi(emit, msg, "destroying") });
     } catch (error) {
       throw new Error(`Pulumi destroy failed. Check AWS role permissions and whether the stack state is still available. ${extractProcessError(error)}`);
     }
@@ -741,6 +731,22 @@ function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} must be configured.`);
   return value;
+}
+
+// Pulumi streams a "still working" ticker (lone dots, bare `@ updating....`
+// lines) while waiting on slow resources. Drop those so the deployment log
+// shows real progress (resource create/update lines) instead of rows of dots.
+function isPulumiProgressNoise(line: string): boolean {
+  return /^[.\s]*$/.test(line) || /^@\s*(updating|refreshing|destroying)[.\s]*$/i.test(line);
+}
+
+function emitPulumi(
+  emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>,
+  msg: string,
+  status: DeploymentEvent["status"] = "deploying"
+): void {
+  const trimmed = msg.trim();
+  if (trimmed && !isPulumiProgressNoise(trimmed)) void emit(status, trimmed);
 }
 
 function isAccessDenied(err: unknown): boolean {
