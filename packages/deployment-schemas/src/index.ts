@@ -153,7 +153,10 @@ export const deploymentJobSchema = z.object({
   // When present, the image was already built and pushed to ECR by the
   // customer's GitHub Action. The worker skips clone+build and deploys this
   // image directly. Absent for one-click deploys triggered from the AWSify UI.
-  imageUri: z.string().optional()
+  imageUri: z.string().optional(),
+  // On a destroy job, also delete the deployment record once teardown succeeds
+  // (used when the user deletes a deployment and wants its AWS resources gone).
+  purgeRecord: z.boolean().optional()
 });
 
 export type DeploymentJob = z.infer<typeof deploymentJobSchema>;

@@ -316,12 +316,57 @@ export class DeploymentsService {
 
     const deployment = await this.prisma.deployment.findFirst({
       where: { id: deploymentId, actorUserId: userId },
-      select: { id: true, projectId: true, status: true }
+      include: { project: { include: { repository: true } }, plan: true }
     });
     if (!deployment) return { error: "not_found" };
-    // Deleting only removes the AWSify record (logs/timeline) — it never touches
-    // AWS resources — so allow it even for in-progress/stuck deployments. A still
-    // -running worker job just fails its next log write harmlessly.
+
+    // If this deployment provisioned AWS resources, tear them down first and
+    // delete the record once teardown succeeds. Otherwise just remove the record.
+    const hasInfra =
+      Boolean(deployment.project.awsConnectionId) &&
+      ["approved", "deploying", "deployed", "failed"].includes(deployment.plan.status) &&
+      !["draft", "awaiting_approval", "destroyed", "destroying"].includes(String(deployment.status));
+
+    if (hasInfra && deployment.project.awsConnectionId) {
+      await this.updateStatus(deployment.id, {
+        status: "destroying",
+        appendLog: {
+          status: "destroying",
+          message: "Delete requested — destroying AWS resources, then removing the deployment.",
+          at: new Date().toISOString()
+        }
+      });
+      try {
+        await this.queue.enqueueDeployment({
+          action: "destroy",
+          projectId: deployment.projectId,
+          repoFullName: deployment.project.repository.fullName,
+          branch: deployment.project.branch,
+          awsConnectionId: deployment.project.awsConnectionId,
+          approvedPlanId: deployment.planId,
+          actorUserId: userId,
+          deploymentId: deployment.id,
+          purgeRecord: true
+        });
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        await this.updateStatus(deployment.id, {
+          status: "failed",
+          failureReason: `Could not enqueue the teardown job: ${detail}`,
+          appendLog: { status: "failed", message: `Queue unavailable: ${detail}`, at: new Date().toISOString() }
+        }).catch(() => undefined);
+        return { error: "queue_unavailable", detail };
+      }
+      await this.recordAudit({
+        userId,
+        projectId: deployment.projectId,
+        deploymentId: deployment.id,
+        type: "deployment_delete",
+        message: "Queued AWS teardown and record deletion.",
+        metadata: { deploymentId, status: deployment.status }
+      });
+      return { deploymentId: deployment.id, status: "destroying" };
+    }
 
     await this.recordAudit({
       userId,
@@ -331,9 +376,7 @@ export class DeploymentsService {
       metadata: { deploymentId, status: deployment.status }
     });
 
-    await this.prisma.deployment.delete({
-      where: { id: deploymentId }
-    });
+    await this.prisma.deployment.delete({ where: { id: deploymentId } });
 
     return { deleted: deploymentId };
   }

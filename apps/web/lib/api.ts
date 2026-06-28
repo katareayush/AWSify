@@ -211,7 +211,7 @@ export const api = {
   getDeployment: (id: string) => req<{ deployment: DeploymentDetail }>(`/deployments/${id}`),
 
   deleteDeployment: (id: string) =>
-    req<{ deleted: string }>(`/deployments/${id}`, {
+    req<{ deleted?: string; deploymentId?: string; status?: string }>(`/deployments/${id}`, {
       method: "DELETE"
     }),
 

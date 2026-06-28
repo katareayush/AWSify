@@ -83,9 +83,17 @@ function DeploymentsPageInner() {
   async function deleteDeployment(deployment: Deployment) {
     setDeletingId(deployment.id);
     try {
-      await api.deleteDeployment(deployment.id);
-      setDeployments((current) => current.filter((item) => item.id !== deployment.id));
-      toast.success("Deployment deleted.");
+      const result = await api.deleteDeployment(deployment.id);
+      if (result.status === "destroying") {
+        // AWS teardown queued; the record is removed once it finishes.
+        setDeployments((current) =>
+          current.map((item) => (item.id === deployment.id ? { ...item, status: "destroying" } : item))
+        );
+        toast.success("Destroying AWS resources — this can take a few minutes.");
+      } else {
+        setDeployments((current) => current.filter((item) => item.id !== deployment.id));
+        toast.success("Deployment deleted.");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not delete deployment.");
     } finally {
@@ -214,7 +222,7 @@ function DeploymentsPageInner() {
         <ConfirmDialog
           open={confirmDelete !== null}
           title="Delete deployment?"
-          description="This only removes the deployment record, logs, and timeline from AWSify. Any AWS resources, containers, load balancers, ECR images, or log groups already created will stay alive and may keep costing money. Remove them manually in AWS to stop charges."
+          description="This tears down the AWS resources this deployment created (the Pulumi stack — ECS, load balancer, target groups, roles, log group, ECR repo — plus its env secret), then removes the deployment from AWSify. Teardown runs in the background and can take a few minutes. Deployments that never provisioned anything are removed immediately."
           confirmLabel="Delete"
           tone="danger"
           onConfirm={() => (confirmDelete ? deleteDeployment(confirmDelete) : Promise.resolve())}

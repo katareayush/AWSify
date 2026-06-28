@@ -233,10 +233,15 @@ export class DeploymentOrchestrator {
 
     await emit("destroyed", "Infrastructure teardown completed.");
     if (job.deploymentId) {
-      await this.prisma.deployment.update({
-        where: { id: job.deploymentId },
-        data: { status: "destroyed" as never, liveUrl: null, failureReason: null }
-      }).catch(() => {});
+      if (job.purgeRecord) {
+        // Delete-with-teardown: drop the deployment record now that AWS is clean.
+        await this.prisma.deployment.delete({ where: { id: job.deploymentId } }).catch(() => {});
+      } else {
+        await this.prisma.deployment.update({
+          where: { id: job.deploymentId },
+          data: { status: "destroyed" as never, liveUrl: null, failureReason: null }
+        }).catch(() => {});
+      }
     }
 
     return { status: "destroyed", events: [] };
