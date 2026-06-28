@@ -163,14 +163,20 @@ function DeploymentsPageInner() {
                           {d.project.repoFullName} · {d.project.branch}
                         </p>
                       </div>
-                      <div className="pointer-events-none hidden min-w-0 max-w-[260px] flex-1 md:block">
+                      <div className="hidden min-w-0 max-w-[260px] flex-1 md:block">
                         {d.liveUrl ? (
-                          <p className="flex min-w-0 items-center gap-1.5 text-[12px] text-emerald-300/85">
+                          <a
+                            href={d.liveUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="relative z-10 inline-flex min-w-0 max-w-full items-center gap-1.5 text-[12px] text-emerald-300/85 transition-colors hover:text-emerald-200 hover:underline"
+                          >
                             <ExternalLink className="h-3 w-3 shrink-0" />
                             <span className="min-w-0 truncate font-mono">{d.liveUrl.replace(/^https?:\/\//, "")}</span>
-                          </p>
+                          </a>
                         ) : (
-                          <p className="text-[12px] text-white/30">—</p>
+                          <p className="pointer-events-none text-[12px] text-white/30">—</p>
                         )}
                       </div>
                       <span className="pointer-events-none hidden shrink-0 text-[11.5px] text-white/35 sm:block">
@@ -182,8 +188,8 @@ function DeploymentsPageInner() {
                       <button
                         type="button"
                         onClick={() => setConfirmDelete(d)}
-                        disabled={isRunning || isDeleting}
-                        title={isRunning ? "Wait for this deployment to finish before deleting it." : "Delete deployment"}
+                        disabled={isDeleting}
+                        title={isRunning ? "Force-delete this in-progress deployment record." : "Delete deployment"}
                         className="relative z-10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-red-500/15 bg-red-500/[0.03] text-red-200/70 transition-colors hover:border-red-500/30 hover:bg-red-500/[0.08] hover:text-red-100 disabled:pointer-events-none disabled:opacity-45"
                         aria-label={`Delete deployment ${d.project.name}`}
                       >

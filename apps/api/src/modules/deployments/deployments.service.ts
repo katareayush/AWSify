@@ -319,9 +319,9 @@ export class DeploymentsService {
       select: { id: true, projectId: true, status: true }
     });
     if (!deployment) return { error: "not_found" };
-    if (["queued", "scanning", "deploying"].includes(deployment.status)) {
-      return { error: "deployment_running" };
-    }
+    // Deleting only removes the AWSify record (logs/timeline) — it never touches
+    // AWS resources — so allow it even for in-progress/stuck deployments. A still
+    // -running worker job just fails its next log write harmlessly.
 
     await this.recordAudit({
       userId,

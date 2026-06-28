@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import { Button } from "./button";
 
@@ -33,9 +34,12 @@ export function ConfirmDialog({
     setBusy(false);
     document.body.style.overflow = "hidden";
     const previouslyFocused = document.activeElement as HTMLElement | null;
+    // Move focus into the dialog without scrolling the page (autofocus + the
+    // browser's focus-into-view is what jumped the viewport before).
+    dialogRef.current?.focus({ preventScroll: true });
     return () => {
       document.body.style.overflow = "";
-      previouslyFocused?.focus?.();
+      previouslyFocused?.focus?.({ preventScroll: true });
     };
   }, [open]);
 
@@ -69,7 +73,7 @@ export function ConfirmDialog({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onCancel]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   function requestCancel() {
     if (busy) return;
@@ -85,7 +89,7 @@ export function ConfirmDialog({
     }
   }
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -95,7 +99,8 @@ export function ConfirmDialog({
     >
       <div
         ref={dialogRef}
-        className="animate-palette-in w-full max-w-md overflow-hidden rounded-xl border border-white/[0.1] bg-[#0d0c14] shadow-2xl"
+        tabIndex={-1}
+        className="animate-palette-in w-full max-w-md overflow-hidden rounded-xl border border-white/[0.1] bg-[#0d0c14] shadow-2xl outline-none"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start gap-3.5 p-5">
@@ -123,7 +128,7 @@ export function ConfirmDialog({
           </button>
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-white/[0.06] bg-white/[0.015] px-5 py-3.5">
-          <Button autoFocus variant="secondary" onClick={onCancel} disabled={busy}>
+          <Button variant="secondary" onClick={onCancel} disabled={busy}>
             {cancelLabel}
           </Button>
           <Button
@@ -140,6 +145,7 @@ export function ConfirmDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
