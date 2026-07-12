@@ -9,10 +9,17 @@ export const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 export const APP_INSTALL_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 
 function baseCookieOptions(): CookieOptions {
+  // In production the web app and API are usually on different sites, so the
+  // browser only attaches the session cookie to cross-site fetch()/XHR (e.g. the
+  // /github/me auth check) when it's SameSite=None — and None requires Secure.
+  // Dev runs same-site over http, where Lax is correct and Secure would drop the
+  // cookie. Override with SESSION_COOKIE_SAMESITE=lax if you deploy same-site.
+  const isProd = process.env.NODE_ENV === "production";
+  const sameSite = (process.env.SESSION_COOKIE_SAMESITE as CookieOptions["sameSite"]) ?? (isProd ? "none" : "lax");
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProd,
+    sameSite,
     path: "/"
   };
 }
