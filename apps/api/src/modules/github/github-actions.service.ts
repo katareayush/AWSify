@@ -47,8 +47,10 @@ export class GithubActionsService {
       body: JSON.stringify({ name, value })
     });
     if (create.ok) return;
-    if (create.status !== 409) throw new Error(await describe(create, `create variable ${name}`));
 
+    // Any create failure is treated as "maybe it already exists" — fall through
+    // to an update and only surface an error if that also fails, so we're robust
+    // to whichever status GitHub returns for an existing variable (409/422).
     const update = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/actions/variables/${encodeURIComponent(name)}`,
       {
@@ -57,7 +59,10 @@ export class GithubActionsService {
         body: JSON.stringify({ name, value })
       }
     );
-    if (!update.ok) throw new Error(await describe(update, `update variable ${name}`));
+    if (!update.ok) {
+      const createErr = await describe(create, `create variable ${name}`);
+      throw new Error(`${await describe(update, `update variable ${name}`)} (create also failed: ${createErr})`);
+    }
   }
 
   /**
