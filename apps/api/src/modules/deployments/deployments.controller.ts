@@ -22,6 +22,13 @@ export class DeploymentsController {
     return this.deployments.list(token);
   }
 
+  // Must precede the ":id" route so "/deployments/resources" isn't swallowed as an id.
+  @Get("resources")
+  listResources(@Req() req: Request) {
+    const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
+    return this.deployments.listResources(token);
+  }
+
   @Get(":id")
   get(@Req() req: Request, @Param("id") id: string) {
     const token = req.cookies?.[SESSION_COOKIE] as string | undefined;

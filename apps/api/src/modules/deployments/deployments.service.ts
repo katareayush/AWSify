@@ -10,10 +10,23 @@ import {
 import { createDeploymentPlan } from "@awsify/templates";
 import { PrismaService } from "../prisma.service";
 import { QueueService } from "../queue/queue.service";
+import { GithubActionsService } from "../github/github-actions.service";
 import { GithubCommitService } from "../github/github-commit.service";
 import { GithubService } from "../github/github.service";
 import { diagnoseDeploymentFailure } from "./diagnosis";
 import { isValidEcrImageUri } from "./image-uri";
+
+// AWS-ify no longer builds images itself: every deploy runs the customer's own
+// GitHub Actions workflow (build on their runners) which then calls the redeploy
+// endpoint so the worker only runs the Pulumi release. These identify the file
+// AWS-ify commits and dispatches to drive that pipeline.
+const WORKFLOW_PATH = ".github/workflows/awsify-deploy.yml";
+const WORKFLOW_FILE = "awsify-deploy.yml";
+
+// Statuses a deployment can be in while its GitHub Actions build is still
+// in flight — the record the CI callback should adopt instead of forking a new
+// one, so approve()/redeploy show a single deployment through build + release.
+const PENDING_STATUSES = ["queued", "scanning", "awaiting_approval", "deploying"] as const;
 
 function sanitizeAppName(repoFullName: string): string {
   const name = repoFullName.split("/").pop() ?? "awsify-app";
@@ -26,8 +39,75 @@ export class DeploymentsService {
     private readonly prisma: PrismaService,
     private readonly queue: QueueService,
     private readonly github: GithubService,
-    private readonly githubCommit: GithubCommitService
+    private readonly githubCommit: GithubCommitService,
+    private readonly githubActions: GithubActionsService
   ) {}
+
+  /**
+   * Wires the customer repo so its GitHub Actions workflow can build and
+   * trigger a release "from our end": rotates the CI token into the repo secret,
+   * sets the two config variables, commits the workflow (and a Dockerfile only
+   * if the repo lacks one) straight to the deploy branch, then makes sure a run
+   * starts — the commit's own push if anything changed, otherwise an explicit
+   * workflow_dispatch. Throws with a clear message on any GitHub API failure.
+   */
+  private async wireAndTriggerCi(input: {
+    projectId: string;
+    fullName: string;
+    installationId: string;
+    branch: string;
+    roleArn: string;
+    workflowContent: string;
+    dockerfileContent?: string;
+  }): Promise<{ committed: string[]; wired: string[]; triggered: "push" | "dispatch" }> {
+    const apiUrl = process.env.API_URL;
+    if (!apiUrl) throw new Error("API_URL must be configured to wire GitHub Actions.");
+    if (!input.roleArn) throw new Error("The project's AWS connection has no role ARN; reconnect AWS before deploying.");
+
+    const { installationId, fullName, branch } = input;
+
+    // Fresh CI token: store only the hash, hand the plaintext to the repo secret.
+    const token = `awsify_${randomBytes(32).toString("base64url")}`;
+    await this.prisma.project.update({
+      where: { id: input.projectId },
+      data: { deployTokenHash: hashDeployToken(token) }
+    });
+
+    await this.githubActions.setSecret(installationId, fullName, "AWSIFY_API_TOKEN", token);
+    await this.githubActions.setVariable(installationId, fullName, "AWSIFY_API_URL", apiUrl);
+    await this.githubActions.setVariable(installationId, fullName, "AWSIFY_DEPLOY_ROLE_ARN", input.roleArn);
+    const wired = ["AWSIFY_API_TOKEN", "AWSIFY_API_URL", "AWSIFY_DEPLOY_ROLE_ARN"];
+
+    const committed: string[] = [];
+    if (input.dockerfileContent) {
+      const hasDockerfile = await this.githubActions.fileExists(installationId, fullName, "Dockerfile", branch);
+      if (!hasDockerfile) {
+        await this.githubActions.commitFileToBranch(
+          installationId, fullName, branch, "Dockerfile", input.dockerfileContent,
+          "chore(awsify): add Dockerfile for deploys"
+        );
+        committed.push("Dockerfile");
+      }
+    }
+
+    const workflow = await this.githubActions.commitFileToBranch(
+      installationId, fullName, branch, WORKFLOW_PATH, input.workflowContent,
+      "chore(awsify): add deploy workflow"
+    );
+    if (workflow.changed) committed.push(WORKFLOW_PATH);
+
+    // Any committed file fired a push, which already starts the workflow. Only
+    // dispatch when nothing changed, to avoid running the pipeline twice.
+    let triggered: "push" | "dispatch";
+    if (committed.length > 0) {
+      triggered = "push";
+    } else {
+      await this.githubActions.dispatchWorkflow(installationId, fullName, WORKFLOW_FILE, branch);
+      triggered = "dispatch";
+    }
+
+    return { committed, wired, triggered };
+  }
 
   private getUserId(sessionToken: string | undefined): string | null {
     if (!sessionToken) return null;
@@ -35,27 +115,82 @@ export class DeploymentsService {
     return session?.userId ?? null;
   }
 
+  /**
+   * Loads a deployment with everything needed to wire its repo for CI, or an
+   * error tag. Centralises the includes + artifact lookup used by approve(),
+   * redeployLatest(), and the manual "wire CI" button.
+   */
+  private async loadCiContext(deploymentId: string, userId: string) {
+    const deployment = await this.prisma.deployment.findFirst({
+      where: { id: deploymentId, actorUserId: userId },
+      include: {
+        project: {
+          include: {
+            repository: { include: { installation: true } },
+            awsConnection: true
+          }
+        },
+        plan: { include: { artifacts: true } }
+      }
+    });
+    if (!deployment) return { error: "not_found" as const };
+
+    const repo = deployment.project.repository;
+    const installation = repo.installation;
+    if (!installation) return { error: "installation_missing" as const };
+    if (!deployment.project.awsConnection) return { error: "missing_aws_connection" as const };
+
+    const workflow = deployment.plan.artifacts.find((a) => a.kind === "github_action");
+    if (!workflow) return { error: "no_workflow_artifact" as const };
+    const dockerfile = deployment.plan.artifacts.find((a) => a.kind === "dockerfile");
+
+    return {
+      deployment,
+      wire: {
+        projectId: deployment.projectId,
+        fullName: repo.fullName,
+        installationId: installation.installationId,
+        branch: deployment.project.branch || repo.defaultBranch,
+        roleArn: deployment.project.awsConnection.roleArn,
+        workflowContent: workflow.content,
+        dockerfileContent: dockerfile?.content
+      }
+    };
+  }
+
   async commitArtifactsToRepo(deploymentId: string, sessionToken: string | undefined) {
     const userId = this.getUserId(sessionToken);
     if (!userId) return { error: "not_authenticated" };
-    const result = await this.githubCommit.commitDeploymentArtifacts(deploymentId, userId);
-    const deployment = await this.prisma.deployment.findFirst({
-      where: { id: deploymentId, actorUserId: userId },
-      select: { projectId: true }
-    });
-    if (deployment) {
+
+    const ctx = await this.loadCiContext(deploymentId, userId);
+    if ("error" in ctx) return ctx;
+
+    let result: { committed: string[]; wired: string[]; triggered: "push" | "dispatch" };
+    try {
+      result = await this.wireAndTriggerCi(ctx.wire);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
       await this.recordAudit({
         userId,
-        projectId: deployment.projectId,
+        projectId: ctx.deployment.projectId,
         deploymentId,
-        type: "artifact_pr",
-        message: "Generated deployment artifact PR action completed.",
-        metadata: "error" in result
-          ? { ok: false, error: result.error, detail: result.detail }
-          : { ok: true, branch: result.branch, prNumber: result.prNumber, committed: result.committed }
+        type: "ci_wire",
+        message: "Failed to wire GitHub Actions for deployment.",
+        metadata: { ok: false, detail }
       });
+      return { error: "ci_wire_failed", detail };
     }
-    return result;
+
+    await this.recordAudit({
+      userId,
+      projectId: ctx.deployment.projectId,
+      deploymentId,
+      type: "ci_wire",
+      message: "Wired GitHub Actions and pushed the deploy workflow.",
+      metadata: { ok: true, ...result }
+    });
+
+    return { branch: ctx.wire.branch, committed: result.committed, wired: result.wired, triggered: result.triggered };
   }
 
   async trigger(
@@ -138,60 +273,70 @@ export class DeploymentsService {
     return { deploymentId: deployment.id };
   }
 
+  /**
+   * Redeploys the latest commit by driving the customer's GitHub Actions
+   * workflow (build on their runners), never a worker-side build. If the repo
+   * isn't wired yet we wire it (which commits the workflow and starts a run);
+   * otherwise we dispatch the existing workflow. Either way a placeholder
+   * deployment is created so the UI has something to follow — the CI callback
+   * adopts it (see redeployWithToken) rather than forking a second record.
+   */
   async redeployLatest(deploymentId: string, sessionToken: string | undefined) {
     const userId = this.getUserId(sessionToken);
     if (!userId) return { error: "not_authenticated" };
 
-    const source = await this.prisma.deployment.findFirst({
-      where: { id: deploymentId, actorUserId: userId },
-      include: { project: { include: { repository: true } }, plan: true }
-    });
-    if (!source) return { error: "not_found" };
-    if (!source.project.awsConnectionId) return { error: "missing_aws_connection" };
+    const ctx = await this.loadCiContext(deploymentId, userId);
+    if ("error" in ctx) return ctx;
 
-    const approvedPlan = source.plan.status === "approved"
-      ? source.plan
-      : await this.prisma.deploymentPlan.findFirst({
-          where: { projectId: source.projectId, status: "approved" },
-          orderBy: { approvedAt: "desc" }
-        });
+    const approvedPlan = await this.prisma.deploymentPlan.findFirst({
+      where: { projectId: ctx.deployment.projectId, status: "approved" },
+      orderBy: { approvedAt: "desc" }
+    });
     if (!approvedPlan) return { error: "no_approved_plan" };
+
+    const { branch, fullName, installationId } = ctx.wire;
 
     const deployment = await this.prisma.deployment.create({
       data: {
-        projectId: source.projectId,
+        projectId: ctx.deployment.projectId,
         planId: approvedPlan.id,
         actorUserId: userId,
-        status: "queued",
+        status: "deploying",
         logs: [{
-          status: "queued",
-          message: `Redeploy queued for latest commit on ${source.project.branch}.`,
+          status: "deploying",
+          message: `Redeploy requested — building the latest commit on ${branch} in GitHub Actions.`,
           at: new Date().toISOString()
         }]
       }
     });
 
-    await this.queue.enqueueDeployment({
-      action: "deploy",
-      projectId: source.projectId,
-      repoFullName: source.project.repository.fullName,
-      branch: source.project.branch,
-      awsConnectionId: source.project.awsConnectionId,
-      approvedPlanId: approvedPlan.id,
-      actorUserId: userId,
-      deploymentId: deployment.id
-    });
+    try {
+      const wired = await this.githubActions.fileExists(installationId, fullName, WORKFLOW_PATH, branch);
+      if (wired) {
+        await this.githubActions.dispatchWorkflow(installationId, fullName, WORKFLOW_FILE, branch);
+      } else {
+        await this.wireAndTriggerCi(ctx.wire);
+      }
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      await this.updateStatus(deployment.id, {
+        status: "failed",
+        failureReason: `Could not start the GitHub Actions build: ${detail}`,
+        appendLog: { status: "failed", message: detail, at: new Date().toISOString() }
+      }).catch(() => undefined);
+      return { error: "ci_dispatch_failed", detail };
+    }
 
     await this.recordAudit({
       userId,
-      projectId: source.projectId,
+      projectId: ctx.deployment.projectId,
       deploymentId: deployment.id,
       type: "manual_redeploy",
-      message: "Queued redeploy for latest commit.",
-      metadata: { branch: source.project.branch }
+      message: "Triggered GitHub Actions build for the latest commit.",
+      metadata: { branch }
     });
 
-    return { deploymentId: deployment.id, status: "queued" };
+    return { deploymentId: deployment.id, status: "deploying" };
   }
 
   async destroyInfrastructure(deploymentId: string, sessionToken: string | undefined) {
@@ -282,6 +427,49 @@ export class DeploymentsService {
         project: { name: d.project.name, repoFullName: d.project.repository.fullName, branch: d.project.branch }
       }))
     };
+  }
+
+  /**
+   * Resources view: every deployment that has (or may still have) live AWS
+   * resources, grouped with the resource inventory from its approved plan.
+   * Only deployments that reached the provisioning stage are included — queued,
+   * scanning, awaiting-approval and already-destroyed deployments own no infra.
+   */
+  async listResources(sessionToken: string | undefined) {
+    const userId = this.getUserId(sessionToken);
+    if (!userId) return { error: "not_authenticated" };
+
+    const PROVISIONED_STATUSES = new Set(["deployed", "deploying", "destroying", "failed"]);
+
+    const deployments = await this.prisma.deployment.findMany({
+      where: { actorUserId: userId },
+      include: { project: { include: { repository: true } }, plan: true },
+      orderBy: { createdAt: "desc" }
+    });
+
+    const groups = deployments
+      .filter((d) => PROVISIONED_STATUSES.has(String(d.status)))
+      .map((d) => {
+        const resources = Array.isArray(d.plan.resources)
+          ? (d.plan.resources as Array<{ type: string; name: string; purpose: string }>)
+          : [];
+        return {
+          deploymentId: d.id,
+          projectId: d.projectId,
+          projectName: d.project.name,
+          repoFullName: d.project.repository.fullName,
+          branch: d.project.branch,
+          appName: d.plan.appName,
+          region: d.plan.region,
+          status: String(d.status),
+          liveUrl: d.liveUrl,
+          createdAt: d.createdAt,
+          resources
+        };
+      })
+      .filter((group) => group.resources.length > 0);
+
+    return { groups };
   }
 
   async get(id: string, sessionToken: string | undefined) {
@@ -687,7 +875,14 @@ export class DeploymentsService {
 
     const deployment = await this.prisma.deployment.findFirst({
       where: { id: deploymentId, actorUserId: userId },
-      include: { project: { include: { awsConnection: true } } }
+      include: {
+        project: {
+          include: {
+            awsConnection: true,
+            repository: { include: { installation: true } }
+          }
+        }
+      }
     });
     if (!deployment) return { error: "not_found" };
 
@@ -697,27 +892,51 @@ export class DeploymentsService {
       data: { deployTokenHash: hashDeployToken(token) }
     });
 
+    const apiUrl = process.env.API_URL ?? "";
+    const roleArn = deployment.project.awsConnection?.roleArn ?? "";
+    const installationId = deployment.project.repository.installation?.installationId;
+    const fullName = deployment.project.repository.fullName;
+
+    // Push the rotated settings straight into the repo so nothing needs to be
+    // pasted by hand. If the App can't (missing permission), fall back to showing
+    // the values for a manual paste.
+    let wired = false;
+    let wireError: string | undefined;
+    if (installationId && apiUrl) {
+      try {
+        await this.githubActions.setSecret(installationId, fullName, "AWSIFY_API_TOKEN", token);
+        await this.githubActions.setVariable(installationId, fullName, "AWSIFY_API_URL", apiUrl);
+        if (roleArn) await this.githubActions.setVariable(installationId, fullName, "AWSIFY_DEPLOY_ROLE_ARN", roleArn);
+        wired = true;
+      } catch (err) {
+        wireError = err instanceof Error ? err.message : String(err);
+      }
+    }
+
     await this.recordAudit({
       userId,
       projectId: deployment.projectId,
       deploymentId,
       type: "ci_token_rotate",
-      message: "Rotated CI redeploy token.",
-      metadata: { secretName: "AWSIFY_API_TOKEN", variables: ["AWSIFY_API_URL", "AWSIFY_DEPLOY_ROLE_ARN"] }
+      message: wired ? "Rotated CI token and updated the repo secret/variables." : "Rotated CI redeploy token.",
+      metadata: { secretName: "AWSIFY_API_TOKEN", variables: ["AWSIFY_API_URL", "AWSIFY_DEPLOY_ROLE_ARN"], wired, ...(wireError ? { wireError } : {}) }
     });
 
-    // The GitHub Action needs three repo settings: one secret (the CI token) and
-    // two variables (the API URL and the OIDC role ARN it assumes to push to ECR).
+    // The workflow needs one secret (the CI token) and two variables (the API URL
+    // and the OIDC role ARN it assumes to push to ECR). `wired` tells the UI
+    // whether AWS-ify already set them or the user must paste them in.
     return {
       token,
+      wired,
+      ...(wireError ? { wireError } : {}),
       secretName: "AWSIFY_API_TOKEN",
       variables: [
-        { name: "AWSIFY_API_URL", value: process.env.API_URL ?? "" },
-        { name: "AWSIFY_DEPLOY_ROLE_ARN", value: deployment.project.awsConnection?.roleArn ?? "" }
+        { name: "AWSIFY_API_URL", value: apiUrl },
+        { name: "AWSIFY_DEPLOY_ROLE_ARN", value: roleArn }
       ],
       // Retained for backwards compatibility with existing UI callers.
       variableName: "AWSIFY_API_URL",
-      variableValue: process.env.API_URL ?? "",
+      variableValue: apiUrl,
       projectId: deployment.projectId
     };
   }
@@ -754,21 +973,42 @@ export class DeploymentsService {
       await this.prisma.project.update({ where: { id: project.id }, data: { branch } });
     }
 
-    const deployment = await this.prisma.deployment.create({
-      data: {
-        projectId: project.id,
-        planId: approvedPlan.id,
-        actorUserId: project.userId,
-        status: "queued",
-        logs: [{
-          status: "queued",
-          message: imageUri
-            ? `Code redeploy queued by GitHub Actions with prebuilt image ${imageUri}.`
-            : "Code redeploy queued by GitHub Actions.",
-          at: new Date().toISOString()
-        }]
-      }
+    const log = {
+      status: "queued",
+      message: imageUri
+        ? `GitHub Actions finished building; queuing release of ${imageUri}.`
+        : "Code redeploy queued by GitHub Actions.",
+      at: new Date().toISOString()
+    };
+
+    // approve()/redeployLatest() leave a placeholder deployment in a pending
+    // state while the GitHub Actions build runs. Adopt the most recent one so
+    // the whole build → release shows as a single deployment; only fork a new
+    // record when nothing is waiting (e.g. a plain push to the deploy branch).
+    const pending = await this.prisma.deployment.findFirst({
+      where: { projectId: project.id, status: { in: PENDING_STATUSES as unknown as never } },
+      orderBy: { createdAt: "desc" }
     });
+
+    const deployment = pending
+      ? await this.prisma.deployment.update({
+          where: { id: pending.id },
+          data: {
+            planId: approvedPlan.id,
+            status: "queued",
+            failureReason: null,
+            logs: [...(Array.isArray(pending.logs) ? pending.logs : []), log] as never
+          }
+        })
+      : await this.prisma.deployment.create({
+          data: {
+            projectId: project.id,
+            planId: approvedPlan.id,
+            actorUserId: project.userId,
+            status: "queued",
+            logs: [log]
+          }
+        });
 
     await this.queue.enqueueDeployment({
       action: "deploy",
@@ -793,12 +1033,18 @@ export class DeploymentsService {
       where: { id: deploymentId, actorUserId: userId },
       include: {
         plan: { include: { artifacts: true } },
-        project: { include: { repository: true } }
+        project: {
+          include: {
+            repository: { include: { installation: true } },
+            awsConnection: true
+          }
+        }
       }
     });
     if (!deployment) return { error: "not_found" };
     if (deployment.plan.status !== "awaiting_approval") return { error: "plan_not_awaiting_approval" };
-    if (!deployment.project.awsConnectionId) return { error: "missing_aws_connection" };
+    if (!deployment.project.awsConnectionId || !deployment.project.awsConnection) return { error: "missing_aws_connection" };
+    if (!deployment.project.repository.installation) return { error: "installation_missing" };
 
     const suggestion = deploymentSuggestionSchema.safeParse(deployment.plan.suggestion);
     const hasSuggestion = suggestion.success;
@@ -826,56 +1072,61 @@ export class DeploymentsService {
       data: { status: "approved", approvedAt: new Date() }
     });
 
-    const approvalLog = missingRequired.length > 0
-      ? `Plan approved with ${missingRequired.length} unset required var${missingRequired.length === 1 ? "" : "s"} (${missingRequired.join(", ")}); deployment queued — may fail at runtime if app needs them.`
-      : "Plan approved; deployment queued.";
+    const missingNote = missingRequired.length > 0
+      ? ` (with ${missingRequired.length} unset required var${missingRequired.length === 1 ? "" : "s"}: ${missingRequired.join(", ")}; may fail at runtime if the app needs them)`
+      : "";
 
-    await this.updateStatus(deployment.id, {
-      status: "queued",
-      appendLog: {
-        status: "queued",
-        message: approvalLog,
-        at: new Date().toISOString()
-      }
-    });
+    const workflow = deployment.plan.artifacts.find((a) => a.kind === "github_action");
+    if (!workflow) return { error: "no_workflow_artifact" };
+    const dockerfile = deployment.plan.artifacts.find((a) => a.kind === "dockerfile");
 
+    // Hand the build off to the customer's GitHub Actions instead of enqueuing a
+    // worker build: wire the repo and start a run. The workflow builds the image
+    // and calls back into redeployWithToken, which adopts this record and lets
+    // the worker run the Pulumi release.
+    let wire: { committed: string[]; wired: string[]; triggered: "push" | "dispatch" };
     try {
-      await this.queue.enqueueDeployment({
-        action: "deploy",
+      wire = await this.wireAndTriggerCi({
         projectId: deployment.projectId,
-        repoFullName: deployment.project.repository.fullName,
-        branch: deployment.project.branch,
-        awsConnectionId: deployment.project.awsConnectionId,
-        approvedPlanId: deployment.planId,
-        actorUserId: userId,
-        deploymentId: deployment.id
+        fullName: deployment.project.repository.fullName,
+        installationId: deployment.project.repository.installation.installationId,
+        branch: deployment.project.branch || deployment.project.repository.defaultBranch,
+        roleArn: deployment.project.awsConnection.roleArn,
+        workflowContent: workflow.content,
+        dockerfileContent: dockerfile?.content
       });
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       await this.updateStatus(deployment.id, {
         status: "failed",
-        failureReason: `Could not enqueue the deployment job: ${detail}`,
-        appendLog: {
-          status: "failed",
-          message: `Queue unavailable: ${detail}`,
-          at: new Date().toISOString()
-        }
+        failureReason: `Could not wire GitHub Actions: ${detail}`,
+        appendLog: { status: "failed", message: detail, at: new Date().toISOString() }
       }).catch(() => undefined);
-      return { error: "queue_unavailable", detail };
+      return { error: "ci_wire_failed", detail };
     }
+
+    await this.updateStatus(deployment.id, {
+      status: "deploying",
+      appendLog: {
+        status: "deploying",
+        message: `Plan approved${missingNote}. AWS-ify wired GitHub Actions and ${wire.triggered === "push" ? "pushed the deploy workflow" : "dispatched the deploy workflow"}; your repo is now building the image, then AWS-ify runs the release.`,
+        at: new Date().toISOString()
+      }
+    });
 
     await this.recordAudit({
       userId,
       projectId: deployment.projectId,
       deploymentId: deployment.id,
       type: "deployment_approve",
-      message: "Approved deployment plan and queued deployment.",
-      metadata: { missingRequired }
+      message: "Approved plan and handed the build to GitHub Actions.",
+      metadata: { missingRequired, ...wire }
     });
 
     return {
       deploymentId: deployment.id,
-      status: "queued",
+      status: "deploying",
+      ci: wire,
       ...(missingRequired.length > 0 ? { warning: { missingRequired } } : {})
     };
   }

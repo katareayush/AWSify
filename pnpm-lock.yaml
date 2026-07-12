@@ -65,6 +65,12 @@ importers:
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2
+      tweetnacl:
+        specifier: ^1.0.3
+        version: 1.0.3
+      tweetnacl-sealedbox-js:
+        specifier: ^1.2.0
+        version: 1.2.0
       zod:
         specifier: ^3.24.1
         version: 3.25.76
@@ -2128,6 +2134,9 @@ packages:
   bl@4.1.0:
     resolution: {integrity: sha512-1W07cM9gS6DcLperZfFSj+bWLtaPGSOHWhPiGzXmvVJbRLdG82sH/Kn8EtW1VqWVA54AKf2h5k5BbnIbwF3h6w==}
 
+  blakejs@1.2.1:
+    resolution: {integrity: sha512-QXUSXI3QVc/gJME0dBpXrag1kbzOqCjCX8/b54ntNyW6sjtoqxqRk3LTmXzaJoh71zMsDCjM+47jS7XiwN/+fQ==}
+
   body-parser@1.20.4:
     resolution: {integrity: sha512-ZTgYYLMOXY9qKU/57FAo8F+HA2dGX7bqGc71txDRC1rS4frdFI5R7NhluHxH6M0YItAP0sHB4uqAOcYKxO6uGA==}
     engines: {node: '>= 0.8', npm: 1.2.8000 || >= 1.4.16}
@@ -4182,6 +4191,12 @@ packages:
   turbo@2.9.16:
     resolution: {integrity: sha512-NqgRQy6j6dPYcdSdv0q1g9QsZg7SWg87RERM8otw/1AtKU2yTFVClOM7cbwKzOonZr/Ek1blTBucw64L9H0Bwg==}
     hasBin: true
+
+  tweetnacl-sealedbox-js@1.2.0:
+    resolution: {integrity: sha512-QoCr8K2hwri+ky7SUa22oSre8g88XaWi0hwwWd16pJMuDyn5gL/UyE0PyR2EOFEMJ70T2trJ9+Sv+Qa18olEmQ==}
+
+  tweetnacl@1.0.3:
+    resolution: {integrity: sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw==}
 
   type-fest@0.21.3:
     resolution: {integrity: sha512-t0rzBq87m3fVcduHDUFhKmyyX+9eo6WQjZvf51Ea/M0Q7+T374Jp1aUiyUl0GKxp8M/OETVHSDvmkyPgvX+X2w==}
@@ -6476,6 +6491,8 @@ snapshots:
       inherits: 2.0.4
       readable-stream: 3.6.2
 
+  blakejs@1.2.1: {}
+
   body-parser@1.20.4:
     dependencies:
       bytes: 3.1.2
@@ -8648,6 +8665,13 @@ snapshots:
       '@turbo/linux-arm64': 2.9.16
       '@turbo/windows-64': 2.9.16
       '@turbo/windows-arm64': 2.9.16
+
+  tweetnacl-sealedbox-js@1.2.0:
+    dependencies:
+      blakejs: 1.2.1
+      tweetnacl: 1.0.3
+
+  tweetnacl@1.0.3: {}
 
   type-fest@0.21.3: {}
 

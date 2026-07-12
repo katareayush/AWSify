@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Copy, ExternalLink, FileDiff, GitPullRequest, Loader2, RotateCw, Rocket } from "lucide-react";
+import { Check, Copy, FileDiff, GitPullRequest, Loader2, RotateCw, Rocket } from "lucide-react";
 import { Button } from "../ui/button";
 import { Panel } from "../ui/panel";
 import { useToast } from "../ui/toast";
@@ -17,6 +17,8 @@ interface DeployActionsPanelProps {
 
 interface CiToken {
   token: string;
+  wired?: boolean;
+  wireError?: string;
   secretName: string;
   variables?: { name: string; value: string }[];
   variableName: string;
@@ -46,9 +48,9 @@ export function DeployActionsPanel({ deploymentId, planStatus, targetBranch, has
     try {
       const result = await api.commitDeploymentArtifacts(deploymentId);
       setCommitResult(result);
-      toast.success(`Pushed to ${result.branch} (PR #${result.prNumber}).`);
+      toast.success(`Wired GitHub Actions on ${result.branch} and started a build.`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not commit artifacts.");
+      toast.error(err instanceof Error ? err.message : "Could not set up GitHub Actions.");
     } finally {
       setCommitting(false);
     }
@@ -68,8 +70,9 @@ export function DeployActionsPanel({ deploymentId, planStatus, targetBranch, has
   async function rotateCiToken() {
     setRotating(true);
     try {
-      setCiToken(await api.rotateDeploymentCiToken(deploymentId));
-      toast.success("CI token rotated.");
+      const result = await api.rotateDeploymentCiToken(deploymentId);
+      setCiToken(result);
+      toast.success(result.wired ? "Token rotated and repo secret updated." : "CI token rotated — paste it into the repo.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not rotate token.");
     } finally {
@@ -112,12 +115,12 @@ export function DeployActionsPanel({ deploymentId, planStatus, targetBranch, has
         <section className="px-5 py-4">
           <div className="flex items-center gap-2">
             <GitPullRequest className="h-3.5 w-3.5 text-white/55" />
-            <p className="text-[12.5px] font-medium text-white/85">Commit deploy files</p>
+            <p className="text-[12.5px] font-medium text-white/85">Set up GitHub Actions deploys</p>
           </div>
           <p className="mt-1.5 text-[11.5px] leading-[1.55] text-white/45">
             {commitResult
-              ? <>Updates branch <span className="font-mono text-white/65">{commitResult.branch}</span> — safe to re-run.</>
-              : <>Push Dockerfile, workflow, and Pulumi files; open a PR against <span className="font-mono text-white/65">{targetBranch}</span>.</>}
+              ? <>Workflow synced to <span className="font-mono text-white/65">{commitResult.branch}</span> and a build was {commitResult.triggered === "push" ? "pushed" : "dispatched"} — safe to re-run.</>
+              : <>Commit the deploy workflow to <span className="font-mono text-white/65">{targetBranch}</span> and wire the repo secret + variables, so every push builds in your repo and deploys itself.</>}
           </p>
           <Button
             className="mt-3 w-full"
@@ -149,22 +152,15 @@ export function DeployActionsPanel({ deploymentId, planStatus, targetBranch, has
           >
             {committing ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitPullRequest className="h-4 w-4" />}
             {committing
-              ? (commitResult ? "Updating…" : "Pushing…")
-              : (commitResult ? "Update branch" : "Open pull request")}
+              ? (commitResult ? "Re-syncing…" : "Wiring…")
+              : (commitResult ? "Re-sync workflow" : "Wire CI & push workflow")}
           </Button>
           {commitResult && (
             <div className="mt-3 space-y-1.5 rounded-md border border-white/[0.06] bg-black/30 px-3 py-2.5">
               <MiniRow label="Branch" value={commitResult.branch} />
-              <MiniRow label="PR" value={`#${commitResult.prNumber}`} />
-              <a
-                href={commitResult.prUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-[11.5px] text-violet-soft hover:underline"
-              >
-                View on GitHub
-                <ExternalLink className="h-3 w-3" />
-              </a>
+              <MiniRow label="Committed" value={commitResult.committed.length ? commitResult.committed.join(", ") : "already current"} />
+              <MiniRow label="Wired" value={commitResult.wired.join(", ")} />
+              <MiniRow label="Build" value={commitResult.triggered === "push" ? "started via push" : "dispatched"} />
             </div>
           )}
         </section>
@@ -198,7 +194,7 @@ export function DeployActionsPanel({ deploymentId, planStatus, targetBranch, has
             <p className="text-[12.5px] font-medium text-white/85">CI redeploy token</p>
           </div>
           <p className="mt-1.5 text-[11.5px] leading-[1.55] text-white/45">
-            Generate a deploy token. Add it as repo secret <span className="font-mono text-white/65">AWSIFY_API_TOKEN</span>, plus variables <span className="font-mono text-white/65">AWSIFY_API_URL</span> and <span className="font-mono text-white/65">AWSIFY_DEPLOY_ROLE_ARN</span>.
+            AWS-ify set the repo secret <span className="font-mono text-white/65">AWSIFY_API_TOKEN</span> and variables <span className="font-mono text-white/65">AWSIFY_API_URL</span> / <span className="font-mono text-white/65">AWSIFY_DEPLOY_ROLE_ARN</span> automatically. Rotate to issue a new token and re-push it to the repo.
           </p>
           <Button
             className="mt-3 w-full"
@@ -207,21 +203,28 @@ export function DeployActionsPanel({ deploymentId, planStatus, targetBranch, has
             disabled={rotating}
           >
             {rotating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
-            {ciToken ? "Rotate token" : "Generate token"}
+            {ciToken ? "Rotate token" : "Rotate token"}
           </Button>
           {ciToken && (
             <div className="mt-3 space-y-2 rounded-md border border-amber-500/15 bg-amber-500/[0.04] px-3 py-2.5">
-              <div className="flex items-start justify-between gap-2">
-                <p className="break-all font-mono text-[11px] leading-[1.55] text-amber-200/90">{ciToken.token}</p>
-                <button
-                  type="button"
-                  onClick={copyToken}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-white/55 transition-colors hover:bg-white/[0.05] hover:text-white"
-                  aria-label="Copy token"
-                >
-                  {tokenCopied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-                </button>
-              </div>
+              <p className="text-[11px] leading-[1.55] text-amber-200/90">
+                {ciToken.wired
+                  ? "Rotated and pushed to the repo — nothing to paste."
+                  : "Rotated. Couldn't update the repo automatically, so paste this token into the AWSIFY_API_TOKEN secret:"}
+              </p>
+              {!ciToken.wired && (
+                <div className="flex items-start justify-between gap-2">
+                  <p className="break-all font-mono text-[11px] leading-[1.55] text-amber-200/90">{ciToken.token}</p>
+                  <button
+                    type="button"
+                    onClick={copyToken}
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-white/55 transition-colors hover:bg-white/[0.05] hover:text-white"
+                    aria-label="Copy token"
+                  >
+                    {tokenCopied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                  </button>
+                </div>
+              )}
               <div className="space-y-1 border-t border-amber-500/10 pt-2">
                 <MiniRow label="Secret" value={ciToken.secretName} />
                 {(ciToken.variables ?? [{ name: ciToken.variableName, value: ciToken.variableValue }]).map((variable) => (
@@ -232,7 +235,7 @@ export function DeployActionsPanel({ deploymentId, planStatus, targetBranch, has
                   />
                 ))}
               </div>
-              <p className="text-[10.5px] text-white/40">Shown once. Rotating replaces the previous token.</p>
+              {ciToken.wireError && <p className="text-[10.5px] text-amber-300/70">{ciToken.wireError}</p>}
             </div>
           )}
         </section>

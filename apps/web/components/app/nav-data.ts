@@ -1,4 +1,5 @@
 import {
+  Boxes,
   FileCode2,
   Github,
   KeyRound,
@@ -24,6 +25,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
       { label: "Deployments", href: "/deployments", icon: FileCode2 },
+      { label: "Resources", href: "/resources", icon: Boxes },
       { label: "Repositories", href: "/repositories", icon: Github }
     ]
   },

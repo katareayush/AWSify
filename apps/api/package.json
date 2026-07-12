@@ -24,6 +24,8 @@
     "ioredis": "^5.4.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-sealedbox-js": "^1.2.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

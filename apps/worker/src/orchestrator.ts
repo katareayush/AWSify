@@ -1,19 +1,19 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { execFile, spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import { createSign } from "node:crypto";
 import { promisify } from "node:util";
 import { createAiProvider } from "@awsify/ai";
 import { decryptSecret } from "@awsify/config";
 import { PrismaClient, createPrismaAdapter } from "@awsify/database";
 import type { DeploymentJob, DeploymentPlan, DeploymentSuggestion, GeneratedArtifact } from "@awsify/deployment-schemas";
-import { collectKeyFiles, scanRepository, type RepoScanResult } from "@awsify/repo-scanner";
-import { generateDockerfile, MANAGED_PIPELINE_POLICY_NAME, buildManagedPipelinePolicy } from "@awsify/templates";
+import { collectKeyFiles, scanRepository } from "@awsify/repo-scanner";
+import { MANAGED_PIPELINE_POLICY_NAME, buildManagedPipelinePolicy } from "@awsify/templates";
 import { createStack } from "@awsify/pulumi-templates";
 import { IAMClient, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { CodeDeployClient, ListApplicationsCommand } from "@aws-sdk/client-codedeploy";
-import { ECRClient, CreateRepositoryCommand, DeleteRepositoryCommand, DescribeRepositoriesCommand, GetAuthorizationTokenCommand } from "@aws-sdk/client-ecr";
+import { ECRClient, DeleteRepositoryCommand } from "@aws-sdk/client-ecr";
 import {
   SecretsManagerClient,
   CreateSecretCommand,
@@ -97,9 +97,11 @@ export class DeploymentOrchestrator {
       throw new Error("AWS_REGION and AWSIFY_AWS_ACCOUNT_ID must be configured.");
     }
 
-    // A pre-built image (GitHub Actions path) needs no checkout. Otherwise clone
-    // so we can scan the repo and build the image on the worker.
-    const needsRepo = planRecord.status !== "approved" || !job.imageUri;
+    // The worker no longer builds images — GitHub Actions does, on the customer's
+    // runners, and calls back with a prebuilt imageUri. A checkout is only needed
+    // for the pre-approval scan; once approved, deploys arrive with an imageUri
+    // and the worker just runs the Pulumi release.
+    const needsRepo = planRecord.status !== "approved";
     const repoPath = needsRepo ? await this.cloneRepository(job) : null;
     if (repoPath) await emit("scanning", "Repository cloned; running static scanner.");
     const scan = repoPath ? scanRepository(repoPath) : null;
@@ -149,26 +151,18 @@ export class DeploymentOrchestrator {
     // has what the pipeline needs — never leave a half-built deployment.
     await this.ensureRolePermissions(connection, deployRegion, credentials, emit);
 
-    let imageUri: string;
-    if (job.imageUri) {
-      imageUri = job.imageUri;
-      await emit("deploying", `Using image built by GitHub Actions: ${imageUri}`);
-    } else {
-      const dockerfilePath = await this.resolveDockerfile(repoPath!, scan!, plan, emit);
-      await emit("deploying", `Dockerfile source: ${dockerfilePath}`);
-      await emit("deploying", "Creating ECR repository and building container image.");
-      const repositoryUri = await this.ensureEcrRepo(plan.appName, deployRegion, credentials);
-      // Tag uniquely per deployment so a redeploy produces a fresh task-definition
-      // revision; otherwise blue-green (CodeDeploy) would see no change to roll out.
-      const tagBase = job.branch.replace(/[^a-zA-Z0-9._-]/g, "-");
-      const tag = job.deploymentId ? `${tagBase}-${job.deploymentId.slice(-8)}` : tagBase;
-      imageUri = `${repositoryUri}:${tag}`;
-      await this.buildAndPushImage(repoPath!, imageUri, repositoryUri, deployRegion, credentials);
-      await emit("deploying", `Image pushed: ${imageUri}`);
+    if (!job.imageUri) {
+      // Should never happen: approved deploys are triggered by the GitHub Actions
+      // workflow, which always builds and passes the image it pushed to ECR.
+      throw new Error(
+        "No prebuilt image for this deploy. Deploys now build in GitHub Actions — approve the plan (which wires the workflow) or push to the deploy branch to start a build."
+      );
     }
+    const imageUri = job.imageUri;
+    await emit("deploying", `Using image built by GitHub Actions: ${imageUri}`);
 
     await emit("deploying", `Running Pulumi stack (${plan.suggestion.computeTarget}).`);
-    const outputs = await this.runPulumiStack(plan, imageUri, credentials, deployRegion, Boolean(job.imageUri), emit);
+    const outputs = await this.runPulumiStack(plan, imageUri, credentials, deployRegion, emit);
 
     await this.maybeBlueGreenShift(outputs, credentials, deployRegion, emit);
 
@@ -247,29 +241,6 @@ export class DeploymentOrchestrator {
     return { status: "destroyed", events: [] };
   }
 
-  /**
-   * Two-tier Dockerfile resolution:
-   *   1. Repo already has one: use it, nothing to write.
-   *   2. Otherwise write the approved AWS-ify template artifact.
-   * Returns a short label for the emit log.
-   */
-  private async resolveDockerfile(
-    repoPath: string,
-    scan: RepoScanResult,
-    plan: DeploymentPlan,
-    emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
-  ): Promise<string> {
-    if (scan.hasDockerfile) {
-      await emit("scanning", "Dockerfile already present in repository - using as-is.");
-      return "existing";
-    }
-
-    await emit("scanning", "No Dockerfile in repository - using approved AWS-ify Dockerfile template.");
-    const artifact = plan.artifacts.find((item) => item.kind === "dockerfile");
-    writeFileSync(join(repoPath, "Dockerfile"), artifact?.content ?? generateDockerfile(plan.suggestion), "utf8");
-    return "awsify-template";
-  }
-
   private async cloneRepository(job: DeploymentJob) {
     const destination = mkdtempSync(join(tmpdir(), "awsify-repo-"));
     const installation = await this.prisma.project.findUnique({
@@ -312,31 +283,6 @@ export class DeploymentOrchestrator {
     };
   }
 
-  private async ensureEcrRepo(appName: string, region: string, credentials: AwsCredentials): Promise<string> {
-    const ecr = new ECRClient({
-      region,
-      credentials: {
-        accessKeyId: credentials.accessKeyId,
-        secretAccessKey: credentials.secretAccessKey,
-        sessionToken: credentials.sessionToken
-      }
-    });
-
-    try {
-      const result = await ecr.send(new CreateRepositoryCommand({
-        repositoryName: appName,
-        imageScanningConfiguration: { scanOnPush: true }
-      }));
-      return result.repository!.repositoryUri!;
-    } catch (err: unknown) {
-      if ((err as { name?: string }).name === "RepositoryAlreadyExistsException") {
-        const existing = await ecr.send(new DescribeRepositoriesCommand({ repositoryNames: [appName] }));
-        return existing.repositories![0].repositoryUri!;
-      }
-      throw err;
-    }
-  }
-
   private async deleteEcrRepo(
     appName: string,
     region: string,
@@ -364,77 +310,30 @@ export class DeploymentOrchestrator {
     }
   }
 
-  private async buildAndPushImage(
-    repoPath: string,
-    imageUri: string,
-    repositoryUri: string,
-    region: string,
-    credentials: AwsCredentials
-  ) {
-    const ecr = new ECRClient({
-      region,
-      credentials: {
-        accessKeyId: credentials.accessKeyId,
-        secretAccessKey: credentials.secretAccessKey,
-        sessionToken: credentials.sessionToken
-      }
-    });
-
-    const authData = await ecr.send(new GetAuthorizationTokenCommand({}));
-    const authToken = Buffer.from(authData.authorizationData![0].authorizationToken!, "base64").toString();
-    const [username, password] = authToken.split(":");
-    const registry = repositoryUri.split("/")[0];
-
-    try {
-      await dockerLogin(username, password, registry);
-    } catch (error) {
-      throw new Error(`Docker login to ECR failed. Check ECR permissions on the AWS-ify role. ${extractProcessError(error)}`);
-    }
-
-    try {
-      await execFileAsync("docker", ["build", "-t", imageUri, repoPath], {
-        timeout: 600_000,
-        maxBuffer: 50 * 1024 * 1024
-      });
-    } catch (error) {
-      throw new Error(`Docker build failed. Check the Dockerfile, build command, and package install step. ${extractProcessError(error)}`);
-    }
-
-    try {
-      await execFileAsync("docker", ["push", imageUri], {
-        timeout: 300_000,
-        maxBuffer: 20 * 1024 * 1024
-      });
-    } catch (error) {
-      throw new Error(`Docker push to ECR failed. Check ECR push permissions and repository access. ${extractProcessError(error)}`);
-    }
-  }
-
   private async runPulumiStack(
     plan: DeploymentPlan,
     imageUri: string | undefined,
     credentials: AwsCredentials,
     region: string,
-    prebuilt: boolean,
     emit: (status: DeploymentEvent["status"], msg: string) => Promise<void>
   ) {
     const stateDir = pulumiStateDir(plan.projectId);
     mkdirSync(stateDir, { recursive: true });
 
     // Env is delivered through a Secrets Manager secret the ECS task reads at
-    // launch. On the GitHub Actions path the workflow already wrote it; on the
-    // one-click UI path we seed it here from the project's stored env vars.
+    // launch. The GitHub Actions workflow writes it from the repo's
+    // secrets/variables before triggering this release; we merge in any env vars
+    // set in the AWS-ify UI as well, without clobbering the GitHub-synced values.
     const secretName = envSecretName(plan.appName);
-    const seed = prebuilt ? undefined : await this.collectStoredEnv(plan.projectId);
+    const seed = await this.collectStoredEnv(plan.projectId);
     const presentKeys = await this.ensureEnvSecret(secretName, region, credentials, seed);
 
     const missingRequiredEnv = plan.suggestion.envVars.filter(
       (envVar) => envVar.required && !presentKeys.includes(envVar.name)
     );
     if (missingRequiredEnv.length > 0) {
-      const source = prebuilt ? "the repo's GitHub secrets/variables" : "the project env vars";
       throw new Error(
-        `Deployment requires env vars that are not set in ${source}: ${missingRequiredEnv.map((envVar) => envVar.name).join(", ")}`
+        `Deployment requires env vars that are not set in the repo's GitHub secrets/variables or the AWS-ify project env vars: ${missingRequiredEnv.map((envVar) => envVar.name).join(", ")}`
       );
     }
 
@@ -485,9 +384,10 @@ export class DeploymentOrchestrator {
 
   /**
    * Guarantees the env Secrets Manager secret exists before Pulumi looks it up.
-   * When `seed` is provided (UI path) the secret is (re)written from it; on the
-   * GitHub path the workflow owns the values, so we only ensure existence.
-   * Returns the JSON keys currently present in the secret.
+   * The GitHub Actions workflow writes the secret from the repo's
+   * secrets/variables first, so those stay the source of truth; here we only
+   * fill in any AWS-ify UI env vars the secret doesn't already carry (existing
+   * values win). Returns the JSON keys currently present in the secret.
    */
   private async ensureEnvSecret(
     secretName: string,
@@ -497,22 +397,25 @@ export class DeploymentOrchestrator {
   ): Promise<string[]> {
     const sm = new SecretsManagerClient({ region, credentials });
 
-    let exists = true;
+    let existing: Record<string, unknown> | null = null;
     try {
-      await sm.send(new DescribeSecretCommand({ SecretId: secretName }));
+      const current = await sm.send(new GetSecretValueCommand({ SecretId: secretName }));
+      existing = parseSecretObject(current.SecretString);
     } catch (err) {
-      if ((err as { name?: string }).name === "ResourceNotFoundException") exists = false;
-      else throw err;
+      if ((err as { name?: string }).name !== "ResourceNotFoundException") throw err;
     }
 
-    if (!exists) {
+    if (!existing) {
       await sm.send(new CreateSecretCommand({ Name: secretName, SecretString: JSON.stringify(seed ?? {}) }));
-    } else if (seed) {
-      await sm.send(new PutSecretValueCommand({ SecretId: secretName, SecretString: JSON.stringify(seed) }));
+      return Object.keys(seed ?? {});
     }
 
-    const current = await sm.send(new GetSecretValueCommand({ SecretId: secretName }));
-    return Object.keys(parseSecretObject(current.SecretString));
+    // GitHub-synced values (existing) win over UI seed values on key overlap.
+    const merged = { ...(seed ?? {}), ...existing };
+    if (seed && Object.keys(seed).some((key) => !(key in existing!))) {
+      await sm.send(new PutSecretValueCommand({ SecretId: secretName, SecretString: JSON.stringify(merged) }));
+    }
+    return Object.keys(merged);
   }
 
   private async deleteEnvSecret(
@@ -712,24 +615,6 @@ function fromDbArtifactKind(kind: string): GeneratedArtifact["kind"] {
   if (kind === "pulumi_preview") return "pulumi-preview";
   if (kind === "cloudformation_role") return "cloudformation-role";
   return kind as GeneratedArtifact["kind"];
-}
-
-function dockerLogin(username: string, password: string, registry: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn("docker", ["login", "--username", username, "--password-stdin", registry], {
-      stdio: ["pipe", "pipe", "pipe"]
-    });
-    let stderr = "";
-    child.stderr.on("data", (chunk) => {
-      stderr += String(chunk);
-    });
-    child.on("error", reject);
-    child.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`docker login failed: ${stderr.trim() || `exit ${code}`}`));
-    });
-    child.stdin.end(password);
-  });
 }
 
 function requireEnv(name: string): string {

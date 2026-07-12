@@ -100,6 +100,26 @@ export interface DeploymentDetail extends Deployment {
   };
 }
 
+export interface ResourceItem {
+  type: string;
+  name: string;
+  purpose: string;
+}
+
+export interface ResourceGroup {
+  deploymentId: string;
+  projectId: string;
+  projectName: string;
+  repoFullName: string;
+  branch: string;
+  appName: string;
+  region: string;
+  status: string;
+  liveUrl: string | null;
+  createdAt: string;
+  resources: ResourceItem[];
+}
+
 export interface DeploymentDiagnosis {
   category: string;
   title: string;
@@ -208,6 +228,8 @@ export const api = {
 
   listDeployments: () => req<{ deployments: Deployment[] }>("/deployments"),
 
+  listResources: () => req<{ groups: ResourceGroup[] }>("/deployments/resources"),
+
   getDeployment: (id: string) => req<{ deployment: DeploymentDetail }>(`/deployments/${id}`),
 
   deleteDeployment: (id: string) =>
@@ -273,6 +295,8 @@ export const api = {
   rotateDeploymentCiToken: (id: string) =>
     req<{
       token: string;
+      wired: boolean;
+      wireError?: string;
       secretName: string;
       variables: { name: string; value: string }[];
       variableName: string;
@@ -301,8 +325,8 @@ export const api = {
 };
 
 export interface CommitArtifactsResponse {
-  prUrl: string;
-  prNumber: number;
   branch: string;
   committed: string[];
+  wired: string[];
+  triggered: "push" | "dispatch";
 }
