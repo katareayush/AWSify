@@ -10,7 +10,9 @@ import { AppModule } from "./modules/app.module";
 const env = loadEnv();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody: keep the unparsed request buffer on req.rawBody so the GitHub
+  // webhook route can verify its HMAC signature.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   app.useGlobalFilters(new AllExceptionsFilter());
   app.use(cookieParser());
   app.enableCors({
