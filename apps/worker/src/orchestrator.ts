@@ -74,7 +74,9 @@ export class DeploymentOrchestrator {
         await this.prisma.deployment.update({
           where: { id: job.deploymentId },
           data: { status: status as never, logs: [...logs, event] as never }
-        }).catch(() => {/* non-fatal: don't break deployment over a log write */});
+        }).catch((err) => {
+          console.error(`[deployment:${job.projectId}] DB status update failed:`, err instanceof Error ? err.message : err);
+        });
       }
     };
 
@@ -229,12 +231,16 @@ export class DeploymentOrchestrator {
     if (job.deploymentId) {
       if (job.purgeRecord) {
         // Delete-with-teardown: drop the deployment record now that AWS is clean.
-        await this.prisma.deployment.delete({ where: { id: job.deploymentId } }).catch(() => {});
+        await this.prisma.deployment.delete({ where: { id: job.deploymentId } }).catch((err) => {
+          console.error(`[deployment:${job.projectId}] failed to purge deployment record after teardown:`, err instanceof Error ? err.message : err);
+        });
       } else {
         await this.prisma.deployment.update({
           where: { id: job.deploymentId },
           data: { status: "destroyed" as never, liveUrl: null, failureReason: null }
-        }).catch(() => {});
+        }).catch((err) => {
+          console.error(`[deployment:${job.projectId}] failed to mark deployment destroyed:`, err instanceof Error ? err.message : err);
+        });
       }
     }
 
