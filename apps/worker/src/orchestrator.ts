@@ -562,6 +562,15 @@ export class DeploymentOrchestrator {
 
     await stack.setConfig("aws:region", { value: plan.region });
 
+    // Reconcile state with reality first so resources already deleted
+    // out-of-band are dropped from state instead of failing the destroy
+    // (e.g. DeleteCluster on a cluster that no longer exists returns 400).
+    try {
+      await stack.refresh({ onOutput: msg => emitPulumi(emit, msg, "destroying") });
+    } catch (error) {
+      await emit("destroying", `State refresh skipped: ${extractProcessError(error)}`);
+    }
+
     try {
       await stack.destroy({ onOutput: msg => emitPulumi(emit, msg, "destroying") });
     } catch (error) {
