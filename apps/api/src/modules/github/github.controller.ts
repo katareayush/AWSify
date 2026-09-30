@@ -6,7 +6,7 @@ import {
   OAUTH_STATE_COOKIE,
   SESSION_COOKIE,
   appInstallStateCookieOptions,
-  appUrl,
+  appUrlFromState,
   clearAuthCookie,
   oauthStateCookieOptions,
   redirectWithError,
@@ -18,8 +18,8 @@ export class GithubController {
   constructor(private readonly github: GithubService) {}
 
   @Get("login-url")
-  loginUrl(@Res({ passthrough: true }) res: Response) {
-    const login = this.github.createOAuthLoginUrl();
+  loginUrl(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const login = this.github.createOAuthLoginUrl(req.get("origin"));
     if (!login) return { error: "GITHUB_CLIENT_ID or API_URL not configured." };
     res.cookie(OAUTH_STATE_COOKIE, this.github.signOAuthState(login.state), oauthStateCookieOptions());
     return { url: login.url };
@@ -28,7 +28,7 @@ export class GithubController {
   @Get("app-install-url")
   appInstallUrl(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
-    const install = this.github.createAppInstallUrlForSession(token);
+    const install = this.github.createAppInstallUrlForSession(token, req.get("origin"));
     if ("error" in install) return { error: install.error };
     res.cookie(APP_INSTALL_STATE_COOKIE, this.github.signOAuthState(install.state), appInstallStateCookieOptions());
     return { url: install.url };
@@ -50,24 +50,25 @@ export class GithubController {
       redirectWithError(res, "/onboarding", "invalid_oauth_state");
       return;
     }
+    const returnUrl = appUrlFromState(state);
 
     let result;
     try {
       result = await this.github.exchangeOAuthCode(code);
     } catch (err) {
       console.error("[github/callback] exchangeOAuthCode threw:", err);
-      redirectWithError(res, "/onboarding", "github_auth_error");
+      redirectWithError(res, "/onboarding", "github_auth_error", returnUrl);
       return;
     }
     if (!result) {
-      redirectWithError(res, "/onboarding", "github_auth_failed");
+      redirectWithError(res, "/onboarding", "github_auth_failed", returnUrl);
       return;
     }
 
     res.cookie(SESSION_COOKIE, result.sessionToken, sessionCookieOptions());
     clearAuthCookie(res, OAUTH_STATE_COOKIE);
 
-    res.redirect(`${appUrl()}/dashboard`);
+    res.redirect(`${returnUrl}/dashboard`);
   }
 
   @Get("repositories")
@@ -105,18 +106,19 @@ export class GithubController {
       redirectWithError(res, "/repositories", "invalid_app_install_state");
       return;
     }
+    const returnUrl = appUrlFromState(state);
 
     const token = req.cookies?.[SESSION_COOKIE] as string | undefined;
     const result = await this.github.syncInstallationForSession(token, installationId);
     if ("error" in result && result.error) {
       const errorCode = result.error;
       const path = errorCode === "not_authenticated" ? "/onboarding" : "/repositories";
-      redirectWithError(res, path, errorCode);
+      redirectWithError(res, path, errorCode, returnUrl);
       return;
     }
 
     clearAuthCookie(res, APP_INSTALL_STATE_COOKIE);
-    res.redirect(`${appUrl()}/repositories`);
+    res.redirect(`${returnUrl}/repositories`);
   }
 
   @Get("me")

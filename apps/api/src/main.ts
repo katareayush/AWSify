@@ -6,8 +6,9 @@ import { loadEnv } from "@awsify/config";
 import { NestFactory } from "@nestjs/core";
 import { AllExceptionsFilter } from "./modules/all-exceptions.filter";
 import { AppModule } from "./modules/app.module";
+import { allowedAppUrls } from "./modules/github/session-cookie";
 
-const env = loadEnv();
+loadEnv();
 
 async function bootstrap() {
   // rawBody: keep the unparsed request buffer on req.rawBody so the GitHub
@@ -16,7 +17,7 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
   app.use(cookieParser());
   app.enableCors({
-    origin: env.APP_URL,
+    origin: allowedAppUrls(),
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
