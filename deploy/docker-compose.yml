@@ -42,6 +42,27 @@ services:
         max-size: "200m"
         max-file: "10"
 
+  web-preview:
+    profiles: [preview]
+    build:
+      context: ${PREVIEW_SOURCE_DIR}
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    image: awsify-web-preview:latest
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    expose:
+      - "3000"
+    networks: [edge]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200m"
+        max-file: "10"
+
   api:
     build:
       context: ..
