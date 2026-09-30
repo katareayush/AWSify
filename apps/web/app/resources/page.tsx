@@ -7,6 +7,7 @@ import { PageHeading } from "../../components/page-heading";
 import { ProductShell } from "../../components/product-shell";
 import { Button } from "../../components/ui/button";
 import { EmptyState } from "../../components/ui/empty-state";
+import { Panel } from "../../components/ui/panel";
 import { PageSkeleton } from "../../components/ui/skeleton";
 import { ResourceGroupCard } from "../../components/resources/resource-group-card";
 import { useAuth } from "../../lib/use-auth";
@@ -62,6 +63,7 @@ export default function ResourcesPage() {
         />
 
         {groups.length === 0 ? (
+          <Panel>
           <EmptyState
             icon={Boxes}
             title="No AWS resources yet"
@@ -75,6 +77,7 @@ export default function ResourcesPage() {
               </Button>
             }
           />
+          </Panel>
         ) : (
           <div className="space-y-4">
             {groups.map((group) => (

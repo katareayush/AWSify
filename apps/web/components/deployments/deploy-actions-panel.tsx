@@ -132,7 +132,7 @@ export function DeployActionsPanel({ deploymentId, planStatus, targetBranch, has
             {diff ? "Refresh diff" : "Preview diff"}
           </Button>
           {diff && (
-            <div className="mt-3 space-y-3 rounded-md border border-white/[0.06] bg-black/25 p-3">
+            <div className="mt-3 space-y-3 rounded-[3px] border border-white/[0.06] bg-black/25 p-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[11.5px] text-white/50">
                   Compared with <span className="font-mono text-white/70">{diff.branch}</span>
@@ -156,7 +156,7 @@ export function DeployActionsPanel({ deploymentId, planStatus, targetBranch, has
               : (commitResult ? "Re-sync workflow" : "Wire CI & push workflow")}
           </Button>
           {commitResult && (
-            <div className="mt-3 space-y-1.5 rounded-md border border-white/[0.06] bg-black/30 px-3 py-2.5">
+            <div className="mt-3 space-y-1.5 rounded-[3px] border border-white/[0.06] bg-black/30 px-3 py-2.5">
               <MiniRow label="Branch" value={commitResult.branch} />
               <MiniRow label="Committed" value={commitResult.committed.length ? commitResult.committed.join(", ") : "already current"} />
               <MiniRow label="Wired" value={commitResult.wired.join(", ")} />
@@ -170,7 +170,7 @@ export function DeployActionsPanel({ deploymentId, planStatus, targetBranch, has
 
       {showCi && (
         <section className="px-5 py-4">
-          <div className="mb-4 rounded-md border border-white/[0.06] bg-white/[0.015] p-3">
+          <div className="mb-4 rounded-[3px] border border-white/[0.06] bg-white/[0.015] p-3">
             <div className="flex items-center gap-2">
               <Rocket className="h-3.5 w-3.5 text-white/55" />
               <p className="text-[12.5px] font-medium text-white/85">Redeploy latest commit</p>
@@ -206,7 +206,7 @@ export function DeployActionsPanel({ deploymentId, planStatus, targetBranch, has
             {ciToken ? "Rotate token" : "Rotate token"}
           </Button>
           {ciToken && (
-            <div className="mt-3 space-y-2 rounded-md border border-amber-500/15 bg-amber-500/[0.04] px-3 py-2.5">
+            <div className="mt-3 space-y-2 rounded-[3px] border border-amber-500/15 bg-amber-500/[0.04] px-3 py-2.5">
               <p className="text-[11px] leading-[1.55] text-amber-200/90">
                 {ciToken.wired
                   ? "Rotated and pushed to the repo — nothing to paste."

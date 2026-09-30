@@ -19,8 +19,8 @@ interface DetailTabsProps {
 
 export function DetailTabs({ tabs, active, onChange }: DetailTabsProps) {
   return (
-    <div className="overflow-x-auto border-b border-white/[0.07]">
-      <div className="flex items-center gap-1">
+    <div className="overflow-x-auto border-b border-white/[0.14]">
+      <div className="flex items-center gap-0">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = tab.key === active;
@@ -29,7 +29,7 @@ export function DetailTabs({ tabs, active, onChange }: DetailTabsProps) {
               key={tab.key}
               type="button"
               onClick={() => onChange(tab.key)}
-              className={`relative flex shrink-0 items-center gap-2 px-3.5 py-2.5 text-[13px] transition-colors ${
+              className={`relative flex shrink-0 items-center gap-2 px-4 py-3 font-mono text-[11px] font-medium uppercase tracking-[0.06em] transition-colors ${
                 isActive ? "text-white" : "text-white/45 hover:text-white/80"
               }`}
             >
@@ -47,7 +47,7 @@ export function DetailTabs({ tabs, active, onChange }: DetailTabsProps) {
                 </span>
               )}
               {tab.alert && !tab.pulse && <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />}
-              {isActive && <span className="absolute inset-x-2 -bottom-px h-px bg-violet-soft" />}
+              {isActive && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-violet" />}
             </button>
           );
         })}

@@ -114,7 +114,7 @@ export function FailurePanel({
             </div>
           </div>
 
-          <div className="mt-3 rounded-lg border border-red-500/10 bg-red-500/[0.035] p-3">
+          <div className="mt-3 rounded-[3px] border border-red-500/10 bg-red-500/[0.035] p-3">
             {loadingDiagnosis ? (
               <div className="flex items-center gap-2 text-[12px] text-red-200/70">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -152,7 +152,7 @@ export function FailurePanel({
           </div>
 
           <pre
-            className="mt-2 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-md border border-red-500/10 bg-red-500/[0.04] p-3 font-mono text-[11.5px] leading-[1.55] text-red-300/90"
+            className="mt-2 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-[3px] border border-red-500/10 bg-red-500/[0.04] p-3 font-mono text-[11.5px] leading-[1.55] text-red-300/90"
             style={!expanded && isLong ? { maxHeight: COLLAPSED_HEIGHT } : undefined}
           >
             {reason}

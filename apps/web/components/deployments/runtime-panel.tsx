@@ -81,7 +81,7 @@ export function RuntimePanel({
             pattern="[0-9]*"
             disabled={!editable}
             placeholder="3000"
-            className="h-9 w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40 disabled:opacity-60"
+            className="h-9 w-full rounded-[3px] border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40 disabled:opacity-60"
           />
         </Field>
         <Field label="Health path">
@@ -90,7 +90,7 @@ export function RuntimePanel({
             onChange={(e) => setHealthPath(e.target.value)}
             placeholder="/"
             disabled={!editable}
-            className="h-9 w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40 disabled:opacity-60"
+            className="h-9 w-full rounded-[3px] border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40 disabled:opacity-60"
           />
         </Field>
       </div>

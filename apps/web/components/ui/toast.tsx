@@ -75,7 +75,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   return (
     <div
       role="status"
-      className={`pointer-events-auto flex items-start gap-3 rounded-lg border px-4 py-3 text-[13px] leading-[1.5] shadow-xl backdrop-blur ${wrapCls}`}
+      className={`pointer-events-auto flex items-start gap-3 rounded-[3px] border px-4 py-3 text-[13px] leading-[1.5] shadow-xl backdrop-blur ${wrapCls}`}
     >
       <Icon className={`${iconCls} mt-0.5 ${iconColor}`} />
       <p className="flex-1 break-words">{toast.message}</p>

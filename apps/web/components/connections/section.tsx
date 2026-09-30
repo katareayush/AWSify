@@ -10,7 +10,7 @@ interface SectionProps {
 
 export function Section({ icon, title, status, statusTone, children }: SectionProps) {
   return (
-    <div className="rounded-xl border border-white/[0.06]">
+    <div className="rounded-[4px] border border-white/[0.06]">
       <div className="flex items-center justify-between gap-3 border-b border-white/[0.05] px-5 py-3">
         <div className="flex items-center gap-2.5">
           {icon}
@@ -52,7 +52,7 @@ export function Input({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="h-9 w-full rounded-md border border-white/[0.08] bg-white/[0.02] px-3 text-[12.5px] text-white outline-none placeholder:text-white/25 focus:border-white/20"
+      className="h-9 w-full rounded-[3px] border border-white/[0.08] bg-white/[0.02] px-3 text-[12.5px] text-white outline-none placeholder:text-white/25 focus:border-white/20"
     />
   );
 }

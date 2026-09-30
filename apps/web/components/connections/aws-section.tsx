@@ -109,7 +109,7 @@ export function AwsSection() {
       statusTone={validCount > 0 ? "ok" : "muted"}
     >
       {connections.length > 0 && (
-        <div className="mb-4 divide-y divide-white/[0.04] rounded-lg border border-white/[0.05]">
+        <div className="mb-4 divide-y divide-white/[0.04] rounded-[3px] border border-white/[0.05]">
           {connections.map((c) => (
             <div key={c.id} className="flex items-center justify-between gap-3 px-4 py-3 text-[12.5px]">
               <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -122,7 +122,7 @@ export function AwsSection() {
                 disabled={removingId === c.id}
                 title="Disconnect this AWS account"
                 aria-label={`Disconnect AWS account ${c.accountId}`}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[3px] text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
               >
                 {removingId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
               </button>
@@ -146,7 +146,7 @@ export function AwsSection() {
             target="_blank"
             rel="noreferrer"
             aria-disabled={!launchStackUrl}
-            className={`inline-flex h-9 items-center gap-2 rounded-md border px-3 text-[12.5px] transition-colors ${
+            className={`inline-flex h-9 items-center gap-2 rounded-[3px] border px-3 text-[12.5px] transition-colors ${
               launchStackUrl
                 ? "border-white/[0.12] bg-white/[0.04] text-white hover:bg-white/[0.08]"
                 : "pointer-events-none border-white/[0.06] bg-white/[0.02] text-white/30"
@@ -173,7 +173,7 @@ export function AwsSection() {
       </ol>
 
       {error && (
-        <div className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">
+        <div className="mt-4 rounded-[3px] border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">
           {error}
         </div>
       )}
@@ -192,13 +192,13 @@ export function AwsSection() {
       </div>
 
       {showManual && (
-        <div className="mt-4 space-y-3 rounded-lg border border-white/[0.05] bg-white/[0.015] p-4">
+        <div className="mt-4 space-y-3 rounded-[3px] border border-white/[0.05] bg-white/[0.015] p-4">
           <p className="text-[11.5px] text-white/45">
             Prefer to upload the template yourself? Download it, create a CloudFormation stack in your AWS account,
             and use the External ID below when prompted.
           </p>
           <Field label="External ID">
-            <div className="flex h-9 items-center justify-between rounded-md border border-white/[0.08] bg-white/[0.02] px-3 text-[12.5px] text-white/55">
+            <div className="flex h-9 items-center justify-between rounded-[3px] border border-white/[0.08] bg-white/[0.02] px-3 text-[12.5px] text-white/55">
               <span className="truncate font-mono">{externalId || "Loading…"}</span>
               <button
                 type="button"

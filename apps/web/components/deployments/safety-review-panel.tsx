@@ -80,12 +80,12 @@ export function SafetyReviewPanel({ resources = [], estimatedCost, region }: Saf
         </div>
         <ul className="grid gap-2 lg:grid-cols-3">
           {IAM_SCOPE.map((item) => (
-            <li key={item} className="rounded-md border border-white/[0.06] bg-white/[0.018] px-3 py-2 text-[11.5px] leading-[1.5] text-white/50">
+            <li key={item} className="rounded-[3px] border border-white/[0.06] bg-white/[0.018] px-3 py-2 text-[11.5px] leading-[1.5] text-white/50">
               {item}
             </li>
           ))}
         </ul>
-        <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-500/15 bg-amber-500/[0.05] px-3 py-2">
+        <div className="mt-3 flex items-start gap-2 rounded-[3px] border border-amber-500/15 bg-amber-500/[0.05] px-3 py-2">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
           <p className="text-[11.5px] leading-[1.5] text-amber-100/65">
             Approval allows AWSify to apply this plan using your connected role. Review deletes, cost, and generated files before continuing.

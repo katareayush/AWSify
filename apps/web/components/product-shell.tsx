@@ -48,8 +48,8 @@ function ShellLayout({ children, active }: { children: React.ReactNode; active: 
         }`}
       >
         <TopBar active={active} onOpenCommandPalette={openPalette} />
-        <div className="px-4 py-6 sm:px-8 sm:py-8">
-          <div className="mx-auto max-w-7xl">
+        <div className="px-4 py-7 sm:px-8 sm:py-10 xl:px-10">
+          <div className="mx-auto max-w-[1216px]">
             <PageTransition>{children}</PageTransition>
           </div>
         </div>

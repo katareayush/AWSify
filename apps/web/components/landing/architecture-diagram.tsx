@@ -12,7 +12,7 @@ const rows: Array<{ icon: Icon; label: string; sub: string; highlight?: boolean 
 
 export function ArchitectureDiagram() {
   return (
-    <div className="scan-line relative h-full overflow-hidden rounded-xl border border-white/[0.08] bg-[#070708] p-4 sm:rounded-2xl sm:p-6">
+    <div className="scan-line relative h-full overflow-hidden rounded-[4px] border border-white/[0.08] bg-[#070708] p-4 sm:rounded-[4px] sm:p-6">
       <div className="flex items-center justify-between">
         <p className="font-mono text-[10.5px] uppercase tracking-wider text-white/40">
           architecture
@@ -29,7 +29,7 @@ export function ArchitectureDiagram() {
         ))}
       </div>
 
-      <div className="absolute right-4 top-4 h-1.5 w-1.5 animate-pulse-slow rounded-full bg-violet shadow-[0_0_12px_rgba(139,92,246,0.7)]" />
+      <div className="absolute right-4 top-4 h-1.5 w-1.5 animate-pulse-slow rounded-full bg-violet shadow-[0_0_12px_rgba(237,70,45,0.7)]" />
     </div>
   );
 }

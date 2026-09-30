@@ -13,6 +13,7 @@ const config: Config = {
     },
     extend: {
       colors: {
+        white: "#f0ede6",
         border: "hsl(var(--border))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
@@ -24,9 +25,9 @@ const config: Config = {
         "accent-foreground": "hsl(var(--accent-foreground))",
         surface: "hsl(var(--surface))",
         violet: {
-          DEFAULT: "#8b5cf6",
-          soft: "#a78bfa",
-          deep: "#6d28d9"
+          DEFAULT: "#ed462d",
+          soft: "#ff725c",
+          deep: "#b92c19"
         },
         ink: {
           950: "#050505",
@@ -44,7 +45,7 @@ const config: Config = {
       },
       boxShadow: {
         panel: "0 1px 2px rgba(15, 23, 42, 0.08), 0 12px 32px rgba(15, 23, 42, 0.06)",
-        glow: "0 0 0 1px rgba(139, 92, 246, 0.18), 0 0 60px -10px rgba(139, 92, 246, 0.45)"
+        glow: "0 0 0 1px rgba(237, 70, 45, 0.18), 0 0 60px -10px rgba(237, 70, 45, 0.45)"
       },
       animation: {
         "reveal-up": "revealUp 0.9s cubic-bezier(0.16, 1, 0.3, 1) both",

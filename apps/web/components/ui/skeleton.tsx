@@ -7,7 +7,7 @@ export function PageSkeleton({ variant = "default" }: { variant?: "default" | "l
     return (
       <div className="space-y-6">
         {/* Header panel: breadcrumb, title + actions, chips, stage strip */}
-        <div className="rounded-xl border border-white/[0.08]">
+        <div className="rounded-[4px] border border-white/[0.08]">
           <div className="space-y-4 p-5 sm:p-6">
             <Skeleton className="h-3.5 w-44" />
             <div className="flex items-center justify-between gap-4">
@@ -16,13 +16,13 @@ export function PageSkeleton({ variant = "default" }: { variant?: "default" | "l
                 <Skeleton className="h-6 w-24 rounded-full" />
               </div>
               <div className="flex gap-2">
-                <Skeleton className="h-9 w-9 rounded-lg" />
-                <Skeleton className="h-9 w-9 rounded-lg" />
+                <Skeleton className="h-9 w-9 rounded-[3px]" />
+                <Skeleton className="h-9 w-9 rounded-[3px]" />
               </div>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-6 w-32 rounded-md" />
+                <Skeleton key={i} className="h-6 w-32 rounded-[3px]" />
               ))}
             </div>
           </div>
@@ -38,8 +38,8 @@ export function PageSkeleton({ variant = "default" }: { variant?: "default" | "l
         </div>
         {/* Tab content */}
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <Skeleton className="h-[380px] w-full rounded-xl" />
-          <Skeleton className="h-72 w-full rounded-xl" />
+          <Skeleton className="h-[380px] w-full rounded-[4px]" />
+          <Skeleton className="h-72 w-full rounded-[4px]" />
         </div>
       </div>
     );
@@ -55,10 +55,10 @@ export function PageSkeleton({ variant = "default" }: { variant?: "default" | "l
             <Skeleton className="h-8 w-64" />
             <Skeleton className="h-4 w-96 max-w-full" />
           </div>
-          <Skeleton className="h-9 w-40 rounded-lg" />
+          <Skeleton className="h-9 w-40 rounded-[3px]" />
         </div>
         {/* Row list */}
-        <div className="divide-y divide-white/[0.04] rounded-xl border border-white/[0.06]">
+        <div className="divide-y divide-white/[0.04] rounded-[4px] border border-white/[0.06]">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="flex items-center gap-4 px-5 py-4">
               <Skeleton className="h-2 w-2 rounded-full" />
@@ -83,15 +83,15 @@ export function PageSkeleton({ variant = "default" }: { variant?: "default" | "l
           <Skeleton className="h-8 w-72" />
           <Skeleton className="h-4 w-56" />
         </div>
-        <Skeleton className="h-9 w-40 rounded-lg" />
+        <Skeleton className="h-9 w-40 rounded-[3px]" />
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-[104px] w-full rounded-xl" />
+          <Skeleton key={i} className="h-[104px] w-full rounded-[4px]" />
         ))}
       </div>
-      <Skeleton className="h-[76px] w-full rounded-xl" />
-      <div className="rounded-xl border border-white/[0.06]">
+      <Skeleton className="h-[76px] w-full rounded-[4px]" />
+      <div className="rounded-[4px] border border-white/[0.06]">
         <div className="border-b border-white/[0.05] px-5 py-3">
           <Skeleton className="h-4 w-40" />
         </div>

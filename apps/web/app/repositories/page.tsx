@@ -233,7 +233,7 @@ function RepositoriesPageInner() {
 
         <Panel className="p-6">
           {validConnections.length > 1 && (
-            <div className="mb-5 rounded-lg border border-white/[0.06] bg-white/[0.015] p-3">
+            <div className="mb-5 rounded-[3px] border border-white/[0.06] bg-white/[0.015] p-3">
               <div className="mb-3 flex items-center gap-2">
                 <KeyRound className="h-4 w-4 text-violet-soft" />
                 <p className="text-[12.5px] font-medium text-white/85">AWS account</p>
@@ -241,7 +241,7 @@ function RepositoriesPageInner() {
               <select
                 value={selectedAwsId ?? ""}
                 onChange={(e) => setSelectedAwsId(e.target.value)}
-                className="h-9 w-full rounded-md border border-white/[0.08] bg-white/[0.02] px-3 text-[12.5px] text-white/80 outline-none focus:border-white/20"
+                className="h-9 w-full rounded-[3px] border border-white/[0.08] bg-white/[0.02] px-3 text-[12.5px] text-white/80 outline-none focus:border-white/20"
               >
                 {validConnections.map((c) => (
                   <option key={c.id} value={c.id} className="bg-[#0a0a0d]">
@@ -252,7 +252,7 @@ function RepositoriesPageInner() {
             </div>
           )}
 
-          <div className="mb-5 rounded-lg border border-white/[0.06] bg-white/[0.015] p-3">
+          <div className="mb-5 rounded-[3px] border border-white/[0.06] bg-white/[0.015] p-3">
             <div className="mb-3 flex items-center gap-2">
               <Users className="h-4 w-4 text-violet-soft" />
               <p className="text-[12.5px] font-medium text-white/85">Expected traffic</p>
@@ -265,7 +265,7 @@ function RepositoriesPageInner() {
                     key={profile.key}
                     type="button"
                     onClick={() => setDeploymentProfile(profile.key)}
-                    className={`rounded-md border px-3 py-2 text-left transition-colors ${
+                    className={`rounded-[3px] border px-3 py-2 text-left transition-colors ${
                       selected
                         ? "border-violet/35 bg-violet/10 text-white"
                         : "border-white/[0.07] bg-white/[0.02] text-white/65 hover:border-white/[0.14] hover:text-white"
@@ -279,7 +279,7 @@ function RepositoriesPageInner() {
             </div>
           </div>
 
-          <div className="flex h-10 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 text-[13px] text-white/45">
+          <div className="flex h-10 items-center gap-2 rounded-[3px] border border-white/[0.08] bg-white/[0.02] px-3 text-[13px] text-white/45">
             <Search className="h-3.5 w-3.5 shrink-0" />
             <input
               value={query}
@@ -396,7 +396,7 @@ function RepoBranchControl({
   const branch = refs?.branch ?? repo.defaultBranch;
 
   return (
-    <div className="w-full min-w-0 max-w-full overflow-hidden rounded-md border border-white/[0.06] bg-white/[0.015] p-2.5">
+    <div className="w-full min-w-0 max-w-full overflow-hidden rounded-[3px] border border-white/[0.06] bg-white/[0.015] p-2.5">
       <label className="flex min-w-0 items-center gap-2">
         <GitBranch className="h-3.5 w-3.5 shrink-0 text-white/40" />
         <select

@@ -95,11 +95,20 @@ function OnboardingPageInner() {
     <AppRoot>
       <div className="flex min-h-screen flex-col">
         <TopNav />
-        <main className="flex flex-1 items-center justify-center px-5 py-12">
-          <div className="w-full max-w-md">
-            <p className="text-[11.5px] tracking-wide text-white/45">Setup · step 1 of {steps.length}</p>
-            <h1 className="mt-3 text-[24px] font-medium tracking-tight text-white">
-              Sign in to get started
+        <main className="grid flex-1 lg:grid-cols-2">
+          <aside className="flex flex-col justify-between bg-[#ed462d] p-7 text-[#0a0a0a] sm:p-12 lg:p-16">
+            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em]">AWS-ify / setup 01—05</p>
+            <div className="my-12 max-w-xl lg:my-0">
+              <h2 className="text-[clamp(3.5rem,6vw,6.5rem)] font-semibold leading-[0.9] tracking-[-0.07em]">Connect once.<br />Ship what&apos;s next.</h2>
+              <p className="mt-7 max-w-sm border-t border-black/25 pt-5 text-[16px] font-medium leading-[1.5]">Your repository becomes a reviewed deployment plan. You approve every resource before it reaches AWS.</p>
+            </div>
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em]">GitHub → Review → AWS</p>
+          </aside>
+          <div className="flex items-center justify-center px-5 py-12 sm:px-12 lg:py-20">
+          <div className="w-full max-w-[480px]">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-soft">01 / Identity</p>
+            <h1 className="mt-4 text-[34px] font-semibold leading-none tracking-[-0.055em] text-white sm:text-[44px]">
+              Start with GitHub.
             </h1>
             <p className="mt-2 text-[13.5px] leading-[1.6] text-white/55">
               AWS-ify uses your GitHub identity. Once signed in we&apos;ll install the GitHub App and connect your AWS account.
@@ -118,7 +127,8 @@ function OnboardingPageInner() {
               {!loading && <ArrowRight className="h-4 w-4" />}
             </Button>
 
-            <ol className="mt-10">
+            <p className="mt-12 border-t border-white/[0.15] pt-5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">What happens next</p>
+            <ol className="mt-5">
               {steps.map((step, i) => (
                 <OnboardingStep
                   key={step.title}
@@ -130,6 +140,7 @@ function OnboardingPageInner() {
               ))}
             </ol>
           </div>
+          </div>
         </main>
       </div>
     </AppRoot>
@@ -138,7 +149,7 @@ function OnboardingPageInner() {
 
 function AuthErrorMessage({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return (
-    <div className="mt-5 flex items-start gap-2.5 rounded-md border border-red-500/20 bg-red-500/[0.06] px-3 py-2.5 text-red-300">
+    <div className="mt-5 flex items-start gap-2.5 rounded-[3px] border border-red-500/20 bg-red-500/[0.06] px-3 py-2.5 text-red-300">
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
       <p className="flex-1 text-[12.5px] leading-[1.5]">{message}</p>
       <button
@@ -155,7 +166,7 @@ function AuthErrorMessage({ message, onDismiss }: { message: string; onDismiss: 
 
 function TopNav() {
   return (
-    <header className="flex h-14 items-center border-b border-white/[0.05] px-5">
+    <header className="flex h-[72px] items-center border-b border-white/[0.13] bg-[#171815] px-5 sm:px-8">
       <Link href="/" className="flex items-center">
         <Wordmark size={16} />
       </Link>
@@ -178,9 +189,9 @@ function OnboardingStep({
     <li className="flex gap-3 text-[13px]">
       <div className="flex flex-col items-center">
         <span
-          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10.5px] ${
+          className={`flex h-6 w-6 shrink-0 items-center justify-center border font-mono text-[10.5px] ${
             current
-              ? "border-violet/50 bg-violet/15 font-medium text-violet-soft shadow-glow"
+              ? "border-violet/50 bg-violet/15 font-medium text-violet-soft"
               : "border-white/[0.08] text-white/35"
           }`}
         >
@@ -192,7 +203,7 @@ function OnboardingStep({
         <p className={current ? "font-medium text-white" : "text-white/70"}>
           {step.title}
           {current && (
-            <span className="ml-2 rounded-full border border-violet/30 bg-violet/10 px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-violet-soft">
+            <span className="ml-2 border border-violet/30 bg-violet/10 px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-violet-soft">
               You are here
             </span>
           )}

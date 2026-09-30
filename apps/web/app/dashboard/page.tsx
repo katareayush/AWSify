@@ -109,7 +109,7 @@ function DashboardPageInner() {
 
   return (
     <ProductShell active="Overview">
-      <div className="space-y-6">
+      <div className="space-y-7">
         <DashboardHero
           githubLogin={me?.githubLogin}
           liveCount={liveCount}
@@ -120,15 +120,17 @@ function DashboardPageInner() {
 
         <StatStrip items={stats} />
 
-        <ConnectionCard connections={connections} failureRate={failureRate} />
-
-        <div className="overflow-hidden rounded-xl border border-white/[0.07] bg-gradient-to-b from-white/[0.015] to-transparent">
-          <div className="flex items-center justify-between border-b border-white/[0.05] px-5 py-3">
-            <p className="text-[13px] font-medium text-white/80">Recent deployments</p>
+        <div className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1.75fr)_minmax(280px,0.85fr)]">
+        <section className="min-w-0 border border-white/[0.14] bg-[#181916]">
+          <div className="flex items-center justify-between px-5 py-4">
+            <div>
+              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.13em] text-white/45">Activity / latest</p>
+              <h2 className="mt-1 text-[17px] font-semibold tracking-[-0.03em] text-white">Recent deployments</h2>
+            </div>
             {deployments.length > 0 && (
               <Link
                 href="/deployments"
-                className="inline-flex items-center gap-1 text-[12px] text-white/45 transition-colors hover:text-white"
+                className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.08em] text-white/55 transition-colors hover:text-white"
               >
                 View all
                 <ArrowRight className="h-3 w-3" />
@@ -152,7 +154,7 @@ function DashboardPageInner() {
             />
           ) : (
             <>
-              <div className="divide-y divide-white/[0.04]">
+              <div>
                 {paginated.map((d) => (
                   <DeploymentRow key={d.id} deployment={d} />
                 ))}
@@ -168,6 +170,8 @@ function DashboardPageInner() {
               </div>
             </>
           )}
+        </section>
+        <ConnectionCard connections={connections} failureRate={failureRate} />
         </div>
       </div>
     </ProductShell>

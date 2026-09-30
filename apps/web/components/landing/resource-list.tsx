@@ -3,7 +3,7 @@ import { resourceListItems } from "./data";
 
 export function ResourceList() {
   return (
-    <div className="h-full overflow-hidden rounded-xl border border-white/[0.08] bg-[#070708] p-4 sm:rounded-2xl sm:p-6">
+    <div className="h-full overflow-hidden rounded-[4px] border border-white/[0.08] bg-[#070708] p-4 sm:rounded-[4px] sm:p-6">
       <div className="flex items-center justify-between">
         <p className="font-mono text-[10.5px] uppercase tracking-wider text-white/40">
           resources rendered

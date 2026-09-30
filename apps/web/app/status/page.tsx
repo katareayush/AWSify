@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
-import { Backdrop } from "../../components/landing/backdrop";
 import { Wordmark } from "../../components/landing/primitives/wordmark";
 import { UptimeBars, type HistoryDay } from "../../components/status/uptime-bars";
 import { relativeTime } from "../../lib/utils";
@@ -37,9 +36,9 @@ function toneOf(state: string): Tone {
 }
 
 const TONE = {
-  ok: { dot: "bg-emerald-400", text: "text-emerald-300", glow: "bg-emerald-500/[0.08]", border: "border-emerald-500/20" },
-  warn: { dot: "bg-amber-300", text: "text-amber-300", glow: "bg-amber-500/[0.07]", border: "border-amber-500/20" },
-  down: { dot: "bg-red-400", text: "text-red-300", glow: "bg-red-500/[0.07]", border: "border-red-500/25" }
+  ok: { dot: "bg-emerald-400", text: "text-emerald-300", border: "border-emerald-500/25" },
+  warn: { dot: "bg-amber-300", text: "text-amber-300", border: "border-amber-500/25" },
+  down: { dot: "bg-red-400", text: "text-red-300", border: "border-red-500/25" }
 } as const;
 
 function label(state: string) {
@@ -80,10 +79,9 @@ export default function StatusPage() {
   const tone = TONE[status ? toneOf(status.state) : "warn"];
 
   return (
-    <main className="min-h-screen bg-[#050508] text-white">
-      <Backdrop />
-      <section className="relative mx-auto max-w-3xl px-5 py-14 sm:py-20">
-        <div className="flex items-center justify-between">
+    <main className="min-h-screen bg-[#111210] text-white">
+      <section className="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-12">
+        <div className="flex items-center justify-between border-b border-white/[0.14] pb-7">
           <Wordmark size={16} />
           <Link
             href="/"
@@ -94,15 +92,15 @@ export default function StatusPage() {
           </Link>
         </div>
 
-        <div className="mt-12">
-          <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-violet-soft">Public status</p>
-          <h1 className="mt-3 text-[32px] font-medium tracking-tight sm:text-[38px]">System status</h1>
+        <div className="mt-16 border-b border-white/[0.14] pb-8">
+          <p className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-soft"><span className="h-1.5 w-1.5 bg-violet" />Public status / AWS-ify</p>
+          <h1 className="mt-4 text-[40px] font-semibold leading-none tracking-[-0.055em] sm:text-[56px]">System status<span className="text-violet">.</span></h1>
+          <p className="mt-3 text-[13px] text-white/50">Live health for the services that power deployments.</p>
         </div>
 
-        <div className={`relative mt-8 overflow-hidden rounded-xl border ${status ? tone.border : "border-white/[0.08]"} bg-gradient-to-b from-white/[0.03] to-white/[0.01]`}>
-          <div aria-hidden className={`pointer-events-none absolute -top-20 left-1/2 h-40 w-[120%] -translate-x-1/2 rounded-full blur-[70px] ${tone.glow}`} />
+        <div className={`mt-8 overflow-hidden border ${status ? tone.border : "border-white/[0.14]"} bg-[#181916]`}>
 
-          <div className="relative flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
             {!status ? (
               <div className="flex items-center gap-2.5 text-white/45">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -111,10 +109,7 @@ export default function StatusPage() {
             ) : (
               <>
                 <div className="flex items-center gap-3">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-50 ${tone.dot}`} />
-                    <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${tone.dot}`} />
-                  </span>
+                  <span className={`h-2.5 w-2.5 ${tone.dot}`} />
                   <p className="text-[16px] font-medium tracking-tight">
                     {toneOf(status.state) === "ok" ? "All systems operational" : "Some systems degraded"}
                   </p>
@@ -128,7 +123,7 @@ export default function StatusPage() {
           </div>
 
           {status && (
-            <div className="relative divide-y divide-white/[0.05] border-t border-white/[0.06]">
+            <div className="divide-y divide-white/[0.1] border-t border-white/[0.13]">
               {status.services.map((service) => {
                 const serviceTone = TONE[toneOf(service.state)];
                 const history = status.history?.find((entry) => entry.name === service.name);
@@ -171,10 +166,10 @@ export default function StatusPage() {
 
         {status && (
           <>
-            <p className="mt-10 font-mono text-[10.5px] uppercase tracking-[0.22em] text-white/35">
+            <p className="mt-12 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
               Last 24 hours
             </p>
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <div className="mt-3 grid grid-cols-2 gap-px border border-white/[0.14] bg-white/[0.14] sm:grid-cols-5">
               <Metric label="Active" value={status.recent.active} accent="from-violet/50" />
               <Metric label="Live" value={status.recent.deployed} accent="from-emerald-500/50" />
               <Metric label="Failed" value={status.recent.failed} accent={status.recent.failed > 0 ? "from-red-500/50" : "from-white/20"} />
@@ -227,9 +222,9 @@ function LegendSwatch({ className, label }: { className: string; label: string }
 
 function Metric({ label, value, accent }: { label: string; value: number | string; accent: string }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-white/[0.07] bg-gradient-to-b from-white/[0.02] to-transparent px-4 py-3.5">
-      <div className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r ${accent} to-transparent`} />
-      <p className="font-mono text-[20px] font-medium tracking-tight text-white">{value}</p>
+    <div className="bg-[#181916] px-4 py-5">
+      <div className={`mb-4 h-1 w-4 ${accent.includes("emerald") ? "bg-emerald-400" : accent.includes("red") ? "bg-red-400" : accent.includes("amber") ? "bg-amber-300" : accent.includes("violet") ? "bg-violet" : "bg-white/25"}`} />
+      <p className="text-[29px] font-semibold leading-none tracking-[-0.055em] text-white">{value}</p>
       <p className="mt-0.5 text-[11px] text-white/40">{label}</p>
     </div>
   );

@@ -24,7 +24,7 @@ export function CostEstimation() {
 
 function CostTable({ total }: { total: number }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-[#070708] sm:rounded-2xl lg:col-span-3">
+    <div className="overflow-hidden rounded-[4px] border border-white/[0.08] bg-[#070708] sm:rounded-[4px] lg:col-span-3">
       <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-4 sm:px-6">
         <div className="flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-violet" />
@@ -58,7 +58,7 @@ function CostTable({ total }: { total: number }) {
 
 function CostHighlight({ kpi, label, body }: { kpi: string; label: string; body: string }) {
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-gradient-to-b from-white/[0.03] to-transparent p-5 sm:rounded-2xl">
+    <div className="rounded-[4px] border border-white/[0.08] bg-gradient-to-b from-white/[0.03] to-transparent p-5 sm:rounded-[4px]">
       <div className="flex items-baseline gap-2">
         <span className="font-mono text-[26px] font-medium tracking-tight text-white">{kpi}</span>
         <span className="text-[11px] uppercase tracking-wider text-white/40">{label}</span>

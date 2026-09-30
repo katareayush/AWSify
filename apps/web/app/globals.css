@@ -3,15 +3,26 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face { font-family: "AWSify Inter"; src: url("/fonts/inter-normal-400.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: "AWSify Inter"; src: url("/fonts/inter-normal-500.woff2") format("woff2"); font-style: normal; font-weight: 500; font-display: swap; }
+@font-face { font-family: "AWSify Inter"; src: url("/fonts/inter-normal-600.woff2") format("woff2"); font-style: normal; font-weight: 600 900; font-display: swap; }
+@font-face { font-family: "AWSify Mono"; src: url("/fonts/jetbrains-mono-normal-400.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: "AWSify Mono"; src: url("/fonts/jetbrains-mono-normal-500.woff2") format("woff2"); font-style: normal; font-weight: 500 800; font-display: swap; }
+@font-face { font-family: "AWSify Display"; src: url("/fonts/instrument-serif-normal-400.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: "AWSify Display"; src: url("/fonts/instrument-serif-italic-400.woff2") format("woff2"); font-style: italic; font-weight: 400; font-display: swap; }
+
 :root {
+  --font-sans: "AWSify Inter";
+  --font-mono: "AWSify Mono";
+  --font-display: "AWSify Display";
   --background: 210 20% 98%;
   --foreground: 225 18% 13%;
   --muted: 220 16% 94%;
   --muted-foreground: 220 9% 43%;
   --border: 220 15% 88%;
-  --primary: 166 72% 28%;
+  --primary: 8 84% 55%;
   --primary-foreground: 0 0% 100%;
-  --accent: 37 88% 50%;
+  --accent: 8 84% 55%;
   --accent-foreground: 32 24% 12%;
   --surface: 0 0% 100%;
 }
@@ -23,7 +34,7 @@
 html,
 body {
   min-height: 100%;
-  background-color: #050505;
+  background-color: #0a0a0a;
 }
 
 body {
@@ -62,12 +73,12 @@ select {
 /* ── Landing page utilities ─────────────────────────────────────────────── */
 
 .landing-root {
-  background: #050505;
+  background: #0a0a0a;
   color: #f5f5f7;
 }
 
 .landing-root ::selection {
-  background: rgba(139, 92, 246, 0.35);
+  background: rgba(237, 70, 45, 0.35);
   color: #fff;
 }
 
@@ -88,9 +99,9 @@ html:has(.landing-root) {
   --muted: 240 6% 10%;
   --muted-foreground: 240 5% 60%;
   --border: 240 6% 14%;
-  --primary: 263 90% 75%;
+  --primary: 8 84% 60%;
   --primary-foreground: 0 0% 100%;
-  --accent: 263 90% 75%;
+  --accent: 8 84% 60%;
   --accent-foreground: 0 0% 100%;
   --surface: 240 8% 6%;
 
@@ -99,7 +110,7 @@ html:has(.landing-root) {
 }
 
 .app-root ::selection {
-  background: rgba(139, 92, 246, 0.35);
+  background: rgba(237, 70, 45, 0.35);
   color: #fff;
 }
 
@@ -117,15 +128,15 @@ html:has(.app-root) {
 
 .bg-grid {
   background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    linear-gradient(to right, rgba(240, 237, 230, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(240, 237, 230, 0.04) 1px, transparent 1px);
   background-size: 80px 80px;
 }
 
 .bg-grid-fine {
   background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    linear-gradient(to right, rgba(240, 237, 230, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(240, 237, 230, 0.035) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
@@ -139,15 +150,15 @@ html:has(.app-root) {
 }
 
 .glass {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.015) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(240, 237, 230, 0.03) 0%, rgba(240, 237, 230, 0.015) 100%);
+  border: 1px solid rgba(240, 237, 230, 0.08);
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
 }
 
 .glass-strong {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(240, 237, 230, 0.05) 0%, rgba(240, 237, 230, 0.02) 100%);
+  border: 1px solid rgba(240, 237, 230, 0.1);
   backdrop-filter: blur(20px) saturate(160%);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
 }
@@ -157,27 +168,27 @@ html:has(.app-root) {
 }
 
 .violet-glow {
-  background: radial-gradient(closest-side, rgba(139, 92, 246, 0.55), rgba(139, 92, 246, 0.18) 60%, transparent 80%);
+  background: radial-gradient(closest-side, rgba(237, 70, 45, 0.55), rgba(237, 70, 45, 0.18) 60%, transparent 80%);
   filter: blur(50px);
 }
 
 .hairline {
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(240, 237, 230, 0.08);
 }
 
 .divider-x {
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  background: linear-gradient(90deg, transparent, rgba(240, 237, 230, 0.12), transparent);
 }
 
 .divider-y {
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  background: linear-gradient(180deg, transparent, rgba(240, 237, 230, 0.12), transparent);
 }
 
 .shimmer {
   background: linear-gradient(
     100deg,
     transparent 30%,
-    rgba(255, 255, 255, 0.08) 50%,
+    rgba(240, 237, 230, 0.08) 50%,
     transparent 70%
   );
   background-size: 200% 100%;
@@ -200,11 +211,11 @@ html:has(.app-root) {
 .text-gradient-sweep {
   background: linear-gradient(
     100deg,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(255, 255, 255, 0.55) 30%,
-    #c4b5fd 50%,
-    rgba(255, 255, 255, 0.55) 70%,
-    rgba(255, 255, 255, 0.95) 100%
+    rgba(240, 237, 230, 0.95) 0%,
+    rgba(240, 237, 230, 0.55) 30%,
+    #ff725c 50%,
+    rgba(240, 237, 230, 0.55) 70%,
+    rgba(240, 237, 230, 0.95) 100%
   );
   background-size: 200% 100%;
   -webkit-background-clip: text;
@@ -261,7 +272,7 @@ html:has(.app-root) {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 0%, rgba(139, 92, 246, 0.12) 50%, transparent 100%);
+  background: linear-gradient(180deg, transparent 0%, rgba(237, 70, 45, 0.12) 50%, transparent 100%);
   animation: scanSweep 6s ease-in-out infinite;
   pointer-events: none;
 }
@@ -313,4 +324,17 @@ html:has(.app-root) {
   .animate-palette-in {
     animation: none !important;
   }
+}
+
+/* AWS-ify's new editorial system: warm paper, signal red, and precise rules. */
+.landing-hero-grid {
+  background-image: linear-gradient(to right, rgba(10,10,10,.09) 1px, transparent 1px), linear-gradient(to bottom, rgba(10,10,10,.09) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,.65), transparent 82%);
+}
+.outline-type { color: transparent; -webkit-text-stroke: 1.5px #0a0a0a; }
+.landing-root, .app-root { --signal: #ed462d; --paper: #f0ede6; }
+.landing-root a:focus-visible, .landing-root button:focus-visible, .app-root a:focus-visible, .app-root button:focus-visible { outline: 2px solid #ed462d; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .landing-root *, .app-root * { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

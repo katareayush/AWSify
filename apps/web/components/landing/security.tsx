@@ -36,7 +36,7 @@ export function Security() {
         ))}
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-5 text-[12.5px] text-white/55 sm:mt-8 sm:gap-x-8 sm:rounded-2xl sm:px-6">
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 rounded-[4px] border border-white/[0.08] bg-white/[0.02] px-4 py-5 text-[12.5px] text-white/55 sm:mt-8 sm:gap-x-8 sm:rounded-[4px] sm:px-6">
         {securityBadges.map((label) => (
           <Badge key={label}>{label}</Badge>
         ))}
@@ -47,9 +47,9 @@ export function Security() {
 
 function Pillar({ icon: Icon, title, body }: { icon: Icon; title: string; body: string }) {
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-white/[0.08] bg-[#070708] p-5 transition-colors hover:border-white/[0.14] sm:rounded-2xl sm:p-7">
+    <div className="group relative overflow-hidden rounded-[4px] border border-white/[0.08] bg-[#070708] p-5 transition-colors hover:border-white/[0.14] sm:rounded-[4px] sm:p-7">
       <div className="flex items-start gap-3 sm:gap-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03]">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] border border-white/[0.08] bg-white/[0.03]">
           <Icon className="h-4 w-4 text-violet-soft" />
         </div>
         <div>

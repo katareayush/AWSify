@@ -1,85 +1,39 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CheckCircle2, KeyRound } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import type { AwsConnection } from "../../lib/api";
-import { Button } from "../ui/button";
 
-interface ConnectionCardProps {
-  connections: AwsConnection[];
-  failureRate: number;
-}
+interface ConnectionCardProps { connections: AwsConnection[]; failureRate: number; }
 
 export function ConnectionCard({ connections, failureRate }: ConnectionCardProps) {
   const valid = connections.filter((c) => c.status === "valid");
-  const invalid = connections.filter((c) => c.status === "invalid");
-  const pending = connections.filter((c) => c.status === "pending");
   const primary = valid[0] ?? connections[0] ?? null;
-  const state = valid.length > 0 ? "ready" : connections.length > 0 ? "attention" : "missing";
+  const state = valid.length > 0 ? "Connected" : connections.length > 0 ? "Needs attention" : "Not connected";
+  const healthy = valid.length > 0;
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-white/[0.07] bg-gradient-to-b from-white/[0.02] to-transparent px-5 py-4">
-      <div
-        className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r to-transparent ${
-          state === "ready" ? "from-emerald-500/40" : "from-amber-500/40"
-        }`}
-      />
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <span
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
-              state === "ready"
-                ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
-                : "border-amber-500/25 bg-amber-500/10 text-amber-300"
-            }`}
-          >
-            {state === "ready" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-          </span>
-          <div>
-            <p className="text-[13px] font-medium text-white">
-              {state === "ready"
-                ? "AWS connection ready"
-                : state === "attention"
-                  ? "AWS connection needs attention"
-                  : "AWS connection missing"}
-            </p>
-            <p className="mt-0.5 text-[11.5px] text-white/40">
-              {primary ? (
-                <>
-                  <span className="font-mono text-white/55">{primary.accountId}</span>
-                  {" · "}
-                  <span className="font-mono text-white/55">{primary.defaultRegion}</span>
-                  {" · "}
-                  {primary.status}
-                </>
-              ) : (
-                "Connect a valid IAM role before starting deployments."
-              )}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 sm:gap-5">
-          <div className="grid grid-cols-3 gap-4 text-right">
-            <MiniMetric label="Invalid" value={invalid.length} alert={invalid.length > 0} />
-            <MiniMetric label="Pending" value={pending.length} />
-            <MiniMetric label="Failure" value={`${failureRate}%`} alert={failureRate > 25} />
-          </div>
-          <Button asChild variant="secondary" size="sm">
-            <Link href="/connections">
-              {state === "ready" ? <KeyRound className="h-3.5 w-3.5" /> : null}
-              {state === "ready" ? "Manage" : "Fix AWS"}
-              {state !== "ready" && <ArrowRight className="h-3.5 w-3.5" />}
-            </Link>
-          </Button>
-        </div>
+    <section className="flex h-full flex-col border border-white/[0.14] bg-[#181916]">
+      <div className="flex items-center justify-between border-b border-white/[0.13] px-5 py-4">
+        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.13em] text-white/60">Cloud account</p>
+        <span className={`flex items-center gap-2 text-[11px] ${healthy ? "text-emerald-300" : "text-amber-300"}`}>
+          <span className={`h-1.5 w-1.5 ${healthy ? "bg-emerald-300" : "bg-amber-300"}`} />{state}
+        </span>
       </div>
-    </div>
+      <div className="flex-1 px-5 py-5">
+        <p className="text-[22px] font-semibold tracking-[-0.045em] text-white">{primary ? primary.accountId : "Connect AWS"}</p>
+        <p className="mt-1 font-mono text-[11px] text-white/45">{primary ? `${primary.defaultRegion} / IAM role` : "No account linked to this workspace"}</p>
+        <dl className="mt-8 divide-y divide-white/[0.1] border-y border-white/[0.1]">
+          <Metric label="Valid connections" value={String(valid.length).padStart(2, "0")} />
+          <Metric label="Accounts linked" value={String(connections.length).padStart(2, "0")} />
+          <Metric label="Deployment failures" value={`${failureRate}%`} />
+        </dl>
+      </div>
+      <Link href="/connections" className="flex items-center justify-between border-t border-white/[0.13] px-5 py-4 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-white/70 transition-colors hover:bg-white/[0.04] hover:text-white">
+        Manage connections <ArrowUpRight className="h-4 w-4 text-violet-soft" />
+      </Link>
+    </section>
   );
 }
 
-function MiniMetric({ label, value, alert }: { label: string; value: number | string; alert?: boolean }) {
-  return (
-    <div>
-      <p className={`font-mono text-[14px] ${alert ? "text-amber-300" : "text-white"}`}>{value}</p>
-      <p className="text-[10.5px] text-white/35">{label}</p>
-    </div>
-  );
+function Metric({ label, value }: { label: string; value: string }) {
+  return <div className="flex items-center justify-between py-3 text-[12px]"><dt className="text-white/45">{label}</dt><dd className="font-mono text-white/80">{value}</dd></div>;
 }

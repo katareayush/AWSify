@@ -39,7 +39,7 @@ export function AuthErrorBanner() {
   }
 
   return (
-    <div className="fixed inset-x-0 top-24 z-[60] mx-auto flex max-w-2xl items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-[13px] text-red-200 shadow-[0_18px_50px_-12px_rgba(239,68,68,0.4)] backdrop-blur-xl">
+    <div className="fixed inset-x-0 top-24 z-[60] mx-auto flex max-w-2xl items-start gap-3 rounded-[4px] border border-red-500/30 bg-red-500/10 px-4 py-3 text-[13px] text-red-200 shadow-[0_18px_50px_-12px_rgba(239,68,68,0.4)] backdrop-blur-xl">
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
       <div className="flex-1 leading-[1.55]">
         <p className="font-medium text-red-100">Sign-in didn&apos;t complete</p>

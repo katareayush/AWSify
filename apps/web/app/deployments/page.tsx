@@ -198,7 +198,7 @@ function DeploymentsPageInner() {
                         onClick={() => setConfirmDelete(d)}
                         disabled={isDeleting}
                         title={isRunning ? "Force-delete this in-progress deployment record." : "Delete deployment"}
-                        className="relative z-10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-red-500/15 bg-red-500/[0.03] text-red-200/70 transition-colors hover:border-red-500/30 hover:bg-red-500/[0.08] hover:text-red-100 disabled:pointer-events-none disabled:opacity-45"
+                        className="relative z-10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[3px] border border-red-500/15 bg-red-500/[0.03] text-red-200/70 transition-colors hover:border-red-500/30 hover:bg-red-500/[0.08] hover:text-red-100 disabled:pointer-events-none disabled:opacity-45"
                         aria-label={`Delete deployment ${d.project.name}`}
                       >
                         {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}

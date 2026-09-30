@@ -100,7 +100,7 @@ export function ConfirmDialog({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="animate-palette-in w-full max-w-md overflow-hidden rounded-xl border border-white/[0.1] bg-[#0d0c14] shadow-2xl outline-none"
+        className="animate-palette-in w-full max-w-md overflow-hidden rounded-[4px] border border-white/[0.1] bg-[#0d0c14] shadow-2xl outline-none"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start gap-3.5 p-5">
@@ -121,7 +121,7 @@ export function ConfirmDialog({
             type="button"
             onClick={requestCancel}
             disabled={busy}
-            className="rounded-md p-1 text-white/35 transition-colors hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-40"
+            className="rounded-[3px] p-1 text-white/35 transition-colors hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-40"
             aria-label="Close"
           >
             <X className="h-4 w-4" />

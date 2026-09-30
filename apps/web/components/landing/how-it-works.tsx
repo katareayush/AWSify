@@ -7,7 +7,7 @@ const stepIcons = [GitBranch, Workflow, Layers, Zap];
 export function HowItWorks() {
   return (
     <Section id="how" eyebrow="How it works" title="Four steps from repository to live service.">
-      <div className="mt-10 space-y-px overflow-hidden rounded-xl border border-white/[0.08] sm:mt-16 sm:rounded-2xl">
+      <div className="mt-10 space-y-px overflow-hidden rounded-[4px] border border-white/[0.08] sm:mt-16 sm:rounded-[4px]">
         {howItWorksSteps.map((step, idx) => (
           <StepRow
             key={step.n}

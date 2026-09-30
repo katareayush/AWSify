@@ -40,7 +40,7 @@ export function Solution() {
 
 function SolutionCard({ icon: Icon, title, body }: { icon: Icon; title: string; body: string }) {
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-white/[0.01] p-5 transition-all hover:border-white/[0.14] sm:rounded-2xl sm:p-7">
+    <div className="group relative overflow-hidden rounded-[4px] border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-white/[0.01] p-5 transition-all hover:border-white/[0.14] sm:rounded-[4px] sm:p-7">
       <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-violet/10 blur-3xl opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
       <div className="relative">
         <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">

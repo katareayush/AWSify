@@ -127,7 +127,7 @@ function edge(source: string, target: string, label: string): Edge {
 function InfraNode({ data }: NodeProps<Node<InfraNodeData>>) {
   const Icon = iconFor(data.icon);
   const toneClass = {
-    core: "border-violet-400/30 bg-violet-400/10 text-violet-100",
+    core: "border-violet/30 bg-violet/10 text-violet-soft",
     network: "border-sky-400/30 bg-sky-400/10 text-sky-100",
     storage: "border-emerald-400/25 bg-emerald-400/10 text-emerald-100",
     observability: "border-amber-400/25 bg-amber-400/10 text-amber-100",
@@ -136,7 +136,7 @@ function InfraNode({ data }: NodeProps<Node<InfraNodeData>>) {
   }[data.tone];
 
   return (
-    <div className={`w-[190px] rounded-lg border px-3 py-2.5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.9)] ${toneClass}`}>
+    <div className={`w-[190px] rounded-[3px] border px-3 py-2.5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.9)] ${toneClass}`}>
       <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border-white/30 !bg-[#111]" />
       <Handle type="source" position={Position.Right} className="!h-2 !w-2 !border-white/30 !bg-[#111]" />
       <div className="flex items-center gap-2">

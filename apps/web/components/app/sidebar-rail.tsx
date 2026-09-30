@@ -13,13 +13,13 @@ interface SidebarRailProps {
 export function SidebarRail({ active, onOpenCommandPalette }: SidebarRailProps) {
   const { setCollapsed } = useSidebar();
   return (
-    <aside className="z-30 hidden w-14 border-r border-white/[0.06] bg-[#0a0a0d]/95 backdrop-blur-xl lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col">
-      <div className="flex h-16 items-center justify-center border-b border-white/[0.06]">
+    <aside className="z-30 hidden w-14 border-r border-white/[0.13] bg-[#171815] lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col">
+      <div className="flex h-[72px] items-center justify-center border-b border-white/[0.13]">
         <Link
           href="/"
           title="AWS-ify"
           aria-label="AWS-ify home"
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-violet/25 bg-violet/10 text-[13px] font-semibold text-violet-soft transition-colors hover:border-violet/40 hover:text-white"
+          className="flex h-8 w-8 items-center justify-center bg-violet text-[13px] font-semibold text-[#0a0a0a] transition-colors hover:bg-violet-soft"
         >
           A
         </Link>
@@ -41,14 +41,14 @@ export function SidebarRail({ active, onOpenCommandPalette }: SidebarRailProps) 
                     href={item.href}
                     title={item.label}
                     aria-label={item.label}
-                    className={`group relative flex h-9 items-center justify-center rounded-lg transition-colors ${
+                    className={`group relative flex h-9 items-center justify-center transition-colors ${
                       isActive
-                        ? "bg-gradient-to-r from-violet/[0.14] to-white/[0.03] text-white"
+                        ? "bg-[#2a211e] text-white"
                         : "text-white/55 hover:bg-white/[0.04] hover:text-white"
                     }`}
                   >
                     {isActive ? (
-                      <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-violet shadow-[0_0_8px_rgba(139,92,246,0.7)]" />
+                      <span className="absolute left-0 top-0 h-full w-[3px] bg-violet" />
                     ) : null}
                     <item.icon
                       className={`h-4 w-4 ${
@@ -68,7 +68,7 @@ export function SidebarRail({ active, onOpenCommandPalette }: SidebarRailProps) 
           onClick={onOpenCommandPalette}
           aria-label="Open command palette"
           title="Command palette (⌘ K)"
-          className="flex h-9 w-full items-center justify-center rounded-lg text-white/55 transition-colors hover:bg-white/[0.04] hover:text-white"
+          className="flex h-9 w-full items-center justify-center rounded-[3px] text-white/55 transition-colors hover:bg-white/[0.04] hover:text-white"
         >
           <Search className="h-4 w-4" />
         </button>

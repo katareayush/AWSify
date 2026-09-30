@@ -100,7 +100,7 @@ export function ResourceGroupCard({ group, onTornDown }: Props) {
       <ul className="divide-y divide-white/[0.03]">
         {group.resources.map((resource, index) => (
           <li key={`${resource.type}-${resource.name}-${index}`} className="flex items-center gap-3 px-5 py-3">
-            <span className="shrink-0 rounded-md border border-white/[0.06] bg-white/[0.03] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-white/45">
+            <span className="shrink-0 rounded-[3px] border border-white/[0.06] bg-white/[0.03] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-white/45">
               {resourceServiceTag(resource.type)}
             </span>
             <div className="min-w-0 flex-1">

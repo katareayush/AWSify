@@ -119,7 +119,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-palette-fade" />
       <div
-        className="relative w-full max-w-xl overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0d] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)] animate-palette-in"
+        className="relative w-full max-w-xl overflow-hidden rounded-[4px] border border-white/[0.08] bg-[#0a0a0d] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)] animate-palette-in"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 border-b border-white/[0.06] px-3.5">

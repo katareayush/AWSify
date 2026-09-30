@@ -10,12 +10,12 @@ export function Nav() {
   const scrolled = useScrolled(20);
 
   return (
-    <header className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4 sm:top-5 sm:px-6">
+    <header className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-3 sm:top-5 sm:px-6">
       <div
-        className={`pointer-events-auto relative flex h-[56px] w-full items-center justify-between rounded-full border border-white/[0.09] backdrop-blur-2xl backdrop-saturate-150 transition-[max-width,gap,padding,background-color,box-shadow] duration-500 ease-out ${
+        className={`pointer-events-auto relative flex h-[58px] w-full items-center justify-between border border-white/[0.16] backdrop-blur-2xl transition-[max-width,gap,padding,background-color,box-shadow] duration-500 ease-out ${
           scrolled
-            ? "max-w-5xl gap-4 bg-black/65 pl-5 pr-1.5 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.8)]"
-            : "max-w-7xl gap-8 bg-black/35 pl-6 pr-2 shadow-[0_14px_40px_-18px_rgba(0,0,0,0.55)]"
+            ? "max-w-5xl gap-4 bg-[#0a0a0a]/95 pl-5 pr-1.5 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.8)]"
+            : "max-w-[1344px] gap-8 bg-[#0a0a0a]/95 pl-6 pr-2 shadow-[0_14px_40px_-18px_rgba(0,0,0,0.55)]"
         }`}
       >
         <NavRing />
@@ -64,7 +64,7 @@ function NavLinks() {
         <a
           key={href}
           href={href}
-          className="whitespace-nowrap rounded-full px-3.5 py-2 text-[14px] text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white"
+          className="whitespace-nowrap px-3.5 py-2 font-mono text-[11px] uppercase tracking-[0.08em] text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white"
         >
           {label}
         </a>
@@ -78,13 +78,13 @@ function Actions() {
     <div className="relative z-10 flex shrink-0 items-center gap-1.5">
       <Link
         href="/dashboard"
-        className="hidden whitespace-nowrap rounded-full px-4 py-2 text-[14px] text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white sm:inline-flex"
+        className="hidden whitespace-nowrap px-4 py-2 font-mono text-[11px] uppercase tracking-[0.08em] text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white sm:inline-flex"
       >
         Sign in
       </Link>
       <Link
         href="/onboarding"
-        className="group inline-flex whitespace-nowrap items-center gap-1.5 rounded-full bg-white py-2 pl-4 pr-3.5 text-[14px] font-medium text-black transition-transform hover:scale-[1.02]"
+        className="group inline-flex whitespace-nowrap items-center gap-1.5 bg-[#ed462d] py-2.5 pl-4 pr-3.5 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#0a0a0a] transition-colors hover:bg-[#ff6349]"
       >
         Get started
         <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />

@@ -4,11 +4,11 @@ import type * as React from "react";
 import { cn } from "../../lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex h-9 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 text-[13px] font-medium tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex h-9 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[3px] px-3.5 text-[13px] font-semibold tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/40 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "bg-white text-black hover:bg-white/90",
+        default: "bg-violet text-[#0a0a0a] hover:bg-violet-soft",
         secondary:
           "border border-white/[0.1] bg-white/[0.04] text-white/85 hover:border-white/[0.18] hover:bg-white/[0.07] hover:text-white",
         quiet: "text-white/65 hover:bg-white/[0.05] hover:text-white",

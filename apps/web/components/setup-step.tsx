@@ -15,7 +15,7 @@ export function SetupStep({ icon: Icon, title, description, state, meta }: Setup
     <Panel className="p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03]">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[3px] border border-white/[0.08] bg-white/[0.03]">
             <Icon className="h-4 w-4 text-violet-soft" />
           </div>
           <div>

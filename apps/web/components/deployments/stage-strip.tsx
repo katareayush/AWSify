@@ -49,11 +49,11 @@ function buildStages(status: string, planStatus?: string | null): Stage[] {
   ];
 }
 
-const STATE_STYLES: Record<StageState, { dot: string; label: string }> = {
-  done: { dot: "border-emerald-500/40 bg-emerald-500/15 text-emerald-300", label: "text-white/70" },
-  active: { dot: "border-violet/50 bg-violet/15 text-violet-soft shadow-glow", label: "text-white" },
-  failed: { dot: "border-red-500/40 bg-red-500/15 text-red-300", label: "text-red-300" },
-  pending: { dot: "border-white/[0.08] bg-white/[0.02] text-white/30", label: "text-white/35" }
+const STATE_STYLES: Record<StageState, { marker: string; label: string; rail: string }> = {
+  done: { marker: "text-emerald-300", label: "text-white/75", rail: "bg-emerald-400" },
+  active: { marker: "text-violet-soft", label: "text-white", rail: "bg-violet" },
+  failed: { marker: "text-red-300", label: "text-red-300", rail: "bg-red-400" },
+  pending: { marker: "text-white/35", label: "text-white/40", rail: "bg-white/[0.12]" }
 };
 
 export function StageStrip({ status, planStatus }: StageStripProps) {
@@ -62,23 +62,15 @@ export function StageStrip({ status, planStatus }: StageStripProps) {
   const spinning = ["queued", "scanning", "deploying", "destroying"].includes(status);
 
   return (
-    <ol className="flex items-center">
+    <ol className={`grid ${stages.length === 3 ? "grid-cols-3" : "grid-cols-4"} border border-white/[0.12] bg-[#151613]`}>
       {stages.map((stage, i) => {
         const styles = STATE_STYLES[stage.state];
         const Icon = stage.icon;
         return (
-          <li key={stage.label} className={`flex items-center ${i > 0 ? "flex-1" : ""}`}>
-            {i > 0 && (
-              <div
-                className={`mx-2 h-px flex-1 sm:mx-3 ${
-                  stage.state === "done" || stages[i - 1].state === "done"
-                    ? "bg-emerald-500/25"
-                    : "bg-white/[0.07]"
-                }`}
-              />
-            )}
-            <div className="flex shrink-0 items-center gap-2">
-              <span className={`flex h-7 w-7 items-center justify-center rounded-full border ${styles.dot}`}>
+          <li key={stage.label} className={`relative min-w-0 px-2 py-3 sm:px-4 ${i > 0 ? "border-l border-white/[0.12]" : ""}`}>
+            <span className={`absolute inset-x-0 top-0 h-[2px] ${styles.rail}`} />
+            <div className="flex items-center gap-2">
+              <span className={`flex h-5 w-5 shrink-0 items-center justify-center ${styles.marker}`}>
                 {stage.state === "done" ? (
                   <Check className="h-3.5 w-3.5" />
                 ) : stage.state === "active" && spinning ? (
@@ -89,7 +81,7 @@ export function StageStrip({ status, planStatus }: StageStripProps) {
                   <Icon className="h-3.5 w-3.5" />
                 )}
               </span>
-              <span className={`hidden text-[12px] font-medium xs:block ${styles.label}`}>{stage.label}</span>
+              <span className={`truncate text-[11px] font-medium sm:text-[12px] ${styles.label}`}>{stage.label}</span>
             </div>
           </li>
         );

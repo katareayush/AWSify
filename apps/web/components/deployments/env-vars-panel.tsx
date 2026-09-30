@@ -24,7 +24,7 @@ const NAME_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
 const CATEGORY_STYLES: Record<string, { label: string; className: string }> = {
   secret: { label: "Secret", className: "border-rose-500/30 bg-rose-500/10 text-rose-300" },
   integration: { label: "Integration", className: "border-sky-500/30 bg-sky-500/10 text-sky-300" },
-  "feature-flag": { label: "Feature flag", className: "border-violet-500/30 bg-violet-500/10 text-violet-300" },
+  "feature-flag": { label: "Feature flag", className: "border-violet/30 bg-violet/10 text-violet-soft" },
   "build-time": { label: "Build-time", className: "border-amber-500/25 bg-amber-500/10 text-amber-300" },
   config: { label: "Config", className: "border-white/10 bg-white/[0.03] text-white/55" },
   custom: { label: "Custom", className: "border-emerald-500/25 bg-emerald-500/10 text-emerald-300" }
@@ -204,7 +204,7 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
         </div>
       </div>
 
-      <div className="mb-4 rounded-lg border border-dashed border-white/10 bg-white/[0.015] p-3">
+      <div className="mb-4 rounded-[3px] border border-dashed border-white/10 bg-white/[0.015] p-3">
         <button
           type="button"
           onClick={() => setShowBulk((value) => !value)}
@@ -228,10 +228,10 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
               onChange={(event) => setBulkText(event.target.value)}
               placeholder={"DATABASE_URL=postgres://...\nNEXT_PUBLIC_API_URL=\"https://api.example.com\""}
               spellCheck={false}
-              className="min-h-28 w-full resize-y rounded-md border border-white/[0.08] bg-black/25 p-3 font-mono text-[12px] leading-[1.5] text-white outline-none placeholder:text-white/25 focus:border-violet/40"
+              className="min-h-28 w-full resize-y rounded-[3px] border border-white/[0.08] bg-black/25 p-3 font-mono text-[12px] leading-[1.5] text-white outline-none placeholder:text-white/25 focus:border-violet/40"
             />
             {(parsedBulk.entries.length > 0 || parsedBulk.invalid.length > 0) && (
-              <div className="rounded-md border border-white/[0.06] bg-black/20 p-3">
+              <div className="rounded-[3px] border border-white/[0.06] bg-black/20 p-3">
                 <p className="text-[11px] text-white/45">
                   Preview: {parsedBulk.entries.length} valid, {parsedBulk.invalid.length} invalid
                 </p>
@@ -324,18 +324,18 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
       )}
 
       {missingOnly && visibleRequired.length === 0 && (
-        <p className="rounded-lg border border-dashed border-white/10 px-4 py-6 text-center text-[12px] text-white/40">
+        <p className="rounded-[3px] border border-dashed border-white/10 px-4 py-6 text-center text-[12px] text-white/40">
           No missing required variables.
         </p>
       )}
 
       {allVars.length === 0 && (
-        <p className="rounded-lg border border-dashed border-white/10 px-4 py-6 text-center text-[12px] text-white/40">
+        <p className="rounded-[3px] border border-dashed border-white/10 px-4 py-6 text-center text-[12px] text-white/40">
           No variables detected. Add one below if your app needs any.
         </p>
       )}
 
-      <div className="mt-4 rounded-lg border border-dashed border-white/10 bg-white/[0.015] p-3">
+      <div className="mt-4 rounded-[3px] border border-dashed border-white/10 bg-white/[0.015] p-3">
         <p className="mb-2 font-mono text-[10.5px] uppercase tracking-wider text-white/35">Add custom variable</p>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
@@ -345,13 +345,13 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
             placeholder="VARIABLE_NAME"
             spellCheck={false}
             autoComplete="off"
-            className="h-9 min-w-0 flex-1 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] uppercase text-white outline-none placeholder:text-white/25 focus:border-violet/40"
+            className="h-9 min-w-0 flex-1 rounded-[3px] border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] uppercase text-white outline-none placeholder:text-white/25 focus:border-violet/40"
           />
           <button
             type="button"
             onClick={handleAddCustom}
             disabled={!customDraft.trim()}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.04] px-3 text-[12px] text-white/80 hover:bg-white/[0.07] disabled:opacity-40"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[3px] border border-white/[0.08] bg-white/[0.04] px-3 text-[12px] text-white/80 hover:bg-white/[0.07] disabled:opacity-40"
           >
             <Plus className="h-3.5 w-3.5" /> Add
           </button>
@@ -360,7 +360,7 @@ export function EnvVarsPanel({ deploymentId, detected, saved, onChange }: EnvVar
       </div>
 
       {error && (
-        <div className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-300">
+        <div className="mt-4 rounded-[3px] border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-300">
           {error}
         </div>
       )}
@@ -426,7 +426,7 @@ function EnvRow({ envVar, value, isVisible, isDeleting, onChangeValue, onToggleV
       : "Paste value";
 
   return (
-    <label className="block rounded-lg border border-white/[0.06] bg-white/[0.015] p-3 transition-colors focus-within:border-white/[0.12]">
+    <label className="block rounded-[3px] border border-white/[0.06] bg-white/[0.015] p-3 transition-colors focus-within:border-white/[0.12]">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <span className="truncate font-mono text-[12.5px] text-white">{envVar.name}</span>
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
@@ -466,7 +466,7 @@ function EnvRow({ envVar, value, isVisible, isDeleting, onChangeValue, onToggleV
           autoComplete="off"
           spellCheck={false}
           placeholder={placeholder}
-          className={`h-9 w-full rounded-md border border-white/[0.08] bg-white/[0.03] pl-3 ${inputPaddingRight} font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40`}
+          className={`h-9 w-full rounded-[3px] border border-white/[0.08] bg-white/[0.03] pl-3 ${inputPaddingRight} font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40`}
         />
         <button
           type="button"

@@ -241,7 +241,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const fieldClassName = "h-9 w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40 disabled:opacity-45";
+const fieldClassName = "h-9 w-full rounded-[3px] border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[12px] text-white outline-none placeholder:text-white/25 focus:border-violet/40 disabled:opacity-45";
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (

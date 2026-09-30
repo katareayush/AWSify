@@ -10,39 +10,29 @@ export interface StatItem {
   tone?: StatTone;
 }
 
-const TONES: Record<StatTone, { chip: string; bar: string }> = {
-  emerald: { chip: "border-emerald-500/25 bg-emerald-500/10 text-emerald-300", bar: "from-emerald-500/50" },
-  violet: { chip: "border-violet/25 bg-violet/10 text-violet-soft", bar: "from-violet/50" },
-  amber: { chip: "border-amber-500/25 bg-amber-500/10 text-amber-300", bar: "from-amber-500/50" },
-  neutral: { chip: "border-white/[0.08] bg-white/[0.04] text-white/55", bar: "from-white/20" }
+const TONE: Record<StatTone, string> = {
+  emerald: "text-emerald-300",
+  violet: "text-violet-soft",
+  amber: "text-amber-300",
+  neutral: "text-white/55"
 };
 
 export function StatStrip({ items }: { items: StatItem[] }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {items.map((item) => (
-        <Stat key={item.label} item={item} />
-      ))}
-    </div>
-  );
-}
-
-function Stat({ item }: { item: StatItem }) {
-  const Icon = item.icon;
-  const tone = TONES[item.tone ?? "neutral"];
-  return (
-    <div className="group relative overflow-hidden rounded-xl border border-white/[0.07] bg-gradient-to-b from-white/[0.025] to-transparent px-4 py-4 transition-colors hover:border-white/[0.12]">
-      <div className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r ${tone.bar} to-transparent`} />
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-[11.5px] tracking-wide text-white/45">{item.label}</p>
-          <p className="mt-1.5 font-mono text-[24px] font-medium tracking-tight text-white">{item.value}</p>
-          {item.hint && <p className="mt-1 text-[11px] text-white/35">{item.hint}</p>}
-        </div>
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${tone.chip}`}>
-          <Icon className="h-3.5 w-3.5" />
-        </span>
-      </div>
+    <div className="grid grid-cols-2 border border-white/[0.14] bg-[#181916] lg:grid-cols-4">
+      {items.map((item, index) => {
+        const Icon = item.icon;
+        return (
+          <div key={item.label} className={`min-w-0 p-4 sm:p-5 ${index % 2 ? "border-l border-white/[0.13]" : ""} ${index > 1 ? "border-t border-white/[0.13] lg:border-t-0" : ""} ${index === 2 ? "lg:border-l" : ""}`}>
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.13em] text-white/50">{item.label}</p>
+              <Icon className={`h-4 w-4 shrink-0 ${TONE[item.tone ?? "neutral"]}`} />
+            </div>
+            <p className="mt-5 text-[36px] font-semibold leading-none tracking-[-0.065em] text-white sm:text-[42px]">{item.value}</p>
+            {item.hint && <p className="mt-2 truncate text-[11px] text-white/38">{item.hint}</p>}
+          </div>
+        );
+      })}
     </div>
   );
 }

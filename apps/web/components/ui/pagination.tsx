@@ -46,7 +46,7 @@ function NavButton({
     <button
       type="button"
       {...props}
-      className="flex h-7 w-7 items-center justify-center rounded-md border border-white/[0.08] bg-white/[0.02] text-white/65 transition-colors enabled:hover:border-white/[0.16] enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+      className="flex h-7 w-7 items-center justify-center rounded-[3px] border border-white/[0.08] bg-white/[0.02] text-white/65 transition-colors enabled:hover:border-white/[0.16] enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </button>

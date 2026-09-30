@@ -86,7 +86,7 @@ export function LogsPanel({ logs, isRunning }: LogsPanelProps) {
       {isRunning && <Loader2 className="h-3.5 w-3.5 animate-spin text-white/40" />}
 
       <div className="ml-auto flex items-center gap-1">
-        <div className="flex items-center gap-0.5 rounded-md border border-white/[0.08] bg-white/[0.02] p-0.5">
+        <div className="flex items-center gap-0.5 rounded-[3px] border border-white/[0.08] bg-white/[0.02] p-0.5">
           {LEVELS.map(l => (
             <button
               key={l.key}
@@ -115,7 +115,7 @@ export function LogsPanel({ logs, isRunning }: LogsPanelProps) {
   const body = (
     <div
       ref={bodyRef}
-      className={`overflow-y-auto rounded-lg border border-white/[0.06] bg-black/40 p-4 font-mono text-[12px] leading-[1.7] ${
+      className={`overflow-y-auto rounded-[3px] border border-white/[0.06] bg-black/40 p-4 font-mono text-[12px] leading-[1.7] ${
         fullscreen ? "flex-1" : "h-[480px]"
       }`}
     >
@@ -157,7 +157,7 @@ function IconButton({ onClick, title, children }: { onClick: () => void; title: 
       type="button"
       onClick={onClick}
       title={title}
-      className="flex h-7 w-7 items-center justify-center rounded-md border border-white/[0.08] bg-white/[0.02] text-white/65 transition-colors hover:bg-white/[0.06] hover:text-white"
+      className="flex h-7 w-7 items-center justify-center rounded-[3px] border border-white/[0.08] bg-white/[0.02] text-white/65 transition-colors hover:bg-white/[0.06] hover:text-white"
     >
       {children}
     </button>

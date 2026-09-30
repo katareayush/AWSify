@@ -15,10 +15,10 @@ type Icon = typeof Cloud;
 export function HeroArtifact() {
   return (
     <div className="relative">
-      <div className="absolute -inset-px rounded-xl bg-gradient-to-b from-violet/30 via-white/5 to-transparent opacity-60 blur-[2px] sm:rounded-2xl" />
-      <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0a0a0c]/80 shadow-[0_30px_120px_-20px_rgba(0,0,0,0.6)] backdrop-blur-xl sm:rounded-2xl">
+      <div className="absolute -inset-px rounded-[4px] bg-gradient-to-b from-violet/30 via-white/5 to-transparent opacity-60 blur-[2px] sm:rounded-[4px]" />
+      <div className="relative overflow-hidden rounded-[4px] border border-white/10 bg-[#0a0a0c]/80 shadow-[0_30px_120px_-20px_rgba(0,0,0,0.6)] backdrop-blur-xl sm:rounded-[4px]">
         <WindowChrome />
-        <div className="grid grid-cols-12 sm:min-h-[360px] lg:min-h-[420px]">
+        <div className="grid grid-cols-12">
           <FileTree />
           <PlanPanel />
           <GuardrailsPanel />
@@ -60,7 +60,7 @@ const generatedFiles = [
 
 function FileTree() {
   return (
-    <aside className="col-span-3 hidden border-r border-white/[0.06] p-4 lg:block">
+    <aside className="col-span-3 hidden border-r border-white/[0.06] p-4 2xl:block">
       <p className="font-mono text-[10px] uppercase tracking-wider text-white/35">Generated</p>
       <ul className="mt-4 space-y-1.5 font-mono text-[12px] text-white/70">
         {generatedFiles.map((f) => (
@@ -104,7 +104,7 @@ function StackRow({ label, value }: { label: string; value: string }) {
 
 function PlanPanel() {
   return (
-    <section className="col-span-12 p-4 sm:p-5 lg:col-span-6 lg:p-7">
+    <section className="col-span-12 min-w-0 p-4 sm:p-5 lg:p-7 2xl:col-span-6">
       <div className="flex flex-col gap-3 xs:flex-row xs:items-start xs:justify-between">
         <div className="min-w-0">
           <p className="font-mono text-[10px] uppercase tracking-wider text-white/35">
@@ -144,7 +144,7 @@ function Pill({ icon: Icon, label }: { icon: Icon; label: string }) {
 
 function MiniInfraDiagram() {
   return (
-    <div className="mt-4 overflow-hidden rounded-xl border border-white/[0.06] bg-black/30 p-3 sm:mt-5 sm:p-5">
+    <div className="mt-4 overflow-hidden rounded-[4px] border border-white/[0.06] bg-black/30 p-3 sm:mt-5 sm:p-5">
       <div className="grid grid-cols-5 items-center gap-1.5 text-[10px] font-mono text-white/55 sm:gap-2 sm:text-[10.5px]">
         <Node icon={Github} label="GitHub" />
         <Arrow />
@@ -208,7 +208,7 @@ const guardrails = [
 
 function GuardrailsPanel() {
   return (
-    <aside className="col-span-12 hidden border-t border-white/[0.06] p-5 sm:block lg:col-span-3 lg:border-l lg:border-t-0">
+    <aside className="col-span-3 hidden border-l border-white/[0.06] p-5 2xl:block">
       <p className="font-mono text-[10px] uppercase tracking-wider text-white/35">Guardrails</p>
       <ul className="mt-4 space-y-2.5 text-[12.5px] text-white/75">
         {guardrails.map((text) => (
