@@ -46,8 +46,31 @@ export function appUrl(): string {
   return value;
 }
 
-export function redirectWithError(res: Response, path: string, errorCode: string): void {
-  const url = new URL(path, appUrl());
+export function allowedAppUrls(): string[] {
+  return [appUrl(), ...(process.env.PREVIEW_APP_URLS ?? "").split(",").map((url) => url.trim()).filter(Boolean)];
+}
+
+export function appUrlForOrigin(origin: string | undefined): string {
+  return origin && allowedAppUrls().includes(origin) ? origin : appUrl();
+}
+
+export function stateForOrigin(state: string, origin: string | undefined): string {
+  const returnUrl = appUrlForOrigin(origin);
+  return returnUrl === appUrl() ? state : `${state}.${Buffer.from(returnUrl).toString("base64url")}`;
+}
+
+export function appUrlFromState(state: string | undefined): string {
+  const encoded = state?.split(".")[1];
+  if (!encoded) return appUrl();
+  try {
+    return appUrlForOrigin(Buffer.from(encoded, "base64url").toString("utf8"));
+  } catch {
+    return appUrl();
+  }
+}
+
+export function redirectWithError(res: Response, path: string, errorCode: string, returnUrl = appUrl()): void {
+  const url = new URL(path, returnUrl);
   url.searchParams.set("error", errorCode);
   res.redirect(url.toString());
 }

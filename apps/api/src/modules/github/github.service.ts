@@ -1,6 +1,7 @@
 import { createHmac, createSign, randomUUID, timingSafeEqual } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma.service";
+import { stateForOrigin } from "./session-cookie";
 
 interface GitHubTokenResponse {
   access_token?: string;
@@ -71,12 +72,12 @@ interface SessionPayload {
 export class GithubService {
   constructor(private readonly prisma: PrismaService) {}
 
-  createOAuthLoginUrl(): { url: string; state: string } | null {
+  createOAuthLoginUrl(origin?: string): { url: string; state: string } | null {
     const clientId = process.env.GITHUB_CLIENT_ID;
     const apiUrl = process.env.API_URL;
     if (!clientId || !apiUrl) return null;
 
-    const state = randomUUID();
+    const state = stateForOrigin(randomUUID(), origin);
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: `${apiUrl}/v1/github/callback`,
@@ -92,12 +93,12 @@ export class GithubService {
     return `https://github.com/apps/${slug}/installations/new`;
   }
 
-  createAppInstallUrlForSession(sessionToken: string | undefined): { url: string; state: string } | { error: string } {
+  createAppInstallUrlForSession(sessionToken: string | undefined, origin?: string): { url: string; state: string } | { error: string } {
     const session = sessionToken ? this.verifySession(sessionToken) : null;
     if (!session) return { error: "not_authenticated" };
     const slug = process.env.GITHUB_APP_SLUG;
     if (!slug) return { error: "GITHUB_APP_SLUG not configured." };
-    const state = randomUUID();
+    const state = stateForOrigin(randomUUID(), origin);
     return { url: `https://github.com/apps/${slug}/installations/new?state=${encodeURIComponent(state)}`, state };
   }
 
