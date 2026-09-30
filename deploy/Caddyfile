@@ -12,6 +12,11 @@
 	reverse_proxy web-preview:3000
 }
 
+{$PREVIEW_CUSTOM_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web-preview:3000
+}
+
 {$API_DOMAIN} {
 	encode zstd gzip
 	reverse_proxy api:4000
